@@ -30,6 +30,7 @@ final class WebSocketHandler: ChannelDuplexHandler {
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = self.unwrapInboundIn(data)
 
+        print(frame)
         switch frame.opcode {
         case .pong:
             self.pong(context: context, frame: frame)
@@ -169,6 +170,24 @@ final class WebSocketHandler: ChannelDuplexHandler {
         var buffer = context.channel.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: codeToSend)
         self.send(context: context, buffer: buffer, opcode: .connectionClose, fin: true, promise: promise)
+    }
+
+    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        switch event {
+        case let evt as ChannelEvent where evt == ChannelEvent.inputClosed:
+            // The remote peer half-closed the channel. At this time, any
+            // outstanding response will be written before the channel is
+            // closed, and if we are idle we will close the channel immediately.
+            context.close(promise: nil)
+
+        case is ChannelShouldQuiesceEvent:
+            // we received a quiesce event. If we have any requests in progress we should
+            // wait for them to finish
+            context.close(promise: nil)
+
+        default:
+            context.fireUserInboundEventTriggered(event)
+        }
     }
 
     func channelInactive(context: ChannelHandlerContext) {

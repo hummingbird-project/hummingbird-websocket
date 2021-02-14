@@ -7,10 +7,14 @@ extension HBHTTPServer {
     public func addWebSocketUpgrade() {
         let upgrader = NIOWebSocketServerUpgrader(
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) in
-                channel.eventLoop.makeSucceededFuture(HTTPHeaders())
+                print("Should I upgrade")
+                return channel.eventLoop.makeSucceededFuture(HTTPHeaders())
             },
             upgradePipelineHandler: { (channel: Channel, _: HTTPRequestHead) in
-                channel.pipeline.addHandlers([WebSocketHandler(), WebSocketEchoHandler()])
+                print("Upgraded")
+                return channel.pipeline.addHandlers([WebSocketHandler(), WebSocketEchoHandler()]).map {
+                    print(channel.pipeline)
+                }
             }
         )
         self.httpChannelInitializer = HTTP1ChannelInitializer(upgraders: [upgrader])
