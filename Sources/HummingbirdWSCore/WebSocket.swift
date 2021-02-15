@@ -26,6 +26,13 @@ public final class HBWebSocket {
         self.readCallback = cb
     }
 
+    /// Set callback to be called whenever WebSocket channel is closed
+    public func onClose(_ cb: @escaping CloseCallback) {
+        channel.closeFuture.whenComplete { _ in
+            cb(self)
+        }
+    }
+
     /// Write data to WebSocket
     /// - Parameters:
     ///   - data: Data to be written
@@ -146,7 +153,8 @@ public final class HBWebSocket {
     }
 
     public typealias ReadCallback = (WebSocketData, HBWebSocket) -> ()
-    
+    public typealias CloseCallback = (HBWebSocket) -> ()
+
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false
 }

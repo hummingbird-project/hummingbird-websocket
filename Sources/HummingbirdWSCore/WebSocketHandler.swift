@@ -1,11 +1,10 @@
 import NIO
 import NIOWebSocket
 
-/// WebSocket channel handler. Sends WebSocket frames, receives and combines frames.
-/// Code inspired from vapor/websocket-kit https://github.com/vapor/websocket-kit
-/// and the WebSocket sample from swift-nio
-/// https://github.com/apple/swift-nio/tree/main/Sources/NIOWebSocketClient
+/// WebSocket channel handler. Passes web socket frames onto `HBWebSocket` object.
 ///
+/// The handler combines fragmented frames together before passing them onto
+/// the `HBWebSocket`.
 final class WebSocketHandler: ChannelInboundHandler {
     typealias InboundIn = WebSocketFrame
 
@@ -15,7 +14,7 @@ final class WebSocketHandler: ChannelInboundHandler {
     init(webSocket: HBWebSocket) {
         self.webSocket = webSocket
     }
-    
+
     /// Read WebSocket frame
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = self.unwrapInboundIn(data)
@@ -66,8 +65,7 @@ final class WebSocketHandler: ChannelInboundHandler {
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
         case is ChannelShouldQuiesceEvent:
-            // we received a quiesce event. If we have any requests in progress we should
-            // wait for them to finish
+            // we received a quiesce event so should close the channel. 
             webSocket.close(promise: nil)
 
         default:
@@ -76,20 +74,14 @@ final class WebSocketHandler: ChannelInboundHandler {
     }
 
     func channelInactive(context: ChannelHandlerContext) {
-        webSocket.close(code: .unknown(1006), promise: nil)
-
-        // We always forward the error on to let others see it.
+        webSocket.close(code: .goingAway, promise: nil)
         context.fireChannelInactive()
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         webSocket.errorCaught(error)
-
-        // We always forward the error on to let others see it.
         context.fireErrorCaught(error)
     }
-
-    private var isClosed: Bool = false
 }
 
 extension WebSocketErrorCode {

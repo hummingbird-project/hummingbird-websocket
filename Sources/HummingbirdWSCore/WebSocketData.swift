@@ -1,11 +1,13 @@
 import NIO
 import NIOWebSocket
 
+/// Enumeration holding WebSocket data
 public enum WebSocketData {
     case text(String)
     case binary(ByteBuffer)
 }
 
+/// Sequence of fragmented WebSocket frames.
 struct WebSocketFrameSequence {
     enum SequenceType {
         case text
@@ -23,7 +25,8 @@ struct WebSocketFrameSequence {
         var data = frame.unmaskedData
         self.buffer.writeBuffer(&data)
     }
-    
+
+    /// Combined frames
     var result: WebSocketData {
         switch type {
         case .text:
