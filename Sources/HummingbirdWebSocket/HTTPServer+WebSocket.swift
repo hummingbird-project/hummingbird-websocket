@@ -4,17 +4,15 @@ import NIOHTTP1
 import NIOWebSocket
 
 extension HBHTTPServer {
-    public func addWebSocketUpgrade() {
+    public func addWebSocketUpgrade(_ onCreate: @escaping (WebSocket) -> ()) {
         let upgrader = NIOWebSocketServerUpgrader(
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) in
-                print("Should I upgrade")
                 return channel.eventLoop.makeSucceededFuture(HTTPHeaders())
             },
             upgradePipelineHandler: { (channel: Channel, _: HTTPRequestHead) in
-                print("Upgraded")
-                return channel.pipeline.addHandlers([WebSocketHandler(), WebSocketEchoHandler()]).map {
-                    print(channel.pipeline)
-                }
+                let webSocket = WebSocket(channel: channel)
+                onCreate(webSocket)
+                return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket))
             }
         )
         self.httpChannelInitializer = HTTP1ChannelInitializer(upgraders: [upgrader])

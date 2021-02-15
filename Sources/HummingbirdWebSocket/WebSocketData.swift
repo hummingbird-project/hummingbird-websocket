@@ -1,7 +1,7 @@
 import NIO
 import NIOWebSocket
 
-enum WebSocketData {
+public enum WebSocketData {
     case text(String)
     case binary(ByteBuffer)
 }
