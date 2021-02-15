@@ -32,12 +32,14 @@ extension HBApplication {
             routerGroup = .init(router: application.router)
             application.lifecycle.register(
                 label: "WebSockets",
-                start: .sync { self.responder = self.routerGroup.middlewares.constructResponder(finalResponder: application.router) },
+                start: .sync {
+                    self.responder = self.application.middleware.constructResponder(finalResponder: application.router)
+                },
                 shutdown: .sync {}
             )
         }
         
-        public func on(
+        @discardableResult public func on(
             _ path: String = "",
             shouldUpgrade: @escaping (HBRequest) throws -> Void = { _ in },
             onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
@@ -45,7 +47,7 @@ extension HBApplication {
             self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
         }
         
-        public func add(middleware: HBMiddleware) -> HBWebSocketRouterGroup {
+        @discardableResult public func add(middleware: HBMiddleware) -> HBWebSocketRouterGroup {
             self.routerGroup.add(middleware: middleware)
         }
 

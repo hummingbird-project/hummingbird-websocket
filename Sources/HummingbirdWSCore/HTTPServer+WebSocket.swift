@@ -5,12 +5,12 @@ import NIOWebSocket
 
 extension HBHTTPServer {
     public func addWebSocketUpgrade(
-        shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
+        shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
         onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> ()
     ) {
         let upgrader = NIOWebSocketServerUpgrader(
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) in
-                return channel.eventLoop.makeSucceededFuture(HTTPHeaders())
+                return shouldUpgrade(channel, head)
             },
             upgradePipelineHandler: { (channel: Channel, head: HTTPRequestHead) in
                 let webSocket = HBWebSocket(channel: channel)
