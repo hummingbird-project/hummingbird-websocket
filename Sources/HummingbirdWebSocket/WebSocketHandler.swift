@@ -7,30 +7,35 @@ import NIOWebSocket
 /// https://github.com/apple/swift-nio/tree/main/Sources/NIOWebSocketClient
 ///
 final class WebSocketHandler: ChannelDuplexHandler {
-    typealias OutboundIn = ByteBuffer
+    typealias OutboundIn = WebSocketData
     typealias OutboundOut = WebSocketFrame
     typealias InboundIn = WebSocketFrame
-    typealias InboundOut = ByteBuffer
+    typealias InboundOut = WebSocketData
 
-    static let pingData: String = "MQTTClient"
+    static let pingData: String = "Hummingbird"
 
     var webSocketFrameSequence: WebSocketFrameSequence?
     var waitingOnPong: Bool = false
     var pingInterval: TimeAmount? = nil
-
+    
     /// Write bytebuffer as WebSocket frame
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         guard context.channel.isActive else { return }
 
         let buffer = unwrapOutboundIn(data)
-        send(context: context, buffer: buffer, opcode: .binary, fin: true, promise: promise)
+        switch buffer {
+        case .text(let string):
+            let buffer = context.channel.allocator.buffer(string: string)
+            send(context: context, buffer: buffer, opcode: .text, fin: true, promise: promise)
+        case.binary(let buffer):
+            send(context: context, buffer: buffer, opcode: .binary, fin: true, promise: promise)
+        }
     }
 
     /// Read WebSocket frame
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = self.unwrapInboundIn(data)
 
-        print(frame)
         switch frame.opcode {
         case .pong:
             self.pong(context: context, frame: frame)
@@ -69,11 +74,7 @@ final class WebSocketHandler: ChannelDuplexHandler {
         }
 
         if let frameSeq = self.webSocketFrameSequence, frame.fin {
-            switch frameSeq.type {
-            case .binary, .text:
-                context.fireChannelRead(wrapInboundOut(frameSeq.buffer))
-            default: break
-            }
+            context.fireChannelRead(wrapInboundOut(frameSeq.result))
             self.webSocketFrameSequence = nil
         }
     }
@@ -174,16 +175,10 @@ final class WebSocketHandler: ChannelDuplexHandler {
 
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
-        case let evt as ChannelEvent where evt == ChannelEvent.inputClosed:
-            // The remote peer half-closed the channel. At this time, any
-            // outstanding response will be written before the channel is
-            // closed, and if we are idle we will close the channel immediately.
-            context.close(promise: nil)
-
         case is ChannelShouldQuiesceEvent:
             // we received a quiesce event. If we have any requests in progress we should
             // wait for them to finish
-            context.close(promise: nil)
+            close(context: context, promise: nil)
 
         default:
             context.fireUserInboundEventTriggered(event)
@@ -211,25 +206,6 @@ final class WebSocketHandler: ChannelDuplexHandler {
     }
 
     private var isClosed: Bool = false
-}
-
-struct WebSocketFrameSequence {
-    var buffer: ByteBuffer
-    var type: WebSocketOpcode
-
-    init(type: WebSocketOpcode) {
-        self.buffer = ByteBufferAllocator().buffer(capacity: 0)
-        self.type = type
-    }
-
-    mutating func append(_ frame: WebSocketFrame) {
-        var data = frame.unmaskedData
-        switch type {
-        case .binary, .text:
-            self.buffer.writeBuffer(&data)
-        default: break
-        }
-    }
 }
 
 extension WebSocketErrorCode {
