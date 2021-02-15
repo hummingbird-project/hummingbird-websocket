@@ -27,7 +27,7 @@ public struct HBWebSocketRouterGroup {
         onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
     ) -> Self {
         let responder = HBCallbackResponder { request in
-            if request.webSocketShouldUpgrade != nil {
+            if request.webSocketTestShouldUpgrade != nil {
                 return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in

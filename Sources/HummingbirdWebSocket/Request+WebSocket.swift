@@ -9,14 +9,14 @@ extension HBRequest {
     }
 
     /// Is this request testing whether we should upgrade to a WebSocket connection
-    var webSocketShouldUpgrade: Bool? {
-        get { self.extensions.get(\.webSocketShouldUpgrade) }
-        set { self.extensions.set(\.webSocketShouldUpgrade, value: newValue) }
+    var webSocketTestShouldUpgrade: Bool? {
+        get { self.extensions.get(\.webSocketTestShouldUpgrade) }
+        set { self.extensions.set(\.webSocketTestShouldUpgrade, value: newValue) }
     }
 }
 
 extension HBResponse {
-    /// Is this request testing whether we should upgrade to a WebSocket connection
+    /// Can we upgrade to a web socket connection?
     var webSocketShouldUpgrade: Bool? {
         get { self.extensions.get(\.webSocketShouldUpgrade) }
         set { self.extensions.set(\.webSocketShouldUpgrade, value: newValue) }

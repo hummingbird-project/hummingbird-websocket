@@ -4,7 +4,7 @@ import HummingbirdWSCore
 extension HBApplication {
     /// WebSocket interface
     public struct WebSocket {
-        /// Add WebSocket upgrade option
+        /// Add WebSocket upgrade option. This should be called before any other access to `HBApplication.ws` is performed
         public func addUpgrade() {
             application.server.addWebSocketUpgrade(
                 shouldUpgrade: { channel, head in
@@ -15,7 +15,7 @@ extension HBApplication {
                         eventLoop: channel.eventLoop,
                         allocator: channel.allocator
                     )
-                    request.webSocketShouldUpgrade = true
+                    request.webSocketTestShouldUpgrade = true
                     return responder.respond(to: request).flatMapThrowing {
                         if $0.webSocketShouldUpgrade == true {
                             return $0.headers
@@ -44,7 +44,12 @@ extension HBApplication {
                 shutdown: .sync {}
             )
         }
-        
+
+        /// Add WebSocket connection upgrade at given path
+        /// - Parameters:
+        ///   - path: URI path connection upgrade is available
+        ///   - shouldUpgrade: Return whether upgrade should be allowed
+        ///   - onUpgrade: Called on upgrade with reference to WebSocket
         @discardableResult public func on(
             _ path: String = "",
             shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?> = { $0.success(nil) },
