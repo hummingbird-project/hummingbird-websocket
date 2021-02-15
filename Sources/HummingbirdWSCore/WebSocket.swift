@@ -53,7 +53,7 @@ public final class WebSocket {
     }
 
     /// Send ping and setup task to check for pong and send new ping
-    public func initiateAutoPing(interval: TimeAmount, pingData: String? = "HummingbirdWS") {
+    public func initiateAutoPing(interval: TimeAmount) {
         guard channel.isActive else {
             return
         }
