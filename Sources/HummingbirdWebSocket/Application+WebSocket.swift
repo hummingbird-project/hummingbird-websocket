@@ -6,7 +6,7 @@ extension HBApplication {
     public struct WebSocket {
         /// Add WebSocket upgrade option. This should be called before any other access to `HBApplication.ws` is performed
         public func addUpgrade() {
-            application.server.addWebSocketUpgrade(
+            self.application.server.addWebSocketUpgrade(
                 shouldUpgrade: { channel, head in
                     let request = HBRequest(
                         head: head,
@@ -35,8 +35,8 @@ extension HBApplication {
                     _ = responder.respond(to: request)
                 }
             )
-            routerGroup = .init(router: application.router)
-            application.lifecycle.register(
+            self.routerGroup = .init(router: self.application.router)
+            self.application.lifecycle.register(
                 label: "WebSockets",
                 start: .sync {
                     self.responder = self.application.middleware.constructResponder(finalResponder: application.router)
@@ -57,18 +57,18 @@ extension HBApplication {
         ) -> HBWebSocketRouterGroup {
             self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
         }
-        
+
         @discardableResult public func add(middleware: HBMiddleware) -> HBWebSocketRouterGroup {
             self.routerGroup.add(middleware: middleware)
         }
 
         var routerGroup: HBWebSocketRouterGroup {
-            get { application.extensions.get(\.ws.routerGroup) }
+            get { self.application.extensions.get(\.ws.routerGroup) }
             nonmutating set { application.extensions.set(\.ws.routerGroup, value: newValue) }
         }
-        
+
         var responder: HBResponder {
-            get { application.extensions.get(\.ws.responder) }
+            get { self.application.extensions.get(\.ws.responder) }
             nonmutating set { application.extensions.set(\.ws.responder, value: newValue) }
         }
 

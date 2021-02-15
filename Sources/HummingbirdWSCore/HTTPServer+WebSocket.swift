@@ -10,7 +10,7 @@ extension HBHTTPServer {
     ///   - onUpgrade: Closure called once upgrade has happened. Includes the `HBWebSocket` created to service the WebSocket connection.
     public func addWebSocketUpgrade(
         shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
-        onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> ()
+        onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
     ) {
         let upgrader = NIOWebSocketServerUpgrader(
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) in

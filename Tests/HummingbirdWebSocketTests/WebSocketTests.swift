@@ -41,5 +41,4 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         XCTAssertNoThrow(try future.wait())
     }
-
 }

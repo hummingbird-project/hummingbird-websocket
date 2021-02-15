@@ -7,9 +7,10 @@ public final class HBWebSocket {
         case client
         case server
     }
+
     public var channel: Channel
     let type: SocketType
-    
+
     var waitingOnPong: Bool = false
     var pingData: ByteBuffer
 
@@ -28,7 +29,7 @@ public final class HBWebSocket {
 
     /// Set callback to be called whenever WebSocket channel is closed
     public func onClose(_ cb: @escaping CloseCallback) {
-        channel.closeFuture.whenComplete { _ in
+        self.channel.closeFuture.whenComplete { _ in
             cb(self)
         }
     }
@@ -42,35 +43,35 @@ public final class HBWebSocket {
         case .text(let string):
             let buffer = self.channel.allocator.buffer(string: string)
             self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
-        case.binary(let buffer):
+        case .binary(let buffer):
             self.send(buffer: buffer, opcode: .binary, fin: true, promise: promise)
         }
     }
-    
+
     /// Close websocket connection
     /// - Parameters:
     ///   - code: Close reason
     ///   - promise: promise that is completed when close has been sent
     public func close(code: WebSocketErrorCode = .goingAway, promise: EventLoopPromise<Void>?) {
-        guard isClosed == false else {
+        guard self.isClosed == false else {
             promise?.succeed(())
             return
         }
         self.isClosed = true
 
-        var buffer = channel.allocator.buffer(capacity: 2)
+        var buffer = self.channel.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
         self.send(buffer: buffer, opcode: .connectionClose, fin: true, promise: promise)
     }
 
     /// Send ping and setup task to check for pong and send new ping
     public func initiateAutoPing(interval: TimeAmount) {
-        guard channel.isActive else {
+        guard self.channel.isActive else {
             return
         }
-        if waitingOnPong {
+        if self.waitingOnPong {
             // We never received a pong from our last ping, so the connection has timed out
-            let promise = channel.eventLoop.makePromise(of: Void.self)
+            let promise = self.channel.eventLoop.makePromise(of: Void.self)
             self.close(code: .goingAway, promise: promise)
             promise.futureResult.whenComplete { _ in
                 // Usually, closing a WebSocket is done by sending the close frame and waiting
@@ -82,22 +83,22 @@ public final class HBWebSocket {
 
         } else {
             // creating random payload
-            let random = (0..<16).map { _ in UInt8.random(in: 0...255)}
+            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
             self.pingData.clear()
             self.pingData.writeBytes(random)
 
             self.send(buffer: self.pingData, opcode: .ping)
             self.waitingOnPong = true
-            _ = channel.eventLoop.scheduleTask(in: interval) {
+            _ = self.channel.eventLoop.scheduleTask(in: interval) {
                 self.initiateAutoPing(interval: interval)
             }
         }
     }
 
     func read(_ data: WebSocketData) {
-        readCallback?(data, self)
+        self.readCallback?(data, self)
     }
-    
+
     /// Send web socket frame to server
     private func send(
         buffer: ByteBuffer,
@@ -105,7 +106,7 @@ public final class HBWebSocket {
         fin: Bool = true,
         promise: EventLoopPromise<Void>? = nil
     ) {
-        let maskKey = makeMaskKey()
+        let maskKey = self.makeMaskKey()
         let frame = WebSocketFrame(fin: fin, opcode: opcode, maskKey: maskKey, data: buffer)
         self.channel.writeAndFlush(frame, promise: promise)
     }
@@ -113,7 +114,7 @@ public final class HBWebSocket {
     /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
     func pong(frame: WebSocketFrame) {
         let frameData = frame.unmaskedData
-        guard frameData == pingData else {
+        guard frameData == self.pingData else {
             self.close(code: .goingAway, promise: nil)
             return
         }
@@ -132,7 +133,7 @@ public final class HBWebSocket {
     func receivedClose(frame: WebSocketFrame) {
         // Handle a received close frame. We're just going to close.
         self.isClosed = true
-        channel.close(promise: nil)
+        self.channel.close(promise: nil)
     }
 
     func errorCaught(_ error: Error) {
@@ -142,20 +143,19 @@ public final class HBWebSocket {
         } else {
             errorCode = .unexpectedServerError
         }
-        close(code: errorCode, promise: nil)
+        self.close(code: errorCode, promise: nil)
     }
-    
+
     /// Make mask key to be used in WebSocket frame
     private func makeMaskKey() -> WebSocketMaskingKey? {
-        guard type == .client else { return nil }
+        guard self.type == .client else { return nil }
         let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: 1...255) }
         return WebSocketMaskingKey(bytes)
     }
 
-    public typealias ReadCallback = (WebSocketData, HBWebSocket) -> ()
-    public typealias CloseCallback = (HBWebSocket) -> ()
+    public typealias ReadCallback = (WebSocketData, HBWebSocket) -> Void
+    public typealias CloseCallback = (HBWebSocket) -> Void
 
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false
 }
-

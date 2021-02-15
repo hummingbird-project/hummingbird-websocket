@@ -50,4 +50,3 @@ public struct HBWebSocketRouterGroup {
         return self
     }
 }
-

@@ -21,5 +21,4 @@ extension HBResponse {
         get { self.extensions.get(\.webSocketShouldUpgrade) }
         set { self.extensions.set(\.webSocketShouldUpgrade, value: newValue) }
     }
-
 }

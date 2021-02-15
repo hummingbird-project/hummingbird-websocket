@@ -13,6 +13,7 @@ struct WebSocketFrameSequence {
         case text
         case binary
     }
+
     var buffer: ByteBuffer
     var type: SequenceType
 
@@ -28,7 +29,7 @@ struct WebSocketFrameSequence {
 
     /// Combined frames
     var result: WebSocketData {
-        switch type {
+        switch self.type {
         case .text:
             return .text(String(buffer: self.buffer))
         case .binary:
@@ -36,4 +37,3 @@ struct WebSocketFrameSequence {
         }
     }
 }
-

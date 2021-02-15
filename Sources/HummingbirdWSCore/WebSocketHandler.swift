@@ -10,7 +10,7 @@ final class WebSocketHandler: ChannelInboundHandler {
 
     var webSocketFrameSequence: WebSocketFrameSequence?
     var webSocket: HBWebSocket
-    
+
     init(webSocket: HBWebSocket) {
         self.webSocket = webSocket
     }
@@ -21,9 +21,9 @@ final class WebSocketHandler: ChannelInboundHandler {
 
         switch frame.opcode {
         case .pong:
-            webSocket.pong(frame: frame)
+            self.webSocket.pong(frame: frame)
         case .ping:
-            webSocket.ping(frame: frame)
+            self.webSocket.ping(frame: frame)
         case .text:
             if var frameSeq = self.webSocketFrameSequence {
                 frameSeq.append(frame)
@@ -47,17 +47,17 @@ final class WebSocketHandler: ChannelInboundHandler {
                 frameSeq.append(frame)
                 self.webSocketFrameSequence = frameSeq
             } else {
-                webSocket.close(code: .protocolError, promise: nil)
+                self.webSocket.close(code: .protocolError, promise: nil)
             }
         case .connectionClose:
-            webSocket.receivedClose(frame: frame)
+            self.webSocket.receivedClose(frame: frame)
 
         default:
             break
         }
 
         if let frameSeq = self.webSocketFrameSequence, frame.fin {
-            webSocket.read(frameSeq.result)
+            self.webSocket.read(frameSeq.result)
             self.webSocketFrameSequence = nil
         }
     }
@@ -65,8 +65,8 @@ final class WebSocketHandler: ChannelInboundHandler {
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
         case is ChannelShouldQuiesceEvent:
-            // we received a quiesce event so should close the channel. 
-            webSocket.close(promise: nil)
+            // we received a quiesce event so should close the channel.
+            self.webSocket.close(promise: nil)
 
         default:
             context.fireUserInboundEventTriggered(event)
@@ -74,12 +74,12 @@ final class WebSocketHandler: ChannelInboundHandler {
     }
 
     func channelInactive(context: ChannelHandlerContext) {
-        webSocket.close(code: .goingAway, promise: nil)
+        self.webSocket.close(code: .goingAway, promise: nil)
         context.fireChannelInactive()
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        webSocket.errorCaught(error)
+        self.webSocket.errorCaught(error)
         context.fireErrorCaught(error)
     }
 }
@@ -95,5 +95,3 @@ extension WebSocketErrorCode {
         }
     }
 }
-
-
