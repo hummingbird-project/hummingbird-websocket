@@ -18,25 +18,25 @@ public struct HBWebSocketRouterGroup {
     /// Add path for closure returning type conforming to ResponseFutureEncodable
     @discardableResult public func on(
         _ path: String = "",
-        shouldUpgrade: @escaping (HBRequest) throws -> Void,
-        onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
+        shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?>,
+        onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
     ) -> Self {
         let responder = HBCallbackResponder { request in
-            guard let webSocket = request.webSocket else {
-                return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
+            if request.webSocketTestShouldUpgrade != nil {
+                return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
-                    do {
-                        try shouldUpgrade(request)
-                        return HBResponse(status: .upgradeRequired)
-                    } catch {
-                        throw HBHTTPError(.upgradeRequired)
+                    return shouldUpgrade(request).map { headers in
+                        HBResponse(status: .ok, headers: headers ?? [:])
                     }
                 }
-            }
-            return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
-                request.body = .byteBuffer(buffer)
-                try onUpgrade(request, webSocket)
-                return HBResponse(status: .ok)
+            } else if let webSocket = request.webSocket {
+                return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
+                    request.body = .byteBuffer(buffer)
+                    onUpgrade(request, webSocket)
+                    return HBResponse(status: .ok)
+                }
+            } else {
+                return request.failure(.upgradeRequired)
             }
         }
         self.router.add(path, method: .GET, responder: self.middlewares.constructResponder(finalResponder: responder))

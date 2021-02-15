@@ -13,6 +13,7 @@ extension HBApplication {
                         eventLoop: channel.eventLoop,
                         allocator: channel.allocator
                     )
+                    request.webSocketTestShouldUpgrade = true
                     return responder.respond(to: request).map {
                         $0.headers
                     }
@@ -41,8 +42,8 @@ extension HBApplication {
         
         @discardableResult public func on(
             _ path: String = "",
-            shouldUpgrade: @escaping (HBRequest) throws -> Void = { _ in },
-            onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
+            shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?> = { $0.success(nil) },
+            onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
         ) -> HBWebSocketRouterGroup {
             self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
         }
