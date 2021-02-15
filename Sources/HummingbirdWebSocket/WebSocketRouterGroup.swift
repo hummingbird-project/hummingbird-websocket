@@ -1,5 +1,6 @@
 import Hummingbird
 
+/// Router Group for adding WebSocket connections to
 public struct HBWebSocketRouterGroup {
     let router: HBRouter
     let middlewares: HBMiddlewareGroup
@@ -9,20 +10,24 @@ public struct HBWebSocketRouterGroup {
         self.middlewares = .init()
     }
 
-    /// Add middleware to RouterGroup
+    /// Add middleware to be applied to web socket upgrade requests
     public func add(middleware: HBMiddleware) -> HBWebSocketRouterGroup {
         self.middlewares.add(middleware)
         return self
     }
 
-    /// Add path for closure returning type conforming to ResponseFutureEncodable
+    /// Add path for websocket with shouldUpgrade and onUpgrade closures
+    /// - Parameters:
+    ///   - path: URI path that the websocket upgrade will proceed
+    ///   - shouldUpgrade: Closure indicating whether we should upgrade or not. Return a failed `EventLoopFuture` for no.
+    ///   - onUpgrade: Closure called with web socket when connection has been upgraded
     @discardableResult public func on(
         _ path: String = "",
         shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?>,
         onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
     ) -> Self {
         let responder = HBCallbackResponder { request in
-            if request.webSocketTestShouldUpgrade != nil {
+            if request.webSocketShouldUpgrade != nil {
                 return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in
@@ -33,7 +38,10 @@ public struct HBWebSocketRouterGroup {
                 return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
                     request.body = .byteBuffer(buffer)
                     onUpgrade(request, webSocket)
-                    return HBResponse(status: .ok)
+                    // create response
+                    let response = HBResponse(status: .ok)
+                    response.webSocketShouldUpgrade = true
+                    return response
                 }
             } else {
                 return request.failure(.upgradeRequired)

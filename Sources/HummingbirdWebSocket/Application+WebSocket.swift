@@ -2,7 +2,9 @@ import Hummingbird
 import HummingbirdWSCore
 
 extension HBApplication {
+    /// WebSocket interface
     public struct WebSocket {
+        /// Add WebSocket upgrade option
         public func addUpgrade() {
             application.server.addWebSocketUpgrade(
                 shouldUpgrade: { channel, head in
@@ -13,9 +15,12 @@ extension HBApplication {
                         eventLoop: channel.eventLoop,
                         allocator: channel.allocator
                     )
-                    request.webSocketTestShouldUpgrade = true
-                    return responder.respond(to: request).map {
-                        $0.headers
+                    request.webSocketShouldUpgrade = true
+                    return responder.respond(to: request).flatMapThrowing {
+                        if $0.webSocketShouldUpgrade == true {
+                            return $0.headers
+                        }
+                        throw HBHTTPError(.badRequest)
                     }
                 },
                 onUpgrade: { ws, head in
@@ -64,6 +69,7 @@ extension HBApplication {
 
         let application: HBApplication
     }
-    
+
+    /// WebSocket interface
     public var ws: WebSocket { .init(application: self) }
 }
