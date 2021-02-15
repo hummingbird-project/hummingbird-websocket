@@ -1,23 +1,35 @@
 import NIO
 import NIOWebSocket
 
+/// WebSocket object
 public final class HBWebSocket {
+    enum SocketType {
+        case client
+        case server
+    }
     public var channel: Channel
+    let type: SocketType
     
     var waitingOnPong: Bool = false
     var pingData: ByteBuffer
 
-    init(channel: Channel) {
+    init(channel: Channel, type: SocketType) {
         self.channel = channel
         self.isClosed = false
         self.readCallback = nil
         self.pingData = channel.allocator.buffer(capacity: 16)
+        self.type = type
     }
-    
+
+    /// Set callback to be called whenever WebSocket receives data
     public func onRead(_ cb: @escaping ReadCallback) {
         self.readCallback = cb
     }
 
+    /// Write data to WebSocket
+    /// - Parameters:
+    ///   - data: Data to be written
+    ///   - promise:promise that is completed when data has been sent
     public func write(_ data: WebSocketData, promise: EventLoopPromise<Void>? = nil) {
         switch data {
         case .text(let string):
@@ -29,6 +41,9 @@ public final class HBWebSocket {
     }
     
     /// Close websocket connection
+    /// - Parameters:
+    ///   - code: Close reason
+    ///   - promise: promise that is completed when close has been sent
     public func close(code: WebSocketErrorCode = .goingAway, promise: EventLoopPromise<Void>?) {
         guard isClosed == false else {
             promise?.succeed(())
@@ -36,18 +51,8 @@ public final class HBWebSocket {
         }
         self.isClosed = true
 
-        let codeAsInt = UInt16(webSocketErrorCode: code)
-        let codeToSend: WebSocketErrorCode
-        if codeAsInt == 1005 || codeAsInt == 1006 {
-            /// Code 1005 and 1006 are used to report errors to the application, but must never be sent over
-            /// the wire (per https://tools.ietf.org/html/rfc6455#section-7.4)
-            codeToSend = .normalClosure
-        } else {
-            codeToSend = code
-        }
-
         var buffer = channel.allocator.buffer(capacity: 2)
-        buffer.write(webSocketErrorCode: codeToSend)
+        buffer.write(webSocketErrorCode: code)
         self.send(buffer: buffer, opcode: .connectionClose, fin: true, promise: promise)
     }
 
@@ -59,7 +64,7 @@ public final class HBWebSocket {
         if waitingOnPong {
             // We never received a pong from our last ping, so the connection has timed out
             let promise = channel.eventLoop.makePromise(of: Void.self)
-            self.close(code: .unknown(1006), promise: promise)
+            self.close(code: .goingAway, promise: promise)
             promise.futureResult.whenComplete { _ in
                 // Usually, closing a WebSocket is done by sending the close frame and waiting
                 // for the peer to respond with their close frame. We are in a timeout situation,
@@ -69,9 +74,11 @@ public final class HBWebSocket {
             }
 
         } else {
+            // creating random payload
             let random = (0..<16).map { _ in UInt8.random(in: 0...255)}
             self.pingData.clear()
             self.pingData.writeBytes(random)
+
             self.send(buffer: self.pingData, opcode: .ping)
             self.waitingOnPong = true
             _ = channel.eventLoop.scheduleTask(in: interval) {
@@ -99,9 +106,7 @@ public final class HBWebSocket {
     /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
     func pong(frame: WebSocketFrame) {
         let frameData = frame.unmaskedData
-        guard /*let pingData = self.pingData,
-              let frameDataString = frameData.readString(length: pingData.count),*/
-              frameData == pingData else {
+        guard frameData == pingData else {
             self.close(code: .goingAway, promise: nil)
             return
         }
@@ -135,6 +140,7 @@ public final class HBWebSocket {
     
     /// Make mask key to be used in WebSocket frame
     private func makeMaskKey() -> WebSocketMaskingKey? {
+        guard type == .client else { return nil }
         let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: 1...255) }
         return WebSocketMaskingKey(bytes)
     }
