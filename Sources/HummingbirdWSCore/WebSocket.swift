@@ -1,10 +1,9 @@
 import NIO
 import NIOWebSocket
 
-public final class WebSocket {
-    var channel: Channel
+public final class HBWebSocket {
+    public var channel: Channel
     
-    var webSocketFrameSequence: WebSocketFrameSequence?
     var waitingOnPong: Bool = false
     var pingData: ByteBuffer
 
@@ -140,7 +139,7 @@ public final class WebSocket {
         return WebSocketMaskingKey(bytes)
     }
 
-    public typealias ReadCallback = (WebSocketData, WebSocket) -> ()
+    public typealias ReadCallback = (WebSocketData, HBWebSocket) -> ()
     
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false

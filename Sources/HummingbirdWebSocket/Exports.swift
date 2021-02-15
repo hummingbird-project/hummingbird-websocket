@@ -1,1 +1,1 @@
-@_exported import class HummingbirdWSCore.WebSocket
+@_exported import class HummingbirdWSCore.HBWebSocket

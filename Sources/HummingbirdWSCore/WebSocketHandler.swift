@@ -10,9 +10,9 @@ final class WebSocketHandler: ChannelInboundHandler {
     typealias InboundIn = WebSocketFrame
 
     var webSocketFrameSequence: WebSocketFrameSequence?
-    var webSocket: WebSocket
+    var webSocket: HBWebSocket
     
-    init(webSocket: WebSocket) {
+    init(webSocket: HBWebSocket) {
         self.webSocket = webSocket
     }
     
