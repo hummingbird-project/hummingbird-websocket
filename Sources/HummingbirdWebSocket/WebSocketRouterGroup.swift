@@ -31,17 +31,16 @@ public struct HBWebSocketRouterGroup {
                 return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in
-                        HBResponse(status: .ok, headers: headers ?? [:])
+                        let response = HBResponse(status: .ok, headers: headers ?? [:])
+                        response.webSocketShouldUpgrade = true
+                        return response
                     }
                 }
             } else if let webSocket = request.webSocket {
                 return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
                     request.body = .byteBuffer(buffer)
                     onUpgrade(request, webSocket)
-                    // create response
-                    let response = HBResponse(status: .ok)
-                    response.webSocketShouldUpgrade = true
-                    return response
+                    return HBResponse(status: .ok)
                 }
             } else {
                 return request.failure(.upgradeRequired)
