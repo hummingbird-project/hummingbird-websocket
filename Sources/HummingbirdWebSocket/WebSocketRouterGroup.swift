@@ -24,7 +24,7 @@ public struct HBWebSocketRouterGroup {
     @discardableResult public func on(
         _ path: String = "",
         shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?>,
-        onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
+        onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
     ) -> Self {
         let responder = HBCallbackResponder { request in
             if request.webSocketTestShouldUpgrade != nil {
@@ -39,7 +39,7 @@ public struct HBWebSocketRouterGroup {
             } else if let webSocket = request.webSocket {
                 return request.body.consumeBody(on: request.eventLoop).flatMapThrowing { buffer in
                     request.body = .byteBuffer(buffer)
-                    onUpgrade(request, webSocket)
+                    try onUpgrade(request, webSocket)
                     return HBResponse(status: .ok)
                 }
             } else {
