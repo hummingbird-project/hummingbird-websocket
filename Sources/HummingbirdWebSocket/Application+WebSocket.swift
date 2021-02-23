@@ -53,7 +53,7 @@ extension HBApplication {
         @discardableResult public func on(
             _ path: String = "",
             shouldUpgrade: @escaping (HBRequest) -> EventLoopFuture<HTTPHeaders?> = { $0.success(nil) },
-            onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
+            onUpgrade: @escaping (HBRequest, HBWebSocket) -> Void
         ) -> HBWebSocketRouterGroup {
             self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
         }
