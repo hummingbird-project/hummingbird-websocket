@@ -22,3 +22,7 @@ app.ws.on("/ws") { req, ws in
 app.start()
 app.wait()
 ```
+
+## Documentation
+
+You can find reference documentation for HummingbirdWebSocket [here](https://hummingbird-project.github.io/hummingbird/current/hummingbird-websocket/index.html). The [hummingbird-examples](https://github.com/hummingbird-project/hummingbird-examples) repository has a number of examples of different uses of the library.
