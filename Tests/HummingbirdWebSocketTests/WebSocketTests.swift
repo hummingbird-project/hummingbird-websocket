@@ -4,5 +4,4 @@ import HummingbirdCore
 import NIO
 import XCTest
 
-final class HummingbirdWebSocketTests: XCTestCase {
-}
+final class HummingbirdWebSocketTests: XCTestCase {}

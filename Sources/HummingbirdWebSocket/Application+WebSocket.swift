@@ -57,7 +57,7 @@ extension HBApplication {
         ) -> HBWebSocketRouterGroup {
             self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
         }
-        
+
         /// Add middleware to be run only for WebSocket HTTP upgrade requests
         @discardableResult public func add(middleware: HBMiddleware) -> HBWebSocketRouterGroup {
             self.routerGroup.add(middleware: middleware)
