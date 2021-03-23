@@ -13,8 +13,7 @@ let package = Package(
         .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", from: "0.5.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "0.5.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.20.0"),
-        // used in tests
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.2.0"),
+        .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
     ],
     targets: [
         .target(name: "HummingbirdWSCore", dependencies: [
@@ -25,10 +24,10 @@ let package = Package(
         .target(name: "HummingbirdWebSocket", dependencies: [
             .byName(name: "HummingbirdWSCore"),
             .product(name: "Hummingbird", package: "hummingbird"),
+            .product(name: "ExtrasBase64", package: "swift-extras-base64"),
         ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
-            .product(name: "AsyncHTTPClient", package: "async-http-client"),
         ]),
     ]
 )

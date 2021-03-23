@@ -2,7 +2,7 @@ import NIO
 import NIOWebSocket
 
 /// Enumeration holding WebSocket data
-public enum WebSocketData {
+public enum WebSocketData: Equatable {
     case text(String)
     case binary(ByteBuffer)
 }

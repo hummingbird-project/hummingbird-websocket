@@ -3,7 +3,7 @@ import NIOWebSocket
 
 /// WebSocket object
 public final class HBWebSocket {
-    enum SocketType {
+    public enum SocketType {
         case client
         case server
     }
@@ -14,7 +14,7 @@ public final class HBWebSocket {
     var waitingOnPong: Bool = false
     var pingData: ByteBuffer
 
-    init(channel: Channel, type: SocketType) {
+    public init(channel: Channel, type: SocketType) {
         self.channel = channel
         self.isClosed = false
         self.readCallback = nil
