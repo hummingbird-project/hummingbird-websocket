@@ -15,7 +15,7 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
     let upgradePromise: EventLoopPromise<Void>
 
     init(url: HBWebSocketClient.SplitURL, headers: HTTPHeaders = [:], upgradePromise: EventLoopPromise<Void>) throws {
-        self.host = url.host
+        self.host = url.hostHeader
         self.urlPath = url.pathQuery
         self.headers = headers
         self.upgradePromise = upgradePromise
@@ -24,6 +24,7 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
     public func channelActive(context: ChannelHandlerContext) {
         // We are connected. It's time to send the message to the server to initialize the upgrade dance.
         var headers = self.headers
+        headers.add(name: "content-length", value: "0")
         headers.replaceOrAdd(name: "host", value: host)
 
         let requestHead = HTTPRequestHead(version: HTTPVersion(major: 1, minor: 1),

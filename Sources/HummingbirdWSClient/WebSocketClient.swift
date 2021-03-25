@@ -119,5 +119,13 @@ public final class HBWebSocketClient {
             self.tlsRequired = url.scheme == .https || url.scheme == .wss ? true : false
             self.pathQuery = url.path + (url.query ?? "")
         }
+
+        /// return "Host" header value. Only include port if it is different from the default port for the request
+        var hostHeader: String {
+            if (self.tlsRequired && self.port != 443) || (!self.tlsRequired && self.port != 80) {
+                return "\(host):\(port)"
+            }
+            return host
+        }
     }
 }
