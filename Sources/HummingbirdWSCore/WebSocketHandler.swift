@@ -5,18 +5,18 @@ import NIOWebSocket
 ///
 /// The handler combines fragmented frames together before passing them onto
 /// the `HBWebSocket`.
-final class WebSocketHandler: ChannelInboundHandler {
-    typealias InboundIn = WebSocketFrame
+public final class WebSocketHandler: ChannelInboundHandler {
+    public typealias InboundIn = WebSocketFrame
 
     var webSocketFrameSequence: WebSocketFrameSequence?
     var webSocket: HBWebSocket
 
-    init(webSocket: HBWebSocket) {
+    public init(webSocket: HBWebSocket) {
         self.webSocket = webSocket
     }
 
     /// Read WebSocket frame
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+    public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = self.unwrapInboundIn(data)
 
         switch frame.opcode {
@@ -62,7 +62,7 @@ final class WebSocketHandler: ChannelInboundHandler {
         }
     }
 
-    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
         case is ChannelShouldQuiesceEvent:
             // we received a quiesce event so should close the channel.
@@ -73,12 +73,12 @@ final class WebSocketHandler: ChannelInboundHandler {
         }
     }
 
-    func channelInactive(context: ChannelHandlerContext) {
+    public func channelInactive(context: ChannelHandlerContext) {
         self.webSocket.close(code: .goingAway, promise: nil)
         context.fireChannelInactive()
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    public func errorCaught(context: ChannelHandlerContext, error: Error) {
         self.webSocket.errorCaught(error)
         context.fireErrorCaught(error)
     }
