@@ -6,10 +6,10 @@ import NIOSSL
 import NIOWebSocket
 
 public final class HBWebSocketClient {
-    static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
-       let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
-
+    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+        let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
+            let url = try SplitURL(url: url)
             let bootstrap = try createBootstrap(url: url, configuration: configuration, on: eventLoop)
             bootstrap
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
@@ -17,7 +17,7 @@ public final class HBWebSocketClient {
                 .channelInitializer { channel in
                     return Self.setupChannelForWebsockets(url: url, channel: channel, wsPromise: wsPromise, on: eventLoop)
                 }
-                .connect(host: url.host!, port: url.port ?? 80)
+                .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
 
         } catch {
@@ -26,12 +26,12 @@ public final class HBWebSocketClient {
         return wsPromise.futureResult
     }
 
-    static func createBootstrap(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
+    static func createBootstrap(url: SplitURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
         if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
             let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
             let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
             let bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
-            if url.scheme == .https || url.scheme == .wss {
+            if url.tlsRequired {
                 bootstrap.enableTLS()
             }
             return bootstrap
@@ -40,7 +40,7 @@ public final class HBWebSocketClient {
     }
 
     static func setupChannelForWebsockets(
-        url: HBURL,
+        url: SplitURL,
         channel: Channel,
         wsPromise: EventLoopPromise<HBWebSocket>,
         on eventLoop: EventLoop
@@ -95,6 +95,29 @@ public final class HBWebSocketClient {
             tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
         ) {
             self.tlsConfiguration = tlsConfiguration
+        }
+    }
+
+    struct SplitURL {
+        let host: String
+        let pathQuery: String
+        let port: Int
+        let tlsRequired: Bool
+
+        init(url: HBURL) throws {
+            guard let host = url.host else { throw HBWebSocketClient.Error.invalidURL }
+            self.host = host
+            if let port = url.port {
+                self.port = port
+            } else {
+                if url.scheme == .https || url.scheme == .wss {
+                    self.port = 443
+                } else {
+                    self.port = 80
+                }
+            }
+            self.tlsRequired = url.scheme == .https || url.scheme == .wss ? true : false
+            self.pathQuery = url.path + (url.query ?? "")
         }
     }
 }

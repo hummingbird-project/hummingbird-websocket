@@ -1,6 +1,6 @@
 import Hummingbird
-@testable import HummingbirdWebSocket
-@testable import HummingbirdWSClient
+import HummingbirdWebSocket
+import HummingbirdWSClient
 import NIO
 import XCTest
 
@@ -57,6 +57,26 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
+            clientWS.onRead { data, ws in
+                XCTAssertEqual(data, .text("Hello"))
+                writePromise.succeed(Void())
+            }
+            clientWS.write(.text("Hello"), promise: nil)
+        } catch {
+            writePromise.fail(error)
+        }
+        try writePromise.futureResult.wait()
+    }
+
+    func testTLS() throws {
+        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { try? elg.syncShutdownGracefully() }
+
+        let eventLoop = elg.next()
+        let writePromise = eventLoop.makePromise(of: Void.self)
+
+        do {
+            let clientWS = try HBWebSocketClient.connect(url: "wss://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
             clientWS.onRead { data, ws in
                 XCTAssertEqual(data, .text("Hello"))
                 writePromise.succeed(Void())

@@ -14,10 +14,9 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
     let headers: HTTPHeaders
     let upgradePromise: EventLoopPromise<Void>
 
-    init(url: HBURL, headers: HTTPHeaders = [:], upgradePromise: EventLoopPromise<Void>) throws {
-        guard let host = url.host else { throw HBWebSocketClient.Error.invalidURL}
-        self.host = host
-        self.urlPath = url.path
+    init(url: HBWebSocketClient.SplitURL, headers: HTTPHeaders = [:], upgradePromise: EventLoopPromise<Void>) throws {
+        self.host = url.host
+        self.urlPath = url.pathQuery
         self.headers = headers
         self.upgradePromise = upgradePromise
     }
