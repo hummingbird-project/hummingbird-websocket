@@ -21,9 +21,9 @@ public final class WebSocketHandler: ChannelInboundHandler {
 
         switch frame.opcode {
         case .pong:
-            self.webSocket.pong(frame: frame)
+            self.webSocket.receivedPong(frame: frame)
         case .ping:
-            self.webSocket.ping(frame: frame)
+            self.webSocket.receivedPing(frame: frame)
         case .text:
             if var frameSeq = self.webSocketFrameSequence {
                 frameSeq.append(frame)
