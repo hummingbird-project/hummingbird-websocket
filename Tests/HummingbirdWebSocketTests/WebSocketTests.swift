@@ -16,16 +16,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
 
         func succeed() {
-            promise.succeed(())
+            self.promise.succeed(())
         }
 
         func fail(_ error: Error) {
-            promise.fail(error)
+            self.promise.fail(error)
         }
 
         func wait() throws {
-            try promise.futureResult.wait()
-            task.cancel()
+            try self.promise.futureResult.wait()
+            self.task.cancel()
         }
     }
 
