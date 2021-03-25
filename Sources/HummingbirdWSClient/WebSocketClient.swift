@@ -5,7 +5,7 @@ import NIO
 import NIOSSL
 import NIOWebSocket
 
-public final class HBWebSocketClient {
+public enum HBWebSocketClient {
     public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
@@ -61,21 +61,22 @@ public final class HBWebSocketClient {
         }
 
         // create random key for request key
-        let requestKey = (0..<16).map { _ in UInt8.random(in: .min ..< .max)}
+        let requestKey = (0..<16).map { _ in UInt8.random(in: .min ..< .max) }
         let base64Key = String(base64Encoding: requestKey, options: [])
-        let websocketUpgrader = NIOWebSocketClientUpgrader(requestKey: base64Key) { channel, req in
+        let websocketUpgrader = NIOWebSocketClientUpgrader(requestKey: base64Key) { channel, _ in
             let webSocket = HBWebSocket(channel: channel, type: .client)
             return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
                 wsPromise.succeed(webSocket)
-                upgradePromise.succeed(Void())
+                upgradePromise.succeed(())
             }
         }
 
         let config: NIOHTTPClientUpgradeConfiguration = (
-            upgraders: [ websocketUpgrader ],
+            upgraders: [websocketUpgrader],
             completionHandler: { _ in
                 channel.pipeline.removeHandler(httpHandler, promise: nil)
-        })
+            }
+        )
 
         // add HTTP handler with web socket upgrade
         return channel.pipeline.addHTTPClientHandlers(withClientUpgrade: config).flatMap {
@@ -123,9 +124,9 @@ public final class HBWebSocketClient {
         /// return "Host" header value. Only include port if it is different from the default port for the request
         var hostHeader: String {
             if (self.tlsRequired && self.port != 443) || (!self.tlsRequired && self.port != 80) {
-                return "\(host):\(port)"
+                return "\(self.host):\(self.port)"
             }
-            return host
+            return self.host
         }
     }
 }

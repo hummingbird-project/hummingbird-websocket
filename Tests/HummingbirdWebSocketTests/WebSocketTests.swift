@@ -5,7 +5,6 @@ import NIO
 import XCTest
 
 final class HummingbirdWebSocketTests: XCTestCase {
-
     func testClientAndServerConnection() throws {
         var upgrade: Bool = false
         var serverHello: Bool = false
@@ -16,7 +15,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         // on websocket connect.
         app.ws.on(
             "/test",
-            onUpgrade: { request, ws in
+            onUpgrade: { _, ws in
                 upgrade = true
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
@@ -33,10 +32,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).wait()
-            clientWS.onRead { data, ws in
+            clientWS.onRead { data, _ in
                 XCTAssertEqual(data, .text("Hello back"))
                 clientHello = true
-                writePromise.succeed(Void())
+                writePromise.succeed(())
             }
             clientWS.write(.text("Hello"), promise: nil)
         } catch {
@@ -57,9 +56,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-            clientWS.onRead { data, ws in
+            clientWS.onRead { data, _ in
                 XCTAssertEqual(data, .text("Hello"))
-                writePromise.succeed(Void())
+                writePromise.succeed(())
             }
             clientWS.write(.text("Hello"), promise: nil)
         } catch {
@@ -77,9 +76,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "wss://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-            clientWS.onRead { data, ws in
+            clientWS.onRead { data, _ in
                 XCTAssertEqual(data, .text("Hello"))
-                writePromise.succeed(Void())
+                writePromise.succeed(())
             }
             clientWS.write(.text("Hello"), promise: nil)
         } catch {
@@ -125,4 +124,3 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 }
-

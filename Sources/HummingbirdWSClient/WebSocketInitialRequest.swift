@@ -25,12 +25,14 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
         // We are connected. It's time to send the message to the server to initialize the upgrade dance.
         var headers = self.headers
         headers.add(name: "content-length", value: "0")
-        headers.replaceOrAdd(name: "host", value: host)
+        headers.replaceOrAdd(name: "host", value: self.host)
 
-        let requestHead = HTTPRequestHead(version: HTTPVersion(major: 1, minor: 1),
-                                          method: .GET,
-                                          uri: urlPath,
-                                          headers: headers)
+        let requestHead = HTTPRequestHead(
+            version: HTTPVersion(major: 1, minor: 1),
+            method: .GET,
+            uri: urlPath,
+            headers: headers
+        )
 
         context.write(self.wrapOutboundOut(.head(requestHead)), promise: nil)
         context.write(self.wrapOutboundOut(.body(.byteBuffer(ByteBuffer()))), promise: nil)
@@ -38,7 +40,6 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
     }
 
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-
         let clientResponse = self.unwrapInboundIn(data)
 
         switch clientResponse {
@@ -58,4 +59,3 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
         context.close(promise: nil)
     }
 }
-
