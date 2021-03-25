@@ -6,7 +6,7 @@ import NIO
 import NIOWebSocket
 
 public final class HBWebSocketClient {
-    static func createWebSocket(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+    static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
        let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
 
         do {
@@ -81,12 +81,12 @@ public final class HBWebSocketClient {
     }
 
     public struct Configuration {
-/*        let tlsConfiguration: TLSConfiguration
+//        let tlsConfiguration: TLSConfiguration
 
         public init(
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
+            //tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
         ) {
-            self.tlsConfiguration = tlsConfiguration
-        }*/
+            //self.tlsConfiguration = tlsConfiguration
+        }
     }
 }

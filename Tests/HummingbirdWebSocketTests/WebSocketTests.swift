@@ -1,5 +1,6 @@
 import Hummingbird
 @testable import HummingbirdWebSocket
+@testable import HummingbirdWSClient
 import NIO
 import XCTest
 
@@ -31,7 +32,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let writePromise = eventLoop.makePromise(of: Void.self)
 
         do {
-            let clientWS = try HBWebSocketClient.createWebSocket(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).wait()
+            let clientWS = try HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).wait()
             clientWS.onRead { data, ws in
                 XCTAssertEqual(data, .text("Hello back"))
                 clientHello = true
@@ -55,7 +56,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let writePromise = eventLoop.makePromise(of: Void.self)
 
         do {
-            let clientWS = try HBWebSocketClient.createWebSocket(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
+            let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
             clientWS.onRead { data, ws in
                 XCTAssertEqual(data, .text("Hello"))
                 writePromise.succeed(Void())
@@ -78,7 +79,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { try? elg.syncShutdownGracefully() }
         let eventLoop = elg.next()
-        let clientWS = HBWebSocketClient.createWebSocket(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
+        let clientWS = HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
             case HBWebSocketClient.Error.websocketUpgradeFailed:
@@ -93,7 +94,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { try? elg.syncShutdownGracefully() }
         let eventLoop = elg.next()
-        let clientWS = HBWebSocketClient.createWebSocket(url: "http://localhost:8080", configuration: .init(), on: eventLoop)
+        let clientWS = HBWebSocketClient.connect(url: "http://localhost:8080", configuration: .init(), on: eventLoop)
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
             case is NIOConnectionError:

@@ -7,6 +7,7 @@ let package = Package(
     name: "hummingbird-websocket",
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
+        .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
         .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
@@ -21,13 +22,18 @@ let package = Package(
             .product(name: "NIO", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
-        .target(name: "HummingbirdWebSocket", dependencies: [
+        .target(name: "HummingbirdWSClient", dependencies: [
             .byName(name: "HummingbirdWSCore"),
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "ExtrasBase64", package: "swift-extras-base64"),
         ]),
+        .target(name: "HummingbirdWebSocket", dependencies: [
+            .byName(name: "HummingbirdWSCore"),
+            .product(name: "Hummingbird", package: "hummingbird"),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
+            .byName(name: "HummingbirdWSClient"),
         ]),
     ]
 )
