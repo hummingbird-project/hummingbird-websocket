@@ -5,7 +5,14 @@ import NIO
 import NIOSSL
 import NIOWebSocket
 
+/// Manages WebSocket client creation
 public enum HBWebSocketClient {
+    /// Connect to WebSocket
+    /// - Parameters:
+    ///   - url: URL of websocket
+    ///   - configuration: Configuration of connection
+    ///   - eventLoop: eventLoop to run connection on
+    /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
     public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
@@ -26,6 +33,7 @@ public enum HBWebSocketClient {
         return wsPromise.futureResult
     }
 
+    /// create bootstrap
     static func createBootstrap(url: SplitURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
         if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
             let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
@@ -39,6 +47,7 @@ public enum HBWebSocketClient {
         preconditionFailure("Failed to create web socket bootstrap")
     }
 
+    /// setup for channel for websocket. Create initial HTTP request and include upgrade for when it is successful
     static func setupChannelForWebsockets(
         url: SplitURL,
         channel: Channel,
@@ -84,14 +93,18 @@ public enum HBWebSocketClient {
         }
     }
 
+    /// Possible Errors returned by websocket connection
     public enum Error: Swift.Error {
         case invalidURL
         case websocketUpgradeFailed
     }
 
+    /// WebSocket connection configuration
     public struct Configuration {
+        /// TLS setup
         let tlsConfiguration: TLSConfiguration
 
+        /// initialize Configuration
         public init(
             tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
         ) {
@@ -99,6 +112,7 @@ public enum HBWebSocketClient {
         }
     }
 
+    /// Processed URL split into sections we need for connection
     struct SplitURL {
         let host: String
         let pathQuery: String

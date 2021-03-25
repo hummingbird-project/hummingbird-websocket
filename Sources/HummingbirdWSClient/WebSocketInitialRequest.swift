@@ -2,9 +2,9 @@ import Hummingbird
 import NIO
 import NIOHTTP1
 
-// The HTTP handler to be used to initiate the request.
-// This initial request will be adapted by the WebSocket upgrader to contain the upgrade header parameters.
-// Channel read will only be called if the upgrade fails.
+/// The HTTP handler to be used to initiate the request.
+/// This initial request will be adapted by the WebSocket upgrader to contain the upgrade header parameters.
+/// Channel read will only be called if the upgrade fails.
 final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChannelHandler {
     public typealias InboundIn = HTTPClientResponsePart
     public typealias OutboundOut = HTTPClientRequestPart
