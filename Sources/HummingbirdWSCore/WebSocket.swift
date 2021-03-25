@@ -17,6 +17,7 @@ public final class HBWebSocket {
     public init(channel: Channel, type: SocketType) {
         self.channel = channel
         self.isClosed = false
+        self.pongCallback = nil
         self.readCallback = nil
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
@@ -25,6 +26,11 @@ public final class HBWebSocket {
     /// Set callback to be called whenever WebSocket receives data
     public func onRead(_ cb: @escaping ReadCallback) {
         self.readCallback = cb
+    }
+
+    /// Set callback to be called whenever WebSocket receives data
+    public func onPong(_ cb: @escaping PongCallback) {
+        self.pongCallback = cb
     }
 
     /// Set callback to be called whenever WebSocket channel is closed
@@ -62,6 +68,21 @@ public final class HBWebSocket {
         var buffer = self.channel.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
         self.send(buffer: buffer, opcode: .connectionClose, fin: true, promise: promise)
+    }
+
+    public func sendPing(promise: EventLoopPromise<Void>?) {
+        _ = self.channel.eventLoop.submit {
+            if self.waitingOnPong {
+                promise?.succeed(())
+                return
+            }
+            // creating random payload
+            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
+            self.pingData.clear()
+            self.pingData.writeBytes(random)
+
+            self.send(buffer: self.pingData, opcode: .ping, promise: promise)
+        }
     }
 
     /// Send ping and setup task to check for pong and send new ping
@@ -112,17 +133,18 @@ public final class HBWebSocket {
     }
 
     /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
-    func pong(frame: WebSocketFrame) {
+    func receivedPong(frame: WebSocketFrame) {
         let frameData = frame.unmaskedData
         guard frameData == self.pingData else {
             self.close(code: .goingAway, promise: nil)
             return
         }
         self.waitingOnPong = false
+        self.pongCallback?(self)
     }
 
     /// Respond to ping from client
-    func ping(frame: WebSocketFrame) {
+    func receivedPing(frame: WebSocketFrame) {
         if frame.fin {
             self.send(buffer: frame.unmaskedData, opcode: .pong, fin: true, promise: nil)
         } else {
@@ -155,7 +177,9 @@ public final class HBWebSocket {
 
     public typealias ReadCallback = (WebSocketData, HBWebSocket) -> Void
     public typealias CloseCallback = (HBWebSocket) -> Void
+    public typealias PongCallback = (HBWebSocket) -> Void
 
+    private var pongCallback: PongCallback?
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false
 }
