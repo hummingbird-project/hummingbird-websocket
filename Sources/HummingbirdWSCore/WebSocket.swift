@@ -71,7 +71,7 @@ public final class HBWebSocket {
     }
 
     public func sendPing(promise: EventLoopPromise<Void>?) {
-        _ = channel.eventLoop.submit {
+        _ = self.channel.eventLoop.submit {
             if self.waitingOnPong {
                 promise?.succeed(())
                 return
@@ -140,7 +140,7 @@ public final class HBWebSocket {
             return
         }
         self.waitingOnPong = false
-        pongCallback?(self)
+        self.pongCallback?(self)
     }
 
     /// Respond to ping from client

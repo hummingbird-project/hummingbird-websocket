@@ -5,7 +5,31 @@ import NIO
 import XCTest
 
 final class HummingbirdWebSocketTests: XCTestCase {
-    func setupClientAndServer(onServer: @escaping (HBWebSocket)->(), onClient: @escaping (HBWebSocket)->()) -> HBApplication {
+    struct TimeoutPromise {
+        let task: Scheduled<Void>
+        let promise: EventLoopPromise<Void>
+
+        init(eventLoop: EventLoop, timeout: TimeAmount) {
+            let promise = eventLoop.makePromise(of: Void.self)
+            self.promise = promise
+            self.task = eventLoop.scheduleTask(in: timeout) { promise.fail(ChannelError.connectTimeout(timeout)) }
+        }
+
+        func succeed() {
+            promise.succeed(())
+        }
+
+        func fail(_ error: Error) {
+            promise.fail(error)
+        }
+
+        func wait() throws {
+            try promise.futureResult.wait()
+            task.cancel()
+        }
+    }
+
+    func setupClientAndServer(onServer: @escaping (HBWebSocket) -> Void, onClient: @escaping (HBWebSocket) -> Void) -> HBApplication {
         let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
@@ -20,7 +44,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
             switch result {
             case .failure(let error):
                 XCTFail("\(error)")
-                break
             case .success(let ws):
                 onClient(ws)
             }
@@ -33,9 +56,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
         var clientHello: Bool = false
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let writePromise = elg.next().makePromise(of: Void.self)
-
-        let app = setupClientAndServer(
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let app = self.setupClientAndServer(
             onServer: { ws in
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
@@ -47,14 +69,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 ws.onRead { data, _ in
                     XCTAssertEqual(data, .text("Hello back"))
                     clientHello = true
-                    writePromise.succeed(())
+                    promise.succeed()
                 }
                 ws.write(.text("Hello"), promise: nil)
             }
         )
         defer { app.stop() }
 
-        try writePromise.futureResult.wait()
+        try promise.wait()
         XCTAssertTrue(serverHello)
         XCTAssertTrue(clientHello)
     }
@@ -64,19 +86,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { try? elg.syncShutdownGracefully() }
 
         let eventLoop = elg.next()
-        let writePromise = eventLoop.makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
             clientWS.onRead { data, _ in
                 XCTAssertEqual(data, .text("Hello"))
-                writePromise.succeed(())
+                promise.succeed()
             }
             clientWS.write(.text("Hello"), promise: nil)
         } catch {
-            writePromise.fail(error)
+            promise.fail(error)
         }
-        try writePromise.futureResult.wait()
+        try promise.wait()
     }
 
     func testTLS() throws {
@@ -84,19 +106,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { try? elg.syncShutdownGracefully() }
 
         let eventLoop = elg.next()
-        let writePromise = eventLoop.makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
         do {
             let clientWS = try HBWebSocketClient.connect(url: "wss://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
             clientWS.onRead { data, _ in
                 XCTAssertEqual(data, .text("Hello"))
-                writePromise.succeed(())
+                promise.succeed()
             }
             clientWS.write(.text("Hello"), promise: nil)
         } catch {
-            writePromise.fail(error)
+            promise.fail(error)
         }
-        try writePromise.futureResult.wait()
+        try promise.wait()
     }
 
     func testNotWebSocket() throws {
@@ -139,12 +161,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testClientCloseConnection() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = elg.next().makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
 
-        let app = setupClientAndServer(
+        let app = self.setupClientAndServer(
             onServer: { ws in
-                ws.onClose { ws in
-                    promise.succeed(())
+                ws.onClose { _ in
+                    promise.succeed()
                 }
             },
             onClient: { ws in
@@ -154,15 +176,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
         )
         defer { app.stop() }
 
-        try promise.futureResult.wait()
+        try promise.wait()
     }
 
     func testServerCloseConnection() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = elg.next().makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
 
-        let app = setupClientAndServer(
+        let app = self.setupClientAndServer(
             onServer: { ws in
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
@@ -170,59 +192,59 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 }
             },
             onClient: { ws in
-                ws.onClose { ws in
-                    promise.succeed(())
+                ws.onClose { _ in
+                    promise.succeed()
                 }
                 ws.write(.text("Hello"), promise: nil)
             }
         )
         defer { app.stop() }
 
-        try promise.futureResult.wait()
+        try promise.wait()
     }
 
     func testPingPong() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = elg.next().makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
 
-        let app = setupClientAndServer(
-            onServer: { ws in
+        let app = self.setupClientAndServer(
+            onServer: { _ in
             },
             onClient: { ws in
-                ws.onPong { ws in
-                    promise.succeed(())
+                ws.onPong { _ in
+                    promise.succeed()
                 }
                 ws.sendPing(promise: nil)
             }
         )
         defer { app.stop() }
 
-        try promise.futureResult.wait()
+        try promise.wait()
     }
 
     func testAutoPing() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = elg.next().makePromise(of: Void.self)
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
         var count = 0
 
-        let app = setupClientAndServer(
+        let app = self.setupClientAndServer(
             onServer: { ws in
-                ws.initiateAutoPing(interval: .seconds(5))
-                ws.onPong { ws in
+                ws.initiateAutoPing(interval: .seconds(2))
+                ws.onPong { _ in
                     count += 1
                     // wait for second pong, meaning auto ping caught the first one
                     if count == 2 {
-                        promise.succeed(())
+                        promise.succeed()
                     }
                 }
             },
-            onClient: { ws in
+            onClient: { _ in
             }
         )
         defer { app.stop() }
 
-        try promise.futureResult.wait()
+        try promise.wait()
     }
 }
