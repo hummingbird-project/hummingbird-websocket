@@ -1,3 +1,4 @@
+import Hummingbird
 import NIO
 import NIOHTTP1
 
@@ -10,21 +11,21 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
 
     let host: String
     let urlPath: String
+    let headers: HTTPHeaders
     let upgradePromise: EventLoopPromise<Void>
 
-    init(host: String, urlPath: String, upgradePromise: EventLoopPromise<Void>) {
+    init(url: HBURL, headers: HTTPHeaders = [:], upgradePromise: EventLoopPromise<Void>) throws {
+        guard let host = url.host else { throw HBWebSocketClient.Error.invalidURL}
         self.host = host
+        self.urlPath = url.path
+        self.headers = headers
         self.upgradePromise = upgradePromise
-        self.urlPath = urlPath
     }
 
     public func channelActive(context: ChannelHandlerContext) {
         // We are connected. It's time to send the message to the server to initialize the upgrade dance.
-        var headers = HTTPHeaders()
-        headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
-        headers.add(name: "Content-Length", value: "\(0)")
-        headers.add(name: "host", value: host)
-        headers.add(name: "Sec-WebSocket-Protocol", value: "mqttv3.1")
+        var headers = self.headers
+        headers.replaceOrAdd(name: "host", value: host)
 
         let requestHead = HTTPRequestHead(version: HTTPVersion(major: 1, minor: 1),
                                           method: .GET,

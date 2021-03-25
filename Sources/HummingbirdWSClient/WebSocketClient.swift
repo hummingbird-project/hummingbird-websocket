@@ -2,7 +2,7 @@ import ExtrasBase64
 import Hummingbird
 import HummingbirdWSCore
 import NIO
-//import NIOSSL
+import NIOSSL
 import NIOWebSocket
 
 public final class HBWebSocketClient {
@@ -20,9 +20,6 @@ public final class HBWebSocketClient {
                 .connect(host: url.host!, port: url.port ?? 80)
                 .cascadeFailure(to: wsPromise)
 
-            if url.scheme == .https || url.scheme == .wss {
-                bootstrap.enableTLS()
-            }
         } catch {
             wsPromise.fail(error)
         }
@@ -31,9 +28,13 @@ public final class HBWebSocketClient {
 
     static func createBootstrap(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
         if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
-            //let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
-            //let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
-            return NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
+            let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
+            let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
+            let bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
+            if url.scheme == .https || url.scheme == .wss {
+                bootstrap.enableTLS()
+            }
+            return bootstrap
         }
         preconditionFailure("Failed to create web socket bootstrap")
     }
@@ -45,13 +46,19 @@ public final class HBWebSocketClient {
         on eventLoop: EventLoop
     ) -> EventLoopFuture<Void> {
         let upgradePromise = eventLoop.makePromise(of: Void.self)
-        // initial HTTP request handler, before upgrade
-        let httpHandler = WebSocketInitialRequestHandler(
-            host: url.host!,
-            urlPath: url.path,
-            upgradePromise: upgradePromise
-        )
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
+
+        // initial HTTP request handler, before upgrade
+        let httpHandler: WebSocketInitialRequestHandler
+        do {
+            httpHandler = try WebSocketInitialRequestHandler(
+                url: url,
+                upgradePromise: upgradePromise
+            )
+        } catch {
+            upgradePromise.fail(Error.invalidURL)
+            return upgradePromise.futureResult
+        }
 
         // create random key for request key
         let requestKey = (0..<16).map { _ in UInt8.random(in: .min ..< .max)}
@@ -77,16 +84,17 @@ public final class HBWebSocketClient {
     }
 
     public enum Error: Swift.Error {
+        case invalidURL
         case websocketUpgradeFailed
     }
 
     public struct Configuration {
-//        let tlsConfiguration: TLSConfiguration
+        let tlsConfiguration: TLSConfiguration
 
         public init(
-            //tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
+            tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
         ) {
-            //self.tlsConfiguration = tlsConfiguration
+            self.tlsConfiguration = tlsConfiguration
         }
     }
 }
