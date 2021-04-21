@@ -175,7 +175,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testClientCloseConnection() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
         let app = self.setupClientAndServer(
             onServer: { ws in
@@ -196,7 +196,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testServerCloseConnection() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
         let app = self.setupClientAndServer(
             onServer: { ws in
@@ -220,7 +220,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testPingPong() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
         let app = self.setupClientAndServer(
             onServer: { _ in
@@ -240,7 +240,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testAutoPing() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
         var count = 0
 
         let app = self.setupClientAndServer(
