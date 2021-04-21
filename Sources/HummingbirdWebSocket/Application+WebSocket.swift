@@ -18,6 +18,13 @@ import HummingbirdWSCore
 extension HBApplication {
     /// WebSocket interface
     public struct WebSocket {
+        /// Context used to create HBRequest
+        struct WebSocketContext: HBRequestContext {
+            var eventLoop: EventLoop
+            var allocator: ByteBufferAllocator
+            var remoteAddress: SocketAddress? { nil }
+        }
+
         /// Add WebSocket upgrade option. This should be called before any other access to `HBApplication.ws` is performed
         public func addUpgrade() {
             self.application.server.addWebSocketUpgrade(
@@ -26,8 +33,7 @@ extension HBApplication {
                         head: head,
                         body: .byteBuffer(nil),
                         application: application,
-                        eventLoop: channel.eventLoop,
-                        allocator: channel.allocator
+                        context: WebSocketContext(eventLoop: channel.eventLoop, allocator: channel.allocator)
                     )
                     request.webSocketTestShouldUpgrade = true
                     return responder.respond(to: request).flatMapThrowing {
@@ -42,8 +48,7 @@ extension HBApplication {
                         head: head,
                         body: .byteBuffer(nil),
                         application: application,
-                        eventLoop: ws.channel.eventLoop,
-                        allocator: ws.channel.allocator
+                        context: WebSocketContext(eventLoop: ws.channel.eventLoop, allocator: ws.channel.allocator)
                     )
                     request.webSocket = ws
                     _ = responder.respond(to: request)
