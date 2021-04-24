@@ -43,7 +43,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func setupClientAndServer(onServer: @escaping (HBWebSocket) -> Void, onClient: @escaping (HBWebSocket) -> Void) -> HBApplication {
+    func setupClientAndServer(onServer: @escaping (HBWebSocket) -> Void, onClient: @escaping (HBWebSocket) -> Void) throws -> HBApplication {
         let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
@@ -51,7 +51,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         app.ws.on("/test", onUpgrade: { _, ws in
             onServer(ws)
         })
-        app.start()
+        try app.start()
 
         let eventLoop = app.eventLoopGroup.next()
         HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).whenComplete { result in
@@ -71,7 +71,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
-        let app = self.setupClientAndServer(
+        let app = try self.setupClientAndServer(
             onServer: { ws in
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
@@ -140,7 +140,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         app.router.get("/test") { _ in
             "hello"
         }
-        app.start()
+        try app.start()
         defer { app.stop() }
 
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -177,7 +177,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
-        let app = self.setupClientAndServer(
+        let app = try self.setupClientAndServer(
             onServer: { ws in
                 ws.onClose { _ in
                     promise.succeed()
@@ -198,7 +198,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
-        let app = self.setupClientAndServer(
+        let app = try self.setupClientAndServer(
             onServer: { ws in
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
@@ -222,7 +222,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
-        let app = self.setupClientAndServer(
+        let app = try self.setupClientAndServer(
             onServer: { _ in
             },
             onClient: { ws in
@@ -243,7 +243,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
         var count = 0
 
-        let app = self.setupClientAndServer(
+        let app = try self.setupClientAndServer(
             onServer: { ws in
                 ws.initiateAutoPing(interval: .seconds(2))
                 ws.onPong { _ in
