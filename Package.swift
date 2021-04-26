@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", from: "0.6.0"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", .branch("main")),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", .branch("main")),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.20.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
