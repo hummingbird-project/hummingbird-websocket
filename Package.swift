@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "hummingbird-websocket",
+    platforms: [.iOS(.v12), .tvOS(.v12)],
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
         .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
