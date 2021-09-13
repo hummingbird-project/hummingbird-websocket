@@ -41,11 +41,12 @@ public struct HBWebSocketRouterGroup {
         onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
     ) -> Self {
         let responder = HBCallbackResponder { request in
+            var request = request
             if request.webSocketTestShouldUpgrade != nil {
                 return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in
-                        let response = HBResponse(status: .ok, headers: headers ?? [:])
+                        var response = HBResponse(status: .ok, headers: headers ?? [:])
                         response.webSocketShouldUpgrade = true
                         return response
                     }

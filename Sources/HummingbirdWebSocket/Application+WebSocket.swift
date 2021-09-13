@@ -29,7 +29,7 @@ extension HBApplication {
         public func addUpgrade() {
             self.application.server.addWebSocketUpgrade(
                 shouldUpgrade: { channel, head in
-                    let request = HBRequest(
+                    var request = HBRequest(
                         head: head,
                         body: .byteBuffer(nil),
                         application: application,
@@ -44,7 +44,7 @@ extension HBApplication {
                     }
                 },
                 onUpgrade: { ws, head in
-                    let request = HBRequest(
+                    var request = HBRequest(
                         head: head,
                         body: .byteBuffer(nil),
                         application: application,
