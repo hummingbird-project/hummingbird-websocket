@@ -95,45 +95,46 @@ final class HummingbirdWebSocketTests: XCTestCase {
         XCTAssertTrue(clientHello)
     }
 
-    func testClient() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { try? elg.syncShutdownGracefully() }
+    /* Commented out as ws://echo.websocket.org is not working anymore
+      func testClient() throws {
+         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+         defer { try? elg.syncShutdownGracefully() }
 
-        let eventLoop = elg.next()
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+         let eventLoop = elg.next()
+         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
-        do {
-            let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-            clientWS.onRead { data, _ in
-                XCTAssertEqual(data, .text("Hello"))
-                promise.succeed()
-            }
-            clientWS.write(.text("Hello"), promise: nil)
-        } catch {
-            promise.fail(error)
-        }
-        try promise.wait()
-    }
+         do {
+             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
+             clientWS.onRead { data, _ in
+                 XCTAssertEqual(data, .text("Hello"))
+                 promise.succeed()
+             }
+             clientWS.write(.text("Hello"), promise: nil)
+         } catch {
+             promise.fail(error)
+         }
+         try promise.wait()
+     }
 
-    func testTLS() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { try? elg.syncShutdownGracefully() }
+     func testTLS() throws {
+         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+         defer { try? elg.syncShutdownGracefully() }
 
-        let eventLoop = elg.next()
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+         let eventLoop = elg.next()
+         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
 
-        do {
-            let clientWS = try HBWebSocketClient.connect(url: "wss://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-            clientWS.onRead { data, _ in
-                XCTAssertEqual(data, .text("Hello"))
-                promise.succeed()
-            }
-            clientWS.write(.text("Hello"), promise: nil)
-        } catch {
-            promise.fail(error)
-        }
-        try promise.wait()
-    }
+         do {
+             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
+             clientWS.onRead { data, _ in
+                 XCTAssertEqual(data, .text("Hello"))
+                 promise.succeed()
+             }
+             clientWS.write(.text("Hello"), promise: nil)
+         } catch {
+             promise.fail(error)
+         }
+         try promise.wait()
+     }*/
 
     func testNotWebSocket() throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
@@ -260,5 +261,26 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { app.stop() }
 
         try promise.wait()
+    }
+
+    func testQuery() throws {
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade()
+        // on websocket connect.
+        app.ws.on(
+            "/test",
+            shouldUpgrade: { request in
+                guard request.uri.queryParameters["connect"] != nil else { return request.failure(HBHTTPError(.badRequest)) }
+                return request.success(nil)
+            },
+            onUpgrade: { _, _ in }
+        )
+        try app.start()
+        defer { app.stop() }
+
+        let eventLoop = app.eventLoopGroup.next()
+        let wsFuture = HBWebSocketClient.connect(url: "ws://localhost:8080/test?connect", configuration: .init(), on: eventLoop)
+        try wsFuture.wait()
     }
 }

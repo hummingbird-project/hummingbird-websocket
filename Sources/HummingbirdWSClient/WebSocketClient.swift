@@ -120,7 +120,7 @@ public enum HBWebSocketClient {
 
         /// initialize Configuration
         public init(
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.forClient()
+            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
         ) {
             self.tlsConfiguration = tlsConfiguration
         }
@@ -146,7 +146,7 @@ public enum HBWebSocketClient {
                 }
             }
             self.tlsRequired = url.scheme == .https || url.scheme == .wss ? true : false
-            self.pathQuery = url.path + (url.query ?? "")
+            self.pathQuery = url.path + (url.query.map { "?\($0)" } ?? "")
         }
 
         /// return "Host" header value. Only include port if it is different from the default port for the request
