@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import NIO
+import NIOCore
 import NIOWebSocket
 
 /// WebSocket channel handler. Passes web socket frames onto `HBWebSocket` object.

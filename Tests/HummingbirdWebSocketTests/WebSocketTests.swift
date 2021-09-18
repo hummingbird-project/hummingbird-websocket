@@ -15,7 +15,8 @@
 import Hummingbird
 import HummingbirdWebSocket
 import HummingbirdWSClient
-import NIO
+import NIOCore
+import NIOPosix
 import XCTest
 
 final class HummingbirdWebSocketTests: XCTestCase {
@@ -281,6 +282,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let wsFuture = HBWebSocketClient.connect(url: "ws://localhost:8080/test?connect", configuration: .init(), on: eventLoop)
-        try wsFuture.wait()
+        _ = try wsFuture.wait()
     }
 }

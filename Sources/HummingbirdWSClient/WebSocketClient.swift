@@ -15,7 +15,8 @@
 import ExtrasBase64
 import Hummingbird
 import HummingbirdWSCore
-import NIO
+import NIOCore
+import NIOPosix
 import NIOSSL
 import NIOWebSocket
 

@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Hummingbird
-import NIO
+import NIOCore
 import NIOHTTP1
 
 /// The HTTP handler to be used to initiate the request.
