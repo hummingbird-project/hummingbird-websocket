@@ -58,7 +58,7 @@ extension HBApplication {
             self.application.lifecycle.register(
                 label: "WebSockets",
                 start: .sync {
-                    self.responder = self.application.middleware.constructResponder(finalResponder: application.router)
+                    self.responder = self.application.router.buildRouter() // routerGroup. self.application.middleware.constructResponder(finalResponder: application.router)
                 },
                 shutdown: .sync {}
             )

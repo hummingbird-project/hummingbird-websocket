@@ -16,10 +16,10 @@ import Hummingbird
 
 /// Router Group for adding WebSocket connections to
 public struct HBWebSocketRouterGroup {
-    let router: HBRouter
+    let router: HBRouterBuilder
     let middlewares: HBMiddlewareGroup
 
-    init(router: HBRouter) {
+    init(router: HBRouterBuilder) {
         self.router = router
         self.middlewares = .init()
     }
