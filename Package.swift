@@ -13,7 +13,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", from: "1.0.0-alpha"),
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "1.0.0-alpha"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "feature/run-router-first"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.1"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
