@@ -37,7 +37,7 @@ extension HBApplication {
                     )
                     request.webSocketTestShouldUpgrade = true
                     return responder.respond(to: request).flatMapThrowing {
-                        if $0.webSocketShouldUpgrade == true {
+                        if $0.status == .ok {
                             return $0.headers
                         }
                         throw HBHTTPError(.badRequest)
@@ -54,11 +54,11 @@ extension HBApplication {
                     _ = responder.respond(to: request)
                 }
             )
-            self.routerGroup = .init(router: self.application.router)
+            self.routerGroup = .init(router: HBRouterBuilder())
             self.application.lifecycle.register(
                 label: "WebSockets",
                 start: .sync {
-                    self.responder = self.application.router.buildRouter() // routerGroup. self.application.middleware.constructResponder(finalResponder: application.router)
+                    self.responder = self.routerGroup.router.buildRouter()
                 },
                 shutdown: .sync {}
             )
