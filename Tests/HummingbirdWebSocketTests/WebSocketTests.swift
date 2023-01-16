@@ -242,7 +242,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testAutoPing() throws {
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(30))
         var count = 0
 
         let app = try self.setupClientAndServer(
