@@ -28,11 +28,3 @@ extension HBRequest {
         set { self.extensions.set(\.webSocketTestShouldUpgrade, value: newValue) }
     }
 }
-
-extension HBResponse {
-    /// Can we upgrade to a web socket connection?
-    var webSocketShouldUpgrade: Bool? {
-        get { self.extensions.get(\.webSocketShouldUpgrade) }
-        set { self.extensions.set(\.webSocketShouldUpgrade, value: newValue) }
-    }
-}

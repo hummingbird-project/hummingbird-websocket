@@ -16,10 +16,10 @@ import Hummingbird
 
 /// Router Group for adding WebSocket connections to
 public struct HBWebSocketRouterGroup {
-    let router: HBRouter
+    let router: HBRouterBuilder
     let middlewares: HBMiddlewareGroup
 
-    init(router: HBRouter) {
+    init(router: HBRouterBuilder) {
         self.router = router
         self.middlewares = .init()
     }
@@ -46,9 +46,7 @@ public struct HBWebSocketRouterGroup {
                 return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in
-                        var response = HBResponse(status: .ok, headers: headers ?? [:])
-                        response.webSocketShouldUpgrade = true
-                        return response
+                        return HBResponse(status: .ok, headers: headers ?? [:])
                     }
                 }
             } else if let webSocket = request.webSocket {
