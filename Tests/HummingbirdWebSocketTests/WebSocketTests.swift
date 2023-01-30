@@ -66,6 +66,23 @@ final class HummingbirdWebSocketTests: XCTestCase {
         return app
     }
 
+    func setupClientAndServer(onServer: @escaping (HBWebSocket) async throws -> Void, onClient: @escaping (HBWebSocket) async throws -> Void) async throws -> HBApplication {
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade()
+        // on websocket connect.
+        app.ws.on("/test", onUpgrade: { _, ws in
+            try await onServer(ws)
+            return .ok
+        })
+        try app.start()
+
+        let eventLoop = app.eventLoopGroup.next()
+        let ws = try await HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
+        try await onClient(ws)
+        return app
+    }
+
     func testClientAndServerConnection() throws {
         var serverHello: Bool = false
         var clientHello: Bool = false
@@ -77,7 +94,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 ws.onRead { data, ws in
                     XCTAssertEqual(data, .text("Hello"))
                     serverHello = true
-                    ws.write(.text("Hello back"))
+                    ws.write(.text("Hello back"), promise: nil)
                 }
             },
             onClient: { ws in
@@ -285,3 +302,37 @@ final class HummingbirdWebSocketTests: XCTestCase {
         _ = try wsFuture.wait()
     }
 }
+
+#if compiler(>=5.5.2) && canImport(_Concurrency)
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension HummingbirdWebSocketTests {
+    func testServerAsyncReadWrite() async throws {
+        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
+        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+
+        let app = try await self.setupClientAndServer(
+            onServer: { ws in
+                let stream = ws.readStream()
+                Task {
+                    for try await data in stream {
+                        XCTAssertEqual(data, .text("Hello"))
+                    }
+                    ws.onClose { _ in
+                        promise.succeed()
+                    }
+                }
+            },
+            onClient: { ws in
+                try await ws.write(.text("Hello"))
+                try await ws.close()
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
+    }
+}
+
+#endif // compiler(>=5.5.2) && canImport(_Concurrency)

@@ -42,7 +42,7 @@ public final class HBWebSocket {
         self.readCallback = cb
     }
 
-    /// Set callback to be called whenever WebSocket receives data
+    /// Set callback to be called whenever WebSocket receives a pong
     public func onPong(_ cb: @escaping PongCallback) {
         self.pongCallback = cb
     }
@@ -55,10 +55,19 @@ public final class HBWebSocket {
     }
 
     /// Write data to WebSocket
+    /// - Parameter data: data to be written
+    /// - Returns: future that is completed when data is written
+    public func write(_ data: WebSocketData) -> EventLoopFuture<Void> {
+        let promise = self.channel.eventLoop.makePromise(of: Void.self)
+        self.write(data, promise: promise)
+        return promise.futureResult
+    }
+
+    /// Write data to WebSocket
     /// - Parameters:
     ///   - data: Data to be written
-    ///   - promise:promise that is completed when data has been sent
-    public func write(_ data: WebSocketData, promise: EventLoopPromise<Void>? = nil) {
+    ///   - promise: promise that is completed when data has been sent
+    public func write(_ data: WebSocketData, promise: EventLoopPromise<Void>?) {
         switch data {
         case .text(let string):
             let buffer = self.channel.allocator.buffer(string: string)
@@ -69,10 +78,19 @@ public final class HBWebSocket {
     }
 
     /// Close websocket connection
+    /// - Parameter code:
+    /// - Returns: future that is complete once close message is sent
+    public func close(code: WebSocketErrorCode = .normalClosure) -> EventLoopFuture<Void> {
+        let promise = self.channel.eventLoop.makePromise(of: Void.self)
+        self.close(code: code, promise: promise)
+        return promise.futureResult
+    }
+
+    /// Close websocket connection
     /// - Parameters:
     ///   - code: Close reason
     ///   - promise: promise that is completed when close has been sent
-    public func close(code: WebSocketErrorCode = .goingAway, promise: EventLoopPromise<Void>?) {
+    public func close(code: WebSocketErrorCode = .normalClosure, promise: EventLoopPromise<Void>?) {
         guard self.isClosed == false else {
             promise?.succeed(())
             return
@@ -84,6 +102,16 @@ public final class HBWebSocket {
         self.send(buffer: buffer, opcode: .connectionClose, fin: true, promise: promise)
     }
 
+    /// Send ping message
+    /// - Returns: future that is complete when ping message is sent
+    public func sendPing() -> EventLoopFuture<Void> {
+        let promise = self.channel.eventLoop.makePromise(of: Void.self)
+        self.sendPing(promise: promise)
+        return promise.futureResult
+    }
+
+    /// Send ping message
+    /// - Parameter promise: promise that is completed when ping message has been sent
     public func sendPing(promise: EventLoopPromise<Void>?) {
         _ = self.channel.eventLoop.submit {
             if self.waitingOnPong {
@@ -197,3 +225,44 @@ public final class HBWebSocket {
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false
 }
+
+#if compiler(>=5.5.2) && canImport(_Concurrency)
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension HBWebSocket {
+    /// Write data to WebSocket
+    /// - Parameters:
+    ///   - data: Data to be written
+    public func write(_ data: WebSocketData) async throws {
+        return try await self.write(data).get()
+    }
+
+    /// Close websocket connection
+    /// - Parameter code: reason for closing socket
+    public func close(code: WebSocketErrorCode = .normalClosure) async throws {
+        return try await self.close(code: code).get()
+    }
+
+    /// Send ping message
+    public func sendPing() async throws {
+        return try await self.sendPing().get()
+    }
+
+    /// Return stream of web socket data
+    ///
+    /// This uses the `onRead`` and `onClose` functions so should not be used
+    /// at the same time as these functions.
+    /// - Returns: Web socket data stream
+    public func readStream() -> AsyncStream<WebSocketData> {
+        return AsyncStream { cont in
+            self.onRead { data, _ in
+                cont.yield(data)
+            }
+            self.onClose { _ in
+                cont.finish()
+            }
+        }
+    }
+}
+
+#endif
