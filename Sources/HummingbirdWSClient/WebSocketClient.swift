@@ -160,3 +160,19 @@ public enum HBWebSocketClient {
         }
     }
 }
+
+#if compiler(>=5.5.2) && canImport(_Concurrency)
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension HBWebSocketClient {
+    /// Connect to WebSocket
+    /// - Parameters:
+    ///   - url: URL of websocket
+    ///   - configuration: Configuration of connection
+    ///   - eventLoop: eventLoop to run connection on
+    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
+        return try await self.connect(url: url, configuration: configuration, on: eventLoop).get()
+    }
+}
+
+#endif // compiler(>=5.5.2) && canImport(_Concurrency)

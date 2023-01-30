@@ -98,3 +98,23 @@ extension HBApplication {
     /// WebSocket interface
     public var ws: WebSocket { .init(application: self) }
 }
+
+#if compiler(>=5.5.2) && canImport(_Concurrency)
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension HBApplication.WebSocket {
+    /// Add WebSocket connection upgrade at given path
+    /// - Parameters:
+    ///   - path: URI path connection upgrade is available
+    ///   - shouldUpgrade: Return whether upgrade should be allowed
+    ///   - onUpgrade: Called on upgrade with reference to WebSocket
+    @discardableResult public func on(
+        _ path: String = "",
+        shouldUpgrade: @escaping (HBRequest) async throws -> HTTPHeaders? = { _ in return nil },
+        onUpgrade: @escaping (HBRequest, HBWebSocket) async throws -> HTTPResponseStatus
+    ) -> HBWebSocketRouterGroup {
+        self.routerGroup.on(path, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
+    }
+}
+
+#endif // compiler(>=5.5.2) && canImport(_Concurrency)
