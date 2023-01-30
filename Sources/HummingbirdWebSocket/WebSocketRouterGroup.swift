@@ -73,8 +73,9 @@ public struct HBWebSocketRouterGroup {
         onUpgrade: @escaping (HBRequest, HBWebSocket) throws -> Void
     ) -> Self {
         return self.on(
-            path, shouldUpgrade: shouldUpgrade,
-            onUpgrade: { request, ws in
+            path,
+            shouldUpgrade: shouldUpgrade,
+            onUpgrade: { request, ws -> EventLoopFuture<HTTPResponseStatus> in
                 do {
                     try onUpgrade(request, ws)
                     return request.eventLoop.makeSucceededFuture(.ok)
