@@ -103,14 +103,14 @@ extension HBWebSocketRouterGroup {
     ) -> HBWebSocketRouterGroup {
         self.on(
             path,
-            shouldUpgrade: { request in
+            shouldUpgrade: { request -> EventLoopFuture<HTTPHeaders?> in
                 let promise = request.eventLoop.makePromise(of: HTTPHeaders?.self)
                 promise.completeWithTask {
                     try await shouldUpgrade(request)
                 }
                 return promise.futureResult
             },
-            onUpgrade: { request, ws in
+            onUpgrade: { request, ws -> EventLoopFuture<HTTPResponseStatus> in
                 let promise = request.eventLoop.makePromise(of: HTTPResponseStatus.self)
                 promise.completeWithTask {
                     try await onUpgrade(request, ws)
