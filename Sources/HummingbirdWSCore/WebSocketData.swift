@@ -51,3 +51,7 @@ struct WebSocketFrameSequence {
         }
     }
 }
+
+#if compiler(>=5.6)
+extension WebSocketData: Sendable {}
+#endif // compiler(>=5.6)
