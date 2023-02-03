@@ -176,3 +176,7 @@ extension HBWebSocketClient {
 }
 
 #endif // compiler(>=5.5.2) && canImport(_Concurrency)
+
+#if compiler(>=5.6)
+extension HBWebSocketClient.Configuration: Sendable {}
+#endif // compiler(>=5.6)

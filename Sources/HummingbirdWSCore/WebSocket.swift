@@ -22,11 +22,15 @@ public final class HBWebSocket {
         case server
     }
 
-    public var channel: Channel
+    public let channel: Channel
+    @inlinable public var eventLoop: EventLoop {
+        return self.channel.eventLoop
+    }
+
     let type: SocketType
 
-    var waitingOnPong: Bool = false
-    var pingData: ByteBuffer
+    private var waitingOnPong: Bool = false
+    private var pingData: ByteBuffer
 
     public init(channel: Channel, type: SocketType) {
         self.channel = channel
@@ -113,7 +117,7 @@ public final class HBWebSocket {
     /// Send ping message
     /// - Parameter promise: promise that is completed when ping message has been sent
     public func sendPing(promise: EventLoopPromise<Void>?) {
-        _ = self.channel.eventLoop.submit {
+        self.channel.eventLoop.execute {
             if self.waitingOnPong {
                 promise?.succeed(())
                 return
@@ -132,6 +136,11 @@ public final class HBWebSocket {
         guard self.channel.isActive else {
             return
         }
+        if !self.eventLoop.inEventLoop {
+            self.eventLoop.execute {
+                self.initiateAutoPing(interval: interval)
+            }
+        }
         if self.waitingOnPong {
             // We never received a pong from our last ping, so the connection has timed out
             let promise = self.channel.eventLoop.makePromise(of: Void.self)
@@ -145,6 +154,7 @@ public final class HBWebSocket {
             }
 
         } else {
+            self.sendPing(promise: nil)
             // creating random payload
             let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
             self.pingData.clear()
@@ -265,4 +275,11 @@ extension HBWebSocket {
     }
 }
 
-#endif
+#endif // compiler(>=5.5.2) && canImport(_Concurrency)
+
+#if compiler(>=5.6)
+// HBWebSocket can be set to Sendable because ping data which is mutable is
+// managed internally and is only ever changed on the event loop
+extension HBWebSocket: @unchecked Sendable {}
+extension HBWebSocket.SocketType: Sendable {}
+#endif // compiler(>=5.6)
