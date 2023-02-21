@@ -31,6 +31,7 @@ public final class HBWebSocket {
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
+    private var autoPingTask: Scheduled<Void>?
 
     public init(channel: Channel, type: SocketType) {
         self.channel = channel
@@ -54,6 +55,7 @@ public final class HBWebSocket {
     /// Set callback to be called whenever WebSocket channel is closed
     public func onClose(_ cb: @escaping CloseCallback) {
         self.channel.closeFuture.whenComplete { _ in
+            self.autoPingTask?.cancel()
             cb(self)
         }
     }
@@ -162,7 +164,7 @@ public final class HBWebSocket {
 
             self.send(buffer: self.pingData, opcode: .ping)
             self.waitingOnPong = true
-            _ = self.channel.eventLoop.scheduleTask(in: interval) {
+            self.autoPingTask = self.channel.eventLoop.scheduleTask(in: interval) {
                 self.initiateAutoPing(interval: interval)
             }
         }
