@@ -78,9 +78,13 @@ public final class WebSocketHandler: ChannelInboundHandler {
 
     public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
+        case let evt as ChannelEvent where evt == ChannelEvent.inputClosed:
+            // client has closed the input channel now we can close the channel fully
+            context.close(promise: nil)
+
         case is ChannelShouldQuiesceEvent:
-            // we received a quiesce event so should close the channel.
-            self.webSocket.close(promise: nil)
+            // we received a quiesce event so send close message.
+            self.webSocket.close(code: .goingAway, promise: nil)
 
         default:
             context.fireUserInboundEventTriggered(event)
