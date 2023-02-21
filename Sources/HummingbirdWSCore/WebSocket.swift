@@ -31,6 +31,7 @@ public final class HBWebSocket {
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
+    private var autoPingTask: Scheduled<Void>?
 
     public init(channel: Channel, type: SocketType) {
         self.channel = channel
@@ -54,6 +55,7 @@ public final class HBWebSocket {
     /// Set callback to be called whenever WebSocket channel is closed
     public func onClose(_ cb: @escaping CloseCallback) {
         self.channel.closeFuture.whenComplete { _ in
+            self.autoPingTask?.cancel()
             cb(self)
         }
     }
@@ -136,34 +138,24 @@ public final class HBWebSocket {
         guard self.channel.isActive else {
             return
         }
-        if !self.eventLoop.inEventLoop {
-            self.eventLoop.execute {
-                self.initiateAutoPing(interval: interval)
-            }
-        }
-        if self.waitingOnPong {
-            // We never received a pong from our last ping, so the connection has timed out
-            let promise = self.channel.eventLoop.makePromise(of: Void.self)
-            self.close(code: .goingAway, promise: promise)
-            promise.futureResult.whenComplete { _ in
-                // Usually, closing a WebSocket is done by sending the close frame and waiting
-                // for the peer to respond with their close frame. We are in a timeout situation,
-                // so the other side likely will never send the close frame. We just close the
-                // channel ourselves.
-                self.channel.close(mode: .all, promise: nil)
-            }
+        self.autoPingTask = self.channel.eventLoop.scheduleTask(in: interval) {
+            if self.waitingOnPong {
+                // We never received a pong from our last ping, so the connection has timed out
+                let promise = self.channel.eventLoop.makePromise(of: Void.self)
+                self.close(code: .goingAway, promise: promise)
+                promise.futureResult.whenComplete { _ in
+                    // Usually, closing a WebSocket is done by sending the close frame and waiting
+                    // for the peer to respond with their close frame. We are in a timeout situation,
+                    // so the other side likely will never send the close frame. We just close the
+                    // channel ourselves.
+                    self.channel.close(mode: .all, promise: nil)
+                }
 
-        } else {
-            self.sendPing(promise: nil)
-            // creating random payload
-            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
-            self.pingData.clear()
-            self.pingData.writeBytes(random)
-
-            self.send(buffer: self.pingData, opcode: .ping)
-            self.waitingOnPong = true
-            _ = self.channel.eventLoop.scheduleTask(in: interval) {
-                self.initiateAutoPing(interval: interval)
+            } else {
+                self.sendPing().whenSuccess {
+                    self.waitingOnPong = true
+                    self.initiateAutoPing(interval: interval)
+                }
             }
         }
     }
