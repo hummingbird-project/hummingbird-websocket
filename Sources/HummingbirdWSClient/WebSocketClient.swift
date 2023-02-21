@@ -104,7 +104,7 @@ public enum HBWebSocketClient {
         )
 
         // add HTTP handler with web socket upgrade
-        return channel.pipeline.addHTTPClientHandlers(withClientUpgrade: config).flatMap {
+        return channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes, withClientUpgrade: config).flatMap {
             channel.pipeline.addHandler(httpHandler)
         }
     }

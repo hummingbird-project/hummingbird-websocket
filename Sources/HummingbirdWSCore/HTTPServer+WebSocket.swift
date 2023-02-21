@@ -32,8 +32,9 @@ extension HBHTTPServer {
             },
             upgradePipelineHandler: { (channel: Channel, head: HTTPRequestHead) in
                 let webSocket = HBWebSocket(channel: channel, type: .server)
-                onUpgrade(webSocket, head)
-                return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket))
+                return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
+                    onUpgrade(webSocket, head)
+                }
             }
         )
         self.httpChannelInitializer.addProtocolUpgrader(upgrader)
