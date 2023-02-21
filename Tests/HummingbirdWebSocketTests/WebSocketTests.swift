@@ -23,7 +23,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     static var eventLoopGroup: EventLoopGroup!
 
     override class func setUp() {
-        Self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        Self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     override class func tearDown() {
@@ -122,6 +122,24 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try promise.wait()
         XCTAssertTrue(serverHello)
         XCTAssertTrue(clientHello)
+    }
+
+    func testServerImmediateWrite() throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(60))
+        let app = try self.setupClientAndServer(
+            onServer: { ws in
+                ws.write(.text("hello"), promise: nil)
+            },
+            onClient: { ws in
+                ws.onRead { data, _ in
+                    XCTAssertEqual(data, .text("hello"))
+                    promise.succeed()
+                }
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
     }
 
     /* Commented out as ws://echo.websocket.org is not working anymore
