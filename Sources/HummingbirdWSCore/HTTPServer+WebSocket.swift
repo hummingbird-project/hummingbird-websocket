@@ -36,6 +36,6 @@ extension HBHTTPServer {
                 return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket))
             }
         )
-        self.httpChannelInitializer = HTTP1ChannelInitializer(upgraders: [upgrader])
+        self.httpChannelInitializer.addProtocolUpgrader(upgrader)
     }
 }

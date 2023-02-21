@@ -20,6 +20,16 @@ import NIOPosix
 import XCTest
 
 final class HummingbirdWebSocketTests: XCTestCase {
+    static var eventLoopGroup: EventLoopGroup!
+
+    override class func setUp() {
+        Self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    }
+
+    override class func tearDown() {
+        XCTAssertNoThrow(try Self.eventLoopGroup.syncShutdownGracefully())
+    }
+
     struct TimeoutPromise {
         let task: Scheduled<Void>
         let promise: EventLoopPromise<Void>
@@ -44,8 +54,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func setupClientAndServer(onServer: @escaping (HBWebSocket) -> Void, onClient: @escaping (HBWebSocket) -> Void) throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+    func setupClientAndServer(
+        onServer: @escaping (HBWebSocket) -> Void,
+        onClient: @escaping (HBWebSocket) -> Void
+    ) throws -> HBApplication {
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -86,9 +99,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testClientAndServerConnection() throws {
         var serverHello: Bool = false
         var clientHello: Bool = false
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(5))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(5))
         let app = try self.setupClientAndServer(
             onServer: { ws in
                 ws.onRead { data, ws in
@@ -115,11 +126,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     /* Commented out as ws://echo.websocket.org is not working anymore
       func testClient() throws {
-         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-         defer { try? elg.syncShutdownGracefully() }
-
-         let eventLoop = elg.next()
-         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+         let eventLoop = Self.eventLoopGroup.next()
+         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
          do {
              let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
@@ -135,11 +143,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
      }
 
      func testTLS() throws {
-         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-         defer { try? elg.syncShutdownGracefully() }
-
-         let eventLoop = elg.next()
-         let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+         let eventLoop = Self.eventLoopGroup.next()
+         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
          do {
              let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
@@ -162,9 +167,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try app.start()
         defer { app.stop() }
 
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { try? elg.syncShutdownGracefully() }
-        let eventLoop = elg.next()
+        let eventLoop = Self.eventLoopGroup.next()
         let clientWS = HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
@@ -177,9 +180,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testNoConnection() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { try? elg.syncShutdownGracefully() }
-        let eventLoop = elg.next()
+        let eventLoop = Self.eventLoopGroup.next()
         let clientWS = HBWebSocketClient.connect(url: "http://localhost:8080", configuration: .init(), on: eventLoop)
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
@@ -192,9 +193,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testClientCloseConnection() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
         let app = try self.setupClientAndServer(
             onServer: { ws in
@@ -213,9 +212,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testServerCloseConnection() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
         let app = try self.setupClientAndServer(
             onServer: { ws in
@@ -237,9 +234,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testPingPong() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
         let app = try self.setupClientAndServer(
             onServer: { _ in
@@ -257,9 +252,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testAutoPing() throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(30))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(30))
         var count = 0
 
         let app = try self.setupClientAndServer(
@@ -308,9 +301,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension HummingbirdWebSocketTests {
     func testServerAsyncReadWrite() async throws {
-        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
-        let promise = TimeoutPromise(eventLoop: elg.next(), timeout: .seconds(10))
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
         let app = try await self.setupClientAndServer(
             onServer: { ws in
