@@ -116,7 +116,7 @@ public enum HBWebSocketClient {
     }
 
     /// WebSocket connection configuration
-    public struct Configuration {
+    public struct Configuration: Sendable {
         /// TLS setup
         let tlsConfiguration: TLSConfiguration
 
@@ -161,8 +161,6 @@ public enum HBWebSocketClient {
     }
 }
 
-#if compiler(>=5.5.2) && canImport(_Concurrency)
-
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension HBWebSocketClient {
     /// Connect to WebSocket
@@ -174,9 +172,3 @@ extension HBWebSocketClient {
         return try await self.connect(url: url, configuration: configuration, on: eventLoop).get()
     }
 }
-
-#endif // compiler(>=5.5.2) && canImport(_Concurrency)
-
-#if compiler(>=5.6)
-extension HBWebSocketClient.Configuration: Sendable {}
-#endif // compiler(>=5.6)
