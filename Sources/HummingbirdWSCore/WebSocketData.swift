@@ -16,7 +16,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Enumeration holding WebSocket data
-public enum WebSocketData: Equatable {
+public enum WebSocketData: Equatable, Sendable {
     case text(String)
     case binary(ByteBuffer)
 }
@@ -51,7 +51,3 @@ struct WebSocketFrameSequence {
         }
     }
 }
-
-#if compiler(>=5.6)
-extension WebSocketData: Sendable {}
-#endif // compiler(>=5.6)

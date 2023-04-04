@@ -142,41 +142,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try promise.wait()
     }
 
-    /* Commented out as ws://echo.websocket.org is not working anymore
-      func testClient() throws {
-         let eventLoop = Self.eventLoopGroup.next()
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         do {
-             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-             clientWS.onRead { data, _ in
-                 XCTAssertEqual(data, .text("Hello"))
-                 promise.succeed()
-             }
-             clientWS.write(.text("Hello"), promise: nil)
-         } catch {
-             promise.fail(error)
-         }
-         try promise.wait()
-     }
-
-     func testTLS() throws {
-         let eventLoop = Self.eventLoopGroup.next()
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         do {
-             let clientWS = try HBWebSocketClient.connect(url: "ws://echo.websocket.org", configuration: .init(), on: eventLoop).wait()
-             clientWS.onRead { data, _ in
-                 XCTAssertEqual(data, .text("Hello"))
-                 promise.succeed()
-             }
-             clientWS.write(.text("Hello"), promise: nil)
-         } catch {
-             promise.fail(error)
-         }
-         try promise.wait()
-     }*/
-
     func testNotWebSocket() throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
         app.router.get("/test") { _ in
@@ -314,8 +279,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 }
 
-#if compiler(>=5.5.2) && canImport(_Concurrency)
-
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension HummingbirdWebSocketTests {
     func testServerAsyncReadWrite() async throws {
@@ -343,5 +306,3 @@ extension HummingbirdWebSocketTests {
         try promise.wait()
     }
 }
-
-#endif // compiler(>=5.5.2) && canImport(_Concurrency)

@@ -17,7 +17,7 @@ import NIOWebSocket
 
 /// WebSocket object
 public final class HBWebSocket {
-    public enum SocketType {
+    public enum SocketType: Sendable {
         case client
         case server
     }
@@ -228,8 +228,6 @@ public final class HBWebSocket {
     private var isClosed: Bool = false
 }
 
-#if compiler(>=5.5.2) && canImport(_Concurrency)
-
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension HBWebSocket {
     /// Write data to WebSocket
@@ -267,11 +265,8 @@ extension HBWebSocket {
     }
 }
 
-#endif // compiler(>=5.5.2) && canImport(_Concurrency)
-
 #if compiler(>=5.6)
 // HBWebSocket can be set to Sendable because ping data which is mutable is
 // managed internally and is only ever changed on the event loop
 extension HBWebSocket: @unchecked Sendable {}
-extension HBWebSocket.SocketType: Sendable {}
 #endif // compiler(>=5.6)
