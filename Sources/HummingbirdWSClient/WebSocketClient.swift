@@ -65,7 +65,11 @@ public enum HBWebSocketClient {
         return wsPromise.futureResult.flatMapError { error in
             // respond to redirect error
             if let redirect = error as? RedirectError {
-                return self.connect(url: HBURL(redirect.location), headers: headers, configuration: configuration, on: eventLoop)
+                if configuration.followRedirects {
+                    return self.connect(url: HBURL(redirect.location), headers: headers, configuration: configuration, on: eventLoop)
+                } else {
+                    return eventLoop.makeFailedFuture(Error.redirect)
+                }
             }
             return eventLoop.makeFailedFuture(error)
         }
@@ -139,7 +143,11 @@ public enum HBWebSocketClient {
 
     /// Possible Errors returned by websocket connection
     public enum Error: Swift.Error {
+        /// URL is invalid
         case invalidURL
+        /// Request returns a redirect when client is configured not to support redirects
+        case redirect
+        /// WebSocket upgrade failed
         case websocketUpgradeFailed
     }
 
@@ -151,15 +159,18 @@ public enum HBWebSocketClient {
     public struct Configuration: Sendable {
         /// TLS setup
         let tlsConfiguration: TLSConfiguration
-
+        /// Redirects
+        let followRedirects: Bool
         /// Maximum size for a single frame
         let maxFrameSize: Int
 
         /// initialize Configuration
         public init(
+            followRedirects: Bool = false,
             maxFrameSize: Int = 1 << 14,
             tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
         ) {
+            self.followRedirects = followRedirects
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = tlsConfiguration
         }
