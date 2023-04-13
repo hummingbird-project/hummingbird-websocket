@@ -277,6 +277,32 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let wsFuture = HBWebSocketClient.connect(url: "ws://localhost:8080/test?connect", configuration: .init(), on: eventLoop)
         _ = try wsFuture.wait()
     }
+
+    func testAdditionalHeaders() throws {
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade()
+        // on websocket connect.
+        app.ws.on(
+            "/test",
+            shouldUpgrade: { request in
+                guard request.headers["Sec-WebSocket-Extensions"].first == "foo" else { return request.failure(HBHTTPError(.badRequest)) }
+                return request.success(nil)
+            },
+            onUpgrade: { _, _ in }
+        )
+        try app.start()
+        defer { app.stop() }
+
+        let eventLoop = app.eventLoopGroup.next()
+        let wsFuture = HBWebSocketClient.connect(
+            url: "ws://localhost:8080/test",
+            headers: ["Sec-WebSocket-Extensions": "foo"],
+            configuration: .init(),
+            on: eventLoop
+        )
+        _ = try wsFuture.wait()
+    }
 }
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)

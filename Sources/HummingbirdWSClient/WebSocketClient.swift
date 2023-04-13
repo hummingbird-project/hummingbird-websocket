@@ -29,7 +29,7 @@ public enum HBWebSocketClient {
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
-    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+    public static func connect(url: HBURL, headers: HTTPHeaders = [:], configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
             let url = try SplitURL(url: url)
@@ -38,7 +38,7 @@ public enum HBWebSocketClient {
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .channelInitializer { channel in
-                    return Self.setupChannelForWebsockets(url: url, channel: channel, wsPromise: wsPromise, on: eventLoop)
+                    return Self.setupChannelForWebsockets(url: url, headers: headers, channel: channel, wsPromise: wsPromise, on: eventLoop)
                 }
                 .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
@@ -66,6 +66,7 @@ public enum HBWebSocketClient {
     /// setup for channel for websocket. Create initial HTTP request and include upgrade for when it is successful
     static func setupChannelForWebsockets(
         url: SplitURL,
+        headers: HTTPHeaders,
         channel: Channel,
         wsPromise: EventLoopPromise<HBWebSocket>,
         on eventLoop: EventLoop
@@ -78,6 +79,7 @@ public enum HBWebSocketClient {
         do {
             httpHandler = try WebSocketInitialRequestHandler(
                 url: url,
+                headers: headers,
                 upgradePromise: upgradePromise
             )
         } catch {
