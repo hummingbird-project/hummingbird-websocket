@@ -57,7 +57,14 @@ final class WebSocketInitialRequestHandler: ChannelInboundHandler, RemovableChan
         let clientResponse = self.unwrapInboundIn(data)
 
         switch clientResponse {
-        case .head:
+        case .head(let head):
+            // if response is a redirect then throw redirect error
+            if (300..<400).contains(head.status.code),
+               let location = head.headers["location"].first
+            {
+                self.upgradePromise.fail(HBWebSocketClient.RedirectError(location: location))
+                return
+            }
             self.upgradePromise.fail(HBWebSocketClient.Error.websocketUpgradeFailed)
         case .body:
             break

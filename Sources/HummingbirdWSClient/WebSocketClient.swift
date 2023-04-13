@@ -62,7 +62,13 @@ public enum HBWebSocketClient {
         } catch {
             wsPromise.fail(error)
         }
-        return wsPromise.futureResult
+        return wsPromise.futureResult.flatMapError { error in
+            // respond to redirect error
+            if let redirect = error as? RedirectError {
+                return self.connect(url: HBURL(redirect.location), headers: headers, configuration: configuration, on: eventLoop)
+            }
+            return eventLoop.makeFailedFuture(error)
+        }
     }
 
     /// create bootstrap
@@ -135,6 +141,10 @@ public enum HBWebSocketClient {
     public enum Error: Swift.Error {
         case invalidURL
         case websocketUpgradeFailed
+    }
+
+    struct RedirectError: Swift.Error {
+        let location: String
     }
 
     /// WebSocket connection configuration

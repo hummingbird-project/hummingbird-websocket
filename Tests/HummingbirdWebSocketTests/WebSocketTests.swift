@@ -405,4 +405,46 @@ extension HummingbirdWebSocketTests {
 
         try promise.wait()
     }
+
+    func testRedirect() async throws {
+        var serverHello: Bool = false
+        var clientHello: Bool = false
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(5))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade()
+        // on websocket connect.
+        app.ws.on(
+            "/test2",
+            onUpgrade: { _, ws in
+                ws.onRead { data, ws in
+                    XCTAssertEqual(data, .text("Hello"))
+                    serverHello = true
+                    ws.write(.text("Hello back"), promise: nil)
+                }
+            }
+        )
+        app.router.get("test") { _ -> HBResponse in
+            return .redirect(to: "ws://localhost:8080/test2")
+        }
+        try app.start()
+        defer { app.stop() }
+
+        let eventLoop = app.eventLoopGroup.next()
+        let ws = try await HBWebSocketClient.connect(
+            url: "ws://localhost:8080/test",
+            configuration: .init(),
+            on: eventLoop
+        )
+        ws.onRead { data, _ in
+            XCTAssertEqual(data, .text("Hello back"))
+            clientHello = true
+            promise.succeed()
+        }
+        try await ws.write(.text("Hello"))
+
+        try promise.wait()
+        XCTAssertTrue(serverHello)
+        XCTAssertTrue(clientHello)
+    }
 }
