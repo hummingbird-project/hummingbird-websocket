@@ -159,7 +159,8 @@ public enum HBWebSocketClient {
     public struct Configuration: Sendable {
         /// TLS setup
         let tlsConfiguration: TLSConfiguration
-        /// Redirects
+        /// Redirects. RFC 6455 doesn't require clients to follow redirects and the whatwg spec says they
+        /// shouldn't be followed, but if you really want to, you can enable them via `followRedirects`.
         let followRedirects: Bool
         /// Maximum size for a single frame
         let maxFrameSize: Int
