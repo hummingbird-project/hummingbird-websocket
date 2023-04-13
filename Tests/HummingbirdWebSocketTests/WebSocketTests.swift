@@ -433,7 +433,7 @@ extension HummingbirdWebSocketTests {
         let eventLoop = app.eventLoopGroup.next()
         let ws = try await HBWebSocketClient.connect(
             url: "ws://localhost:8080/test",
-            configuration: .init(),
+            configuration: .init(followRedirects: true),
             on: eventLoop
         )
         ws.onRead { data, _ in
