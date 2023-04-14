@@ -26,7 +26,21 @@ extension HBHTTPServer {
         shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
         onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
     ) {
+        return self.addWebSocketUpgrade(maxFrameSize: 1 << 14, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
+    }
+
+    /// Add WebSocket upgrade option
+    /// - Parameters:
+    ///   - maxFrameSize: Maximum size for a single frame
+    ///   - shouldUpgrade: Closure returning whether upgrade should happen
+    ///   - onUpgrade: Closure called once upgrade has happened. Includes the `HBWebSocket` created to service the WebSocket connection.
+    public func addWebSocketUpgrade(
+        maxFrameSize: Int,
+        shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
+        onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
+    ) {
         let upgrader = NIOWebSocketServerUpgrader(
+            maxFrameSize: maxFrameSize,
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) in
                 return shouldUpgrade(channel, head)
             },
