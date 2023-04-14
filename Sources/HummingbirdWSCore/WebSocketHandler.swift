@@ -71,7 +71,7 @@ public final class WebSocketHandler: ChannelInboundHandler {
         }
 
         if let frameSeq = self.webSocketFrameSequence, frame.fin {
-            self.webSocket.read(frameSeq.result)
+            self.webSocket.read(frameSeq.combinedResult)
             self.webSocketFrameSequence = nil
         }
     }
