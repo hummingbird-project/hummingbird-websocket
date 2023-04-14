@@ -131,7 +131,7 @@ public enum HBWebSocketClient {
 
         /// initialize Configuration
         public init(
-            maxFrameSize: Int,
+            maxFrameSize: Int = 1 << 14,
             tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
         ) {
             self.maxFrameSize = maxFrameSize
