@@ -15,6 +15,7 @@
 import Hummingbird
 import HummingbirdWebSocket
 import HummingbirdWSClient
+@testable import HummingbirdWSCore
 import NIOCore
 import NIOPosix
 import XCTest
@@ -28,6 +29,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     override class func tearDown() {
         XCTAssertNoThrow(try Self.eventLoopGroup.syncShutdownGracefully())
+    }
+
+    enum Error: Swift.Error {
+        case unexpectedClose
     }
 
     struct TimeoutPromise {
@@ -52,6 +57,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try self.promise.futureResult.wait()
             self.task.cancel()
         }
+    }
+
+    func createRandomBuffer(size: Int) -> ByteBuffer {
+        // create buffer
+        var data = [UInt8](repeating: 0, count: size)
+        for i in 0..<size {
+            data[i] = UInt8.random(in: 0...255)
+        }
+        return ByteBuffer(bytes: data)
     }
 
     func setupClientAndServer(
@@ -122,6 +136,66 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try promise.wait()
         XCTAssertTrue(serverHello)
         XCTAssertTrue(clientHello)
+    }
+
+    func testClientAndServerSplitPacket() throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(5))
+        let app = try self.setupClientAndServer(
+            onServer: { ws in
+                ws.onRead { data, _ in
+                    XCTAssertEqual(data, .text("Hello World!"))
+                    promise.succeed()
+                }
+            },
+            onClient: { ws in
+                let buffer = ByteBuffer(string: "Hello ")
+                ws.send(buffer: buffer, opcode: .text, fin: false, promise: nil)
+                let buffer2 = ByteBuffer(string: "World!")
+                ws.send(buffer: buffer2, opcode: .text, fin: true, promise: nil)
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
+    }
+
+    func testClientAndServerLargeBuffer() throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
+        let buffer = self.createRandomBuffer(size: 600_000)
+
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade(maxFrameSize: 1_000_000)
+        // on websocket connect.
+        app.ws.on(
+            "/test",
+            onUpgrade: { _, ws in
+                ws.onRead { data, ws in
+                    XCTAssertEqual(data, .binary(buffer))
+                    ws.write(.binary(buffer), promise: nil)
+                }
+            }
+        )
+        try app.start()
+        defer { app.stop() }
+
+        let eventLoop = app.eventLoopGroup.next()
+        let wsFuture = HBWebSocketClient.connect(
+            url: "ws://localhost:8080/test",
+            configuration: .init(maxFrameSize: 1_000_000),
+            on: eventLoop
+        ).map { ws in
+            ws.onRead { data, _ in
+                XCTAssertEqual(data, .binary(buffer))
+                promise.succeed()
+            }
+            ws.onClose { _ in
+                promise.fail(Error.unexpectedClose)
+            }
+            ws.write(.binary(buffer), promise: nil)
+        }
+        wsFuture.cascadeFailure(to: promise.promise)
+        _ = try promise.wait()
     }
 
     func testServerImmediateWrite() throws {
