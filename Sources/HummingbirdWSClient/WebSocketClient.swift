@@ -29,6 +29,8 @@ public enum HBWebSocketClient {
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
+    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
+    ///         between the WebSocket connection being setup and the EventLoopFuture completing
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
     public static func connect(
         url: HBURL,
@@ -199,6 +201,8 @@ extension HBWebSocketClient {
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
+    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
+    ///         between the WebSocket connection being setup and the EventLoopFuture completing
     public static func connect(
         url: HBURL,
         headers: HTTPHeaders = [:],
