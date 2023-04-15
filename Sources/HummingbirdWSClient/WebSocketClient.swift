@@ -29,7 +29,23 @@ public enum HBWebSocketClient {
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
-    public static func connect(url: HBURL, headers: HTTPHeaders = [:], configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+        return self.connect(url: url, headers: [:], configuration: configuration, on: eventLoop)
+    }
+
+    /// Connect to WebSocket
+    /// - Parameters:
+    ///   - url: URL of websocket
+    ///   - headers: Additional headers to send in initial HTTP request
+    ///   - configuration: Configuration of connection
+    ///   - eventLoop: eventLoop to run connection on
+    /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
+    public static func connect(
+        url: HBURL,
+        headers: HTTPHeaders,
+        configuration: Configuration,
+        on eventLoop: EventLoop
+    ) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
             let url = try SplitURL(url: url)
@@ -181,5 +197,15 @@ extension HBWebSocketClient {
     ///   - eventLoop: eventLoop to run connection on
     public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
         return try await self.connect(url: url, configuration: configuration, on: eventLoop).get()
+    }
+
+    /// Connect to WebSocket
+    /// - Parameters:
+    ///   - url: URL of websocket
+    ///   - headers: Additional headers to send in initial HTTP request
+    ///   - configuration: Configuration of connection
+    ///   - eventLoop: eventLoop to run connection on
+    public static func connect(url: HBURL, headers: HTTPHeaders, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
+        return try await self.connect(url: url, headers: headers, configuration: configuration, on: eventLoop).get()
     }
 }
