@@ -379,7 +379,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         _ = try wsFuture.wait()
     }
 
-#if canImport(Network)
+    #if canImport(Network)
     func testTransportServices() throws {
         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
 
@@ -418,7 +418,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         wsFuture.cascadeFailure(to: promise.promise)
         _ = try promise.wait()
     }
-#endif // canImport(Network)
+    #endif // canImport(Network)
 }
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)

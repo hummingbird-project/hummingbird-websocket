@@ -162,6 +162,9 @@ public final class HBWebSocket {
 
     func read(_ data: WebSocketData) {
         self.readCallback?(data, self)
+        if self.readCallback == nil {
+            print("Read data when no read callback was set")
+        }
     }
 
     /// Send web socket frame to server

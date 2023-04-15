@@ -226,7 +226,7 @@ public enum HBWebSocketClient {
             self.tlsConfiguration = .niossl(tlsConfiguration)
         }
 
-#if canImport(Network)
+        #if canImport(Network)
         /// initialize Configuration
         public init(
             maxFrameSize: Int = 1 << 14,
@@ -235,7 +235,7 @@ public enum HBWebSocketClient {
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = .ts(tlsConfiguration)
         }
-#endif
+        #endif
     }
 
     /// Processed URL split into sections we need for connection
