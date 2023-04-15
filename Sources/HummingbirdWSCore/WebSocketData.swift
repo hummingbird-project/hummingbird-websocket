@@ -26,28 +26,44 @@ struct WebSocketFrameSequence {
     enum SequenceType {
         case text
         case binary
+
+        var opcode: WebSocketOpcode {
+            switch self {
+            case .text:
+                return .text
+            case .binary:
+                return .binary
+            }
+        }
     }
 
-    var buffer: ByteBuffer
+    var buffers: [ByteBuffer]
+    var size: Int
     var type: SequenceType
 
     init(type: SequenceType) {
-        self.buffer = ByteBufferAllocator().buffer(capacity: 0)
+        self.buffers = []
         self.type = type
+        self.size = 0
     }
 
     mutating func append(_ frame: WebSocketFrame) {
-        var data = frame.unmaskedData
-        self.buffer.writeBuffer(&data)
+        assert(frame.opcode == self.type.opcode)
+        self.buffers.append(frame.unmaskedData)
+        self.size += frame.unmaskedData.readableBytes
     }
 
     /// Combined frames
-    var result: WebSocketData {
+    var combinedResult: WebSocketData {
+        var result = ByteBufferAllocator().buffer(capacity: self.size)
+        for var buffer in self.buffers {
+            result.writeBuffer(&buffer)
+        }
         switch self.type {
         case .text:
-            return .text(String(buffer: self.buffer))
+            return .text(String(buffer: result))
         case .binary:
-            return .binary(self.buffer)
+            return .binary(result)
         }
     }
 }

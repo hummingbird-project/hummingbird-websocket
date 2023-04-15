@@ -43,14 +43,20 @@ public struct HBWebSocketRouterGroup {
         let responder = HBCallbackResponder { request in
             var request = request
             if request.webSocketTestShouldUpgrade != nil {
-                return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
+                return request.body.consumeBody(
+                    maxSize: request.application.configuration.maxUploadSize,
+                    on: request.eventLoop
+                ).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return shouldUpgrade(request).map { headers in
                         return HBResponse(status: .ok, headers: headers ?? [:])
                     }
                 }
             } else if let webSocket = request.webSocket {
-                return request.body.consumeBody(on: request.eventLoop).flatMap { buffer in
+                return request.body.consumeBody(
+                    maxSize: request.application.configuration.maxUploadSize,
+                    on: request.eventLoop
+                ).flatMap { buffer in
                     request.body = .byteBuffer(buffer)
                     return onUpgrade(request, webSocket).map { HBResponse(status: $0) }
                 }

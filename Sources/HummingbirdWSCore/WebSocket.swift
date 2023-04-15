@@ -165,7 +165,7 @@ public final class HBWebSocket {
     }
 
     /// Send web socket frame to server
-    private func send(
+    func send(
         buffer: ByteBuffer,
         opcode: WebSocketOpcode,
         fin: Bool = true,

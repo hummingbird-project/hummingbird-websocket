@@ -24,9 +24,20 @@ public struct HBWebSocketBuilder {
         var remoteAddress: SocketAddress? { nil }
     }
 
-    /// Add WebSocket upgrade option. This should be called before any other access to `HBApplication.ws` is performed
+    /// Add WebSocket upgrade option.
+    ///
+    /// This should be called before any other access to `HBApplication.ws` is performed
     public func addUpgrade() {
+        self.addUpgrade(maxFrameSize: 1 << 14)
+    }
+
+    /// Add WebSocket upgrade option.
+    ///
+    /// This should be called before any other access to `HBApplication.ws` is performed
+    /// - Parameter maxFrameSize: Maximum size for a web socket frame
+    public func addUpgrade(maxFrameSize: Int) {
         self.application.server.addWebSocketUpgrade(
+            maxFrameSize: maxFrameSize,
             shouldUpgrade: { channel, head in
                 var request = HBRequest(
                     head: head,

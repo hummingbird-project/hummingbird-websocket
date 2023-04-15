@@ -38,7 +38,7 @@ public enum HBWebSocketClient {
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .channelInitializer { channel in
-                    return Self.setupChannelForWebsockets(url: url, headers: headers, channel: channel, wsPromise: wsPromise, on: eventLoop)
+                    return Self.setupChannelForWebsockets(url: url, headers: headers, configuration: configuration, channel: channel, wsPromise: wsPromise, on: eventLoop)
                 }
                 .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
@@ -67,6 +67,7 @@ public enum HBWebSocketClient {
     static func setupChannelForWebsockets(
         url: SplitURL,
         headers: HTTPHeaders,
+        configuration: Configuration,
         channel: Channel,
         wsPromise: EventLoopPromise<HBWebSocket>,
         on eventLoop: EventLoop
@@ -90,7 +91,10 @@ public enum HBWebSocketClient {
         // create random key for request key
         let requestKey = (0..<16).map { _ in UInt8.random(in: .min ..< .max) }
         let base64Key = String(base64Encoding: requestKey, options: [])
-        let websocketUpgrader = NIOWebSocketClientUpgrader(requestKey: base64Key) { channel, _ in
+        let websocketUpgrader = NIOWebSocketClientUpgrader(
+            requestKey: base64Key,
+            maxFrameSize: configuration.maxFrameSize
+        ) { channel, _ in
             let webSocket = HBWebSocket(channel: channel, type: .client)
             return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
                 wsPromise.succeed(webSocket)
@@ -122,10 +126,15 @@ public enum HBWebSocketClient {
         /// TLS setup
         let tlsConfiguration: TLSConfiguration
 
+        /// Maximum size for a single frame
+        let maxFrameSize: Int
+
         /// initialize Configuration
         public init(
+            maxFrameSize: Int = 1 << 14,
             tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
         ) {
+            self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = tlsConfiguration
         }
     }
