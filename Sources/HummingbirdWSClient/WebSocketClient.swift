@@ -235,8 +235,8 @@ public enum HBWebSocketClient {
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = .ts(tlsConfiguration)
         }
-    }
 #endif
+    }
 
     /// Processed URL split into sections we need for connection
     struct SplitURL {
