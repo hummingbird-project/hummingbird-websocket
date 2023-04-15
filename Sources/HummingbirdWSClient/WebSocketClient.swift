@@ -18,8 +18,14 @@ import HummingbirdWSCore
 import NIOCore
 import NIOHTTP1
 import NIOPosix
+#if canImport(NIOSSL)
 import NIOSSL
+#endif
 import NIOWebSocket
+#if canImport(Network)
+import Network
+import NIOTransportServices
+#endif
 
 /// Manages WebSocket client creation
 public enum HBWebSocketClient {
@@ -67,16 +73,55 @@ public enum HBWebSocketClient {
 
     /// create bootstrap
     static func createBootstrap(url: SplitURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
-        if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
-            let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
-            let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
-            let bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
+        var bootstrap: NIOClientTCPBootstrap
+        let serverName = url.host
+        #if canImport(Network)
+        // if eventLoop is compatible with NIOTransportServices create a NIOTSConnectionBootstrap
+        if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
+            // create NIOClientTCPBootstrap with NIOTS TLS provider
+            let options: NWProtocolTLS.Options
+            switch configuration.tlsConfiguration {
+            case .ts(let config):
+                options = try config.getNWProtocolTLSOptions()
+            // This should use canImport(NIOSSL), will change when it works with SwiftUI previews.
+            #if os(macOS) || os(Linux)
+            case .niossl:
+                throw Error.wrongTLSConfig
+            #endif
+            case .default:
+                options = NWProtocolTLS.Options()
+            }
+            sec_protocol_options_set_tls_server_name(options.securityProtocolOptions, serverName)
+            let tlsProvider = NIOTSClientTLSProvider(tlsOptions: options)
+            bootstrap = NIOClientTCPBootstrap(tsBootstrap, tls: tlsProvider)
             if url.tlsRequired {
-                bootstrap.enableTLS()
+                return bootstrap.enableTLS()
             }
             return bootstrap
         }
-        preconditionFailure("Failed to create web socket bootstrap")
+        #endif
+        // This should use canImport(NIOSSL), will change when it works with SwiftUI previews.
+        #if os(macOS) || os(Linux)
+        if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
+            let tlsConfiguration: TLSConfiguration
+            switch configuration.tlsConfiguration {
+            case .niossl(let config):
+                tlsConfiguration = config
+            default:
+                tlsConfiguration = TLSConfiguration.makeClientConfiguration()
+            }
+            if url.tlsRequired {
+                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+                let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: serverName)
+                bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
+                return bootstrap.enableTLS()
+            } else {
+                bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
+            }
+            return bootstrap
+        }
+        #endif
+        preconditionFailure("Cannot create bootstrap for the supplied EventLoop")
     }
 
     /// setup for channel for websocket. Create initial HTTP request and include upgrade for when it is successful
@@ -135,23 +180,59 @@ public enum HBWebSocketClient {
     public enum Error: Swift.Error {
         case invalidURL
         case websocketUpgradeFailed
+        case wrongTLSConfig
     }
 
     /// WebSocket connection configuration
-    public struct Configuration: Sendable {
+    public struct Configuration {
+        /// Enum for different TLS Configuration types.
+        ///
+        /// The TLS Configuration type to use if defined by the EventLoopGroup the client is using.
+        /// If you don't provide an EventLoopGroup then the EventLoopGroup created will be defined
+        /// by this variable. It is recommended on iOS you use NIO Transport Services.
+        enum TLSConfigurationType {
+            /// NIOSSL TLS configuration
+            // This should use canImport(NIOSSL), will change when it works with SwiftUI previews.
+            #if os(macOS) || os(Linux)
+            case niossl(TLSConfiguration)
+            #endif
+            #if canImport(Network)
+            /// NIO Transport Serviecs TLS configuration
+            case ts(TSTLSConfiguration)
+            #endif
+            case `default`
+        }
+
         /// TLS setup
-        let tlsConfiguration: TLSConfiguration
+        let tlsConfiguration: TLSConfigurationType
 
         /// Maximum size for a single frame
         let maxFrameSize: Int
 
         /// initialize Configuration
         public init(
-            maxFrameSize: Int = 1 << 14,
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
+            maxFrameSize: Int = 1 << 14
         ) {
             self.maxFrameSize = maxFrameSize
-            self.tlsConfiguration = tlsConfiguration
+            self.tlsConfiguration = .default
+        }
+
+        /// initialize Configuration
+        public init(
+            maxFrameSize: Int = 1 << 14,
+            tlsConfiguration: TLSConfiguration
+        ) {
+            self.maxFrameSize = maxFrameSize
+            self.tlsConfiguration = .niossl(tlsConfiguration)
+        }
+
+        /// initialize Configuration
+        public init(
+            maxFrameSize: Int = 1 << 14,
+            tlsConfiguration: TSTLSConfiguration
+        ) {
+            self.maxFrameSize = maxFrameSize
+            self.tlsConfiguration = .ts(tlsConfiguration)
         }
     }
 

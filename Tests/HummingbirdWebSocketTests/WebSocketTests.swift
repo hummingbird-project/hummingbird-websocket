@@ -18,6 +18,7 @@ import HummingbirdWSClient
 @testable import HummingbirdWSCore
 import NIOCore
 import NIOPosix
+import NIOTransportServices
 import XCTest
 
 final class HummingbirdWebSocketTests: XCTestCase {
@@ -376,6 +377,45 @@ final class HummingbirdWebSocketTests: XCTestCase {
             on: eventLoop
         )
         _ = try wsFuture.wait()
+    }
+
+    func testTransportServices() throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
+
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade()
+        // on websocket connect.
+        app.ws.on(
+            "/test",
+            onUpgrade: { _, ws in
+                ws.onRead { data, ws in
+                    XCTAssertEqual(data, .text("Hello"))
+                    ws.write(.text("Hello back"), promise: nil)
+                }
+            }
+        )
+        try app.start()
+        defer { app.stop() }
+
+        let elg = NIOTSEventLoopGroup()
+        defer { XCTAssertNoThrow(try elg.syncShutdownGracefully()) }
+        let wsFuture = HBWebSocketClient.connect(
+            url: "ws://localhost:8080/test",
+            configuration: .init(maxFrameSize: 1_000_000),
+            on: elg.next()
+        ).map { ws in
+            ws.onRead { data, _ in
+                XCTAssertEqual(data, .text("Hello back"))
+                promise.succeed()
+            }
+            ws.onClose { _ in
+                promise.fail(Error.unexpectedClose)
+            }
+            ws.write(.text("Hello"), promise: nil)
+        }
+        wsFuture.cascadeFailure(to: promise.promise)
+        _ = try promise.wait()
     }
 }
 
