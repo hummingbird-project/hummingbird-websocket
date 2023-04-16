@@ -199,21 +199,36 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testServerImmediateWrite() throws {
-        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(60))
-        let app = try self.setupClientAndServer(
-            onServer: { ws in
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
+
+        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        // add HTTP to WebSocket upgrade
+        app.ws.addUpgrade(maxFrameSize: 1_000_000)
+        // on websocket connect.
+        app.ws.on(
+            "/test",
+            onUpgrade: { _, ws in
                 ws.write(.text("hello"), promise: nil)
-            },
-            onClient: { ws in
-                ws.onRead { data, _ in
-                    XCTAssertEqual(data, .text("hello"))
-                    promise.succeed()
-                }
             }
         )
+        try app.start()
         defer { app.stop() }
 
-        try promise.wait()
+        let eventLoop = app.eventLoopGroup.next()
+        let wsFuture = HBWebSocketClient.connect(
+            url: "ws://localhost:8080/test",
+            configuration: .init(maxFrameSize: 1_000_000),
+            on: eventLoop
+        ) { data, _ in
+            XCTAssertEqual(data, .text("hello"))
+            promise.succeed()
+        }.map { ws in
+            ws.onClose { _ in
+                promise.fail(Error.unexpectedClose)
+            }
+        }
+        wsFuture.cascadeFailure(to: promise.promise)
+        _ = try promise.wait()
     }
 
     func testNotWebSocket() throws {

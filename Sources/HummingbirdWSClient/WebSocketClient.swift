@@ -26,25 +26,18 @@ public enum HBWebSocketClient {
     /// Connect to WebSocket
     /// - Parameters:
     ///   - url: URL of websocket
-    ///   - configuration: Configuration of connection
-    ///   - eventLoop: eventLoop to run connection on
-    /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
-    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
-        return self.connect(url: url, headers: [:], configuration: configuration, on: eventLoop)
-    }
-
-    /// Connect to WebSocket
-    /// - Parameters:
-    ///   - url: URL of websocket
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
+    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
+    ///         between the WebSocket connection being setup and the EventLoopFuture completing
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
     public static func connect(
         url: HBURL,
-        headers: HTTPHeaders,
+        headers: HTTPHeaders = [:],
         configuration: Configuration,
-        on eventLoop: EventLoop
+        on eventLoop: EventLoop,
+        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
     ) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
@@ -54,7 +47,15 @@ public enum HBWebSocketClient {
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .channelInitializer { channel in
-                    return Self.setupChannelForWebsockets(url: url, headers: headers, configuration: configuration, channel: channel, wsPromise: wsPromise, on: eventLoop)
+                    return Self.setupChannelForWebsockets(
+                        url: url,
+                        headers: headers,
+                        configuration: configuration,
+                        channel: channel,
+                        wsPromise: wsPromise,
+                        on: eventLoop,
+                        readCallback: readCallback
+                    )
                 }
                 .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
@@ -86,7 +87,8 @@ public enum HBWebSocketClient {
         configuration: Configuration,
         channel: Channel,
         wsPromise: EventLoopPromise<HBWebSocket>,
-        on eventLoop: EventLoop
+        on eventLoop: EventLoop,
+        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
     ) -> EventLoopFuture<Void> {
         let upgradePromise = eventLoop.makePromise(of: Void.self)
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
@@ -112,6 +114,9 @@ public enum HBWebSocketClient {
             maxFrameSize: configuration.maxFrameSize
         ) { channel, _ in
             let webSocket = HBWebSocket(channel: channel, type: .client)
+            if let readCallback = readCallback {
+                webSocket.onRead(readCallback)
+            }
             return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
                 wsPromise.succeed(webSocket)
                 upgradePromise.succeed(())
@@ -193,19 +198,24 @@ extension HBWebSocketClient {
     /// Connect to WebSocket
     /// - Parameters:
     ///   - url: URL of websocket
-    ///   - configuration: Configuration of connection
-    ///   - eventLoop: eventLoop to run connection on
-    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
-        return try await self.connect(url: url, configuration: configuration, on: eventLoop).get()
-    }
-
-    /// Connect to WebSocket
-    /// - Parameters:
-    ///   - url: URL of websocket
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
-    public static func connect(url: HBURL, headers: HTTPHeaders, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
-        return try await self.connect(url: url, headers: headers, configuration: configuration, on: eventLoop).get()
+    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
+    ///         between the WebSocket connection being setup and the EventLoopFuture completing
+    public static func connect(
+        url: HBURL,
+        headers: HTTPHeaders = [:],
+        configuration: Configuration,
+        on eventLoop: EventLoop,
+        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
+    ) async throws -> HBWebSocket {
+        return try await self.connect(
+            url: url,
+            headers: headers,
+            configuration: configuration,
+            on: eventLoop,
+            readCallback: readCallback
+        ).get()
     }
 }
