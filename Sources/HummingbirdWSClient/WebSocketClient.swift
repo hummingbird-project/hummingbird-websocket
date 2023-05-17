@@ -66,7 +66,14 @@ public enum HBWebSocketClient {
             // respond to redirect error
             if let redirect = error as? RedirectError {
                 if configuration.followRedirects {
-                    return self.connect(url: HBURL(redirect.location), headers: headers, configuration: configuration, on: eventLoop)
+                    let redirectURL = HBURL(redirect.location)
+                    let originalRequiresTLS = url.scheme == .https || url.scheme == .wss ? true : false
+                    let redirectRequiresTLS = redirectURL.scheme == .https || redirectURL.scheme == .wss ? true : false
+                    // don't allow a redirect to remove TLS
+                    if originalRequiresTLS, !redirectRequiresTLS {
+                        return eventLoop.makeFailedFuture(Error.redirect)
+                    }
+                    return self.connect(url: redirectURL, headers: headers, configuration: configuration, on: eventLoop)
                 } else {
                     return eventLoop.makeFailedFuture(Error.redirect)
                 }
@@ -161,6 +168,7 @@ public enum HBWebSocketClient {
         let tlsConfiguration: TLSConfiguration
         /// Redirects. RFC 6455 doesn't require clients to follow redirects and the whatwg spec says they
         /// shouldn't be followed, but if you really want to, you can enable them via `followRedirects`.
+        /// Redirects are not allowed to remove TLS.
         let followRedirects: Bool
         /// Maximum size for a single frame
         let maxFrameSize: Int
