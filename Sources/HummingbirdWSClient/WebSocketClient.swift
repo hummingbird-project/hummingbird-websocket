@@ -23,22 +23,17 @@ import NIOWebSocket
 
 /// Manages WebSocket client creation
 public enum HBWebSocketClient {
+	enum Error:Swift.Error {
+		case invalidURL
+	}
+
     /// Connect to WebSocket
     /// - Parameters:
     ///   - url: URL of websocket
-    ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
-    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
-    ///         between the WebSocket connection being setup and the EventLoopFuture completing
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
-    public static func connect(
-        url: HBURL,
-        headers: HTTPHeaders = [:],
-        configuration: Configuration,
-        on eventLoop: EventLoop,
-        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
-    ) -> EventLoopFuture<HBWebSocket> {
+    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
             let url = try SplitURL(url: url)
@@ -47,19 +42,10 @@ public enum HBWebSocketClient {
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .channelInitializer { channel in
-                    return Self.setupChannelForWebsockets(
-                        url: url,
-                        headers: headers,
-                        configuration: configuration,
-                        channel: channel,
-                        wsPromise: wsPromise,
-                        on: eventLoop,
-                        readCallback: readCallback
-                    )
-                }
+                    return Self.setupChannelForWebsockets(url: url, channel: channel, wsPromise: wsPromise, on: eventLoop, configuration: configuration)
+                }.connectTimeout(.seconds(5))
                 .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
-
         } catch {
             wsPromise.fail(error)
         }
@@ -69,57 +55,51 @@ public enum HBWebSocketClient {
     /// create bootstrap
     static func createBootstrap(url: SplitURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
         if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
-            let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
-            let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
-            let bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
+            let bootstrap: NIOClientTCPBootstrap
+            
             if url.tlsRequired {
+                let sslContext = try NIOSSLContext(configuration: configuration.tlsConfiguration)
+                let tlsProvider = try NIOSSLClientTLSProvider<ClientBootstrap>(context: sslContext, serverHostname: url.host)
+                bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: tlsProvider)
                 bootstrap.enableTLS()
+            } else {
+                bootstrap = NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
             }
+            
             return bootstrap
         }
         preconditionFailure("Failed to create web socket bootstrap")
     }
 
+
     /// setup for channel for websocket. Create initial HTTP request and include upgrade for when it is successful
     static func setupChannelForWebsockets(
-        url: SplitURL,
-        headers: HTTPHeaders,
-        configuration: Configuration,
-        channel: Channel,
-        wsPromise: EventLoopPromise<HBWebSocket>,
-        on eventLoop: EventLoop,
-        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
+        url:SplitURL,
+        channel:Channel,
+        wsPromise:EventLoopPromise<HBWebSocket>,
+        on eventLoop:EventLoop,
+        configuration:Configuration
     ) -> EventLoopFuture<Void> {
-        let upgradePromise = eventLoop.makePromise(of: Void.self)
+        let upgradePromise = eventLoop.makePromise(of:Void.self)
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
-
-        // initial HTTP request handler, before upgrade
-        let httpHandler: WebSocketInitialRequestHandler
-        do {
-            httpHandler = try WebSocketInitialRequestHandler(
-                url: url,
-                headers: headers,
-                upgradePromise: upgradePromise
-            )
-        } catch {
-            upgradePromise.fail(Error.invalidURL)
-            return upgradePromise.futureResult
-        }
-
+        
         // create random key for request key
         let requestKey = (0..<16).map { _ in UInt8.random(in: .min ..< .max) }
         let base64Key = String(base64Encoding: requestKey, options: [])
-        let websocketUpgrader = NIOWebSocketClientUpgrader(
-            requestKey: base64Key,
-            maxFrameSize: configuration.maxFrameSize
-        ) { channel, _ in
+
+        // initial HTTP request handler, before upgrade
+        let httpHandler:WebSocketInitialRequestHandler
+        do {
+            httpHandler = try WebSocketInitialRequestHandler(url: url)
+        } catch let error {
+            upgradePromise.fail(error)
+            return upgradePromise.futureResult
+        }
+
+        let websocketUpgrader = HBWebSocketClientUpgrader(host:url.hostHeader, requestKey: base64Key, maxFrameSize: 1 << 20, upgradePromise:upgradePromise) { channel, _ in
             let webSocket = HBWebSocket(channel: channel, type: .client)
-            if let readCallback = readCallback {
-                webSocket.onRead(readCallback)
-            }
             return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
                 wsPromise.succeed(webSocket)
-                upgradePromise.succeed(())
             }
         }
 
@@ -136,39 +116,31 @@ public enum HBWebSocketClient {
         }
     }
 
-    /// Possible Errors returned by websocket connection
-    public enum Error: Swift.Error {
-        case invalidURL
-        case websocketUpgradeFailed
-    }
-
     /// WebSocket connection configuration
-    public struct Configuration: Sendable {
+    public struct Configuration {
         /// TLS setup
-        let tlsConfiguration: TLSConfiguration
-
-        /// Maximum size for a single frame
-        let maxFrameSize: Int
+        public let tlsConfiguration:TLSConfiguration
 
         /// initialize Configuration
-        public init(
-            maxFrameSize: Int = 1 << 14,
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
-        ) {
-            self.maxFrameSize = maxFrameSize
+        public init(tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()) {
             self.tlsConfiguration = tlsConfiguration
+        }
+
+        internal func withDecrementedRedirectCount() -> Configuration {
+            return Configuration(tlsConfiguration: self.tlsConfiguration)
         }
     }
 
     /// Processed URL split into sections we need for connection
     struct SplitURL {
-        let host: String
-        let pathQuery: String
-        let port: Int
-        let tlsRequired: Bool
+        let host:String
+        let pathQuery:String
+        let port:Int
+        let tlsRequired:Bool
 
-        init(url: HBURL) throws {
-            guard let host = url.host else { throw HBWebSocketClient.Error.invalidURL }
+        /// Initialize SplitURL
+        init(url:HBURL) throws {
+            guard let host = url.host else { throw Error.invalidURL }
             self.host = host
             if let port = url.port {
                 self.port = port
@@ -183,7 +155,7 @@ public enum HBWebSocketClient {
             self.pathQuery = url.path + (url.query.map { "?\($0)" } ?? "")
         }
 
-        /// return "Host" header value. Only include port if it is different from the default port for the request
+        /// Return "Host" header value. Only include port if it is different from the default port for the request
         var hostHeader: String {
             if (self.tlsRequired && self.port != 443) || (!self.tlsRequired && self.port != 80) {
                 return "\(self.host):\(self.port)"
@@ -193,29 +165,22 @@ public enum HBWebSocketClient {
     }
 }
 
+#if compiler(>=5.5.2) && canImport(_Concurrency)
+
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension HBWebSocketClient {
     /// Connect to WebSocket
     /// - Parameters:
     ///   - url: URL of websocket
-    ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
-    ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
-    ///         between the WebSocket connection being setup and the EventLoopFuture completing
-    public static func connect(
-        url: HBURL,
-        headers: HTTPHeaders = [:],
-        configuration: Configuration,
-        on eventLoop: EventLoop,
-        readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
-    ) async throws -> HBWebSocket {
-        return try await self.connect(
-            url: url,
-            headers: headers,
-            configuration: configuration,
-            on: eventLoop,
-            readCallback: readCallback
-        ).get()
+    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) async throws -> HBWebSocket {
+        return try await self.connect(url: url, configuration: configuration, on: eventLoop).get()
     }
 }
+
+#endif // compiler(>=5.5.2) && canImport(_Concurrency)
+
+#if compiler(>=5.6)
+extension HBWebSocketClient.Configuration: Sendable {}
+#endif // compiler(>=5.6)
