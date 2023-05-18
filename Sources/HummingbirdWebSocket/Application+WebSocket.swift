@@ -35,7 +35,7 @@ public struct HBWebSocketBuilder {
     ///
     /// This should be called before any other access to `HBApplication.ws` is performed
     /// - Parameter maxFrameSize: Maximum size for a web socket frame
-    public func addUpgrade(maxFrameSize: Int, extensions: [WebSocketExtension] = []) {
+    public func addUpgrade(maxFrameSize: Int, extensions: [WebSocketExtensionConfig] = []) {
         self.application.server.addWebSocketUpgrade(
             maxFrameSize: maxFrameSize,
             extensions: extensions,

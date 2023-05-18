@@ -34,6 +34,11 @@ public final class HBWebSocket {
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
+    #if compiler(>=5.8)
+    private let decompressor: (any NIODecompressor)?
+    #else
+    private let decompressor: NIODecompressor?
+    #endif
 
     public init(channel: Channel, type: SocketType, extensions: [WebSocketExtension] = []) {
         self.channel = channel
@@ -43,6 +48,32 @@ public final class HBWebSocket {
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
         self.extensions = extensions
+        #if compiler(>=5.8)
+        var decompressor: (any NIODecompressor)?
+        #else
+        var decompressor: NIODecompressor?
+        #endif
+        for ext in self.extensions {
+            switch ext {
+            case .perMessageDeflate(let requestMaxWindow, _, _, _):
+                decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: requestMaxWindow ?? 15)
+            }
+        }
+        self.decompressor = decompressor
+        if let decompressor = self.decompressor {
+            do {
+                try decompressor.startStream()
+                self.channel.closeFuture.whenComplete { _ in
+                    try? decompressor.finishStream()
+                }
+            } catch {
+                // if we failed to start a streamed compressor then close the websocket
+                self.close(code: .unexpectedServerError, promise: nil)
+            }
+        }
+        self.channel.closeFuture.whenComplete { _ in
+            self.autoPingTask?.cancel()
+        }
     }
 
     /// Set callback to be called whenever WebSocket receives data
@@ -58,7 +89,6 @@ public final class HBWebSocket {
     /// Set callback to be called whenever WebSocket channel is closed
     public func onClose(_ cb: @escaping CloseCallback) {
         self.channel.closeFuture.whenComplete { _ in
-            self.autoPingTask?.cancel()
             cb(self)
         }
     }
@@ -174,8 +204,25 @@ public final class HBWebSocket {
         }
     }
 
-    func read(_ data: WebSocketData) {
-        self.readCallback?(data, self)
+    func read(_ frameSequence: WebSocketFrameSequence) {
+        var bytes = frameSequence.bytes
+        for ext in self.extensions {
+            switch ext {
+            case .perMessageDeflate(_, let requestNoContextTakeover, _, _):
+                if frameSequence.rsv1, let decompressor = self.decompressor {
+                    do {
+                        bytes = try bytes.decompressStream(with: decompressor, maxSize: 1 << 14, allocator: self.channel.allocator)
+                        if requestNoContextTakeover {
+                            try decompressor.resetStream()
+                        }
+                    } catch {
+                        self.close(code: .unexpectedServerError, promise: nil)
+                    }
+                }
+            }
+        }
+        let webSocketData = frameSequence.type.webSocketData(for: bytes)
+        self.readCallback?(webSocketData, self)
     }
 
     /// Send web socket frame to server

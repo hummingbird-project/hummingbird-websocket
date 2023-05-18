@@ -36,6 +36,15 @@ struct WebSocketFrameSequence {
                 return .binary
             }
         }
+
+        func webSocketData(for bytes: ByteBuffer) -> WebSocketData {
+            switch self {
+            case .text:
+                return .text(String(buffer: bytes))
+            case .binary:
+                return .binary(bytes)
+            }
+        }
     }
 
     var buffers: [ByteBuffer]
@@ -59,30 +68,15 @@ struct WebSocketFrameSequence {
         self.size += frame.unmaskedData.readableBytes
     }
 
-    /// Combined frames
-    var combinedResult: WebSocketData {
-        var result = ByteBufferAllocator().buffer(capacity: self.size)
-        for var buffer in self.buffers {
-            result.writeBuffer(&buffer)
-        }
-        // assume reserve1 flag indicates compressed
-        if self.rsv1 {
-            do {
-                let decompressed = try result.decompress(with: .rawDeflate)
-                let values = result.readMultipleIntegers(as: (UInt8, UInt8, UInt8, UInt8).self)
-                guard let values = values, values.0 == 0, values.1 == 0, values.2 == 255, values.3 == 255 else {
-                    return .text("")
-                }
-                result = decompressed
-            } catch {
-                return .text("")
+    var bytes: ByteBuffer {
+        if self.buffers.count == 1 {
+            return self.buffers.first!
+        } else {
+            var result = ByteBufferAllocator().buffer(capacity: self.size)
+            for var buffer in self.buffers {
+                result.writeBuffer(&buffer)
             }
-        }
-        switch self.type {
-        case .text:
-            return .text(String(buffer: result))
-        case .binary:
-            return .binary(result)
+            return result
         }
     }
 }

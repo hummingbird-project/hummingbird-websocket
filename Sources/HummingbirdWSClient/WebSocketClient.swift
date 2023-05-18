@@ -113,7 +113,12 @@ public enum HBWebSocketClient {
             requestKey: base64Key,
             maxFrameSize: configuration.maxFrameSize
         ) { channel, head in
-            let webSocket = HBWebSocket(channel: channel, type: .client, extensions: WebSocketExtension.parseHeaders(head.headers, type: .client))
+            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, type: .client)
+            let webSocket = HBWebSocket(
+                channel: channel, 
+                type: .client, extensions: 
+                configuration.extensions.respond(to: serverExtensions)
+            )
             if let readCallback = readCallback {
                 webSocket.onRead(readCallback)
             }
@@ -150,13 +155,18 @@ public enum HBWebSocketClient {
         /// Maximum size for a single frame
         let maxFrameSize: Int
 
+        /// Maximum size for a single frame
+        let extensions: [WebSocketExtensionConfig]
+
         /// initialize Configuration
         public init(
             maxFrameSize: Int = 1 << 14,
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
+            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration(),
+            extensions: [WebSocketExtensionConfig] = []
         ) {
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = tlsConfiguration
+            self.extensions = extensions
         }
     }
 
