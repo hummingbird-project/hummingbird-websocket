@@ -122,11 +122,13 @@ public enum WebSocketExtension {
     public static func parseHeaders(_ headers: HTTPHeaders, type: HBWebSocket.SocketType) -> [WebSocketExtension] {
         headers["Sec-WebSocket-Extensions"].compactMap { .init(from: $0, type: type) }
     }
+}
 
-    public static func respond(_ extensions: [Self], to requestedExtensions: [Self], type: HBWebSocket.SocketType) -> [Self] {
-        return extensions.compactMap {
+extension Array where Element == WebSocketExtension {
+    func respond(to requestedExtensions: [WebSocketExtension]) -> [WebSocketExtension] {
+        return self.compactMap { element in
             for ext in requestedExtensions {
-                if let response = $0.respond(to: ext) {
+                if let response = element.respond(to: ext) {
                     return response
                 }
             }
