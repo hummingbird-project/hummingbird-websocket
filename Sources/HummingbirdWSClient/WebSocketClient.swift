@@ -33,7 +33,7 @@ public enum HBWebSocketClient {
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
-    public static func connect(url: HBURL, configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
+    public static func connect(url: HBURL, headers: HTTPHeaders = [:], configuration: Configuration, on eventLoop: EventLoop) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
         do {
             let url = try SplitURL(url: url)
@@ -42,7 +42,7 @@ public enum HBWebSocketClient {
                 .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .channelInitializer { channel in
-                    return Self.setupChannelForWebsockets(url: url, channel: channel, wsPromise: wsPromise, on: eventLoop, configuration: configuration)
+                    return Self.setupChannelForWebsockets(url: url, headers:headers, channel: channel, wsPromise: wsPromise, on: eventLoop, configuration: configuration)
                 }.connectTimeout(.seconds(5))
                 .connect(host: url.host, port: url.port)
                 .cascadeFailure(to: wsPromise)
@@ -53,7 +53,7 @@ public enum HBWebSocketClient {
     }
 
     /// create bootstrap
-    static func createBootstrap(url: SplitURL, configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
+    static func createBootstrap(url: SplitURL, headers: HTTPHeaders = [:], configuration: Configuration, on eventLoop: EventLoop) throws -> NIOClientTCPBootstrap {
         if let clientBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
             let bootstrap: NIOClientTCPBootstrap
             
@@ -75,6 +75,7 @@ public enum HBWebSocketClient {
     /// setup for channel for websocket. Create initial HTTP request and include upgrade for when it is successful
     static func setupChannelForWebsockets(
         url:SplitURL,
+		headers: HTTPHeaders = [:],
         channel:Channel,
         wsPromise:EventLoopPromise<HBWebSocket>,
         on eventLoop:EventLoop,
@@ -96,7 +97,7 @@ public enum HBWebSocketClient {
             return upgradePromise.futureResult
         }
 
-        let websocketUpgrader = HBWebSocketClientUpgrader(host:url.hostHeader, requestKey: base64Key, maxFrameSize: 1 << 20, upgradePromise:upgradePromise) { channel, _ in
+        let websocketUpgrader = HBWebSocketClientUpgrader(host:url.hostHeader, headers:headers, requestKey: base64Key, maxFrameSize: 1 << 20, upgradePromise:upgradePromise) { channel, _ in
             let webSocket = HBWebSocket(channel: channel, type: .client)
             return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
                 wsPromise.succeed(webSocket)
@@ -118,12 +119,16 @@ public enum HBWebSocketClient {
 
     /// WebSocket connection configuration
     public struct Configuration {
+		/// the maximum frame size allowed for the websocket connection
+		public let maxFrameSize:Int // 1MB frame size
+
         /// TLS setup
         public let tlsConfiguration:TLSConfiguration
 
         /// initialize Configuration
-        public init(tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()) {
-            self.tlsConfiguration = tlsConfiguration
+        public init(maxFrameSize:Int = 1 << 20, tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()) {
+            self.maxFrameSize = maxFrameSize
+			self.tlsConfiguration = tlsConfiguration
         }
 
         internal func withDecrementedRedirectCount() -> Configuration {

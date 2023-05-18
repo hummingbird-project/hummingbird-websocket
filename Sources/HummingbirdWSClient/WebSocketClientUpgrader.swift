@@ -12,8 +12,8 @@ import struct Foundation.Data
 // - this is needed to allow HummingbirdWebSocket to have precise control over the headers that are sent to the server.
 public final class HBWebSocketClientUpgrader: NIOHTTPClientProtocolUpgrader {
 	/// Errors that may be throwin into an instance's `upgradePromise
-	enum Error:Swift.Error {
-		enum ResponsePart:String {
+	public enum Error:Swift.Error {
+		public enum ResponsePart:String {
 			case httpStatus = "http status"
 			case websocketAcceptValue = "websocket accept value"
 		}
@@ -33,6 +33,8 @@ public final class HBWebSocketClientUpgrader: NIOHTTPClientProtocolUpgrader {
 
 	/// The host to send in the `Host` HTTP header.
 	private let host:String
+	/// The headers that may be added to the HTTP request.
+	private let headers: HTTPHeaders
 	/// Request key to be assigned to the `Sec-WebSocket-Key` HTTP header.
 	private let requestKey: String
 	/// Largest incoming `WebSocketFrame` size in bytes. This is used to set the `maxFrameSize` on the `WebSocket` channel handler upon a successful upgrade.
@@ -43,19 +45,19 @@ public final class HBWebSocketClientUpgrader: NIOHTTPClientProtocolUpgrader {
 	private let upgradePromise:EventLoopPromise<Void>
 	/// Called once the upgrade was successful. This is the owners opportunity to add any needed handlers to the channel pipeline.
 	private let upgradeInitiator: (Channel, HTTPResponseHead) -> EventLoopFuture<Void>
-
+	
 	/// - Parameters:
 	///   - host: sent to the server in the `Host` HTTP header. 
 	///     - Default is "localhost".
 	///   - requestKey: sent to the server in the `Sec-WebSocket-Key` HTTP header.
-	///   - maxFrameSize: largest incoming `WebSocketFrame` size in bytes. 
-	///     - Default is 16,384 bytes.
+	///   - maxFrameSize: largest incoming `WebSocketFrame` size in bytes.
 	///   - automaticErrorHandling: If true, adds `WebSocketProtocolErrorHandler` to the channel pipeline to catch and respond to WebSocket protocol errors. Default is true.
 	///   - upgradePipelineHandler: called once the upgrade was successful
 	public init(
 		host:String = "localhost",
+		headers: HTTPHeaders = [:],
 		requestKey: String,
-		maxFrameSize: Int = 1 << 20,
+		maxFrameSize: Int,
 		automaticErrorHandling: Bool = true,
 		upgradePromise:EventLoopPromise<Void>,
 		upgradeInitiator: @escaping (Channel, HTTPResponseHead) -> EventLoopFuture<Void>
@@ -78,6 +80,11 @@ public final class HBWebSocketClientUpgrader: NIOHTTPClientProtocolUpgrader {
 		upgradeRequestHeaders.replaceOrAdd(name: "Connection", value: "Upgrade")
 		upgradeRequestHeaders.replaceOrAdd(name: "Upgrade", value: "websocket")
 		upgradeRequestHeaders.replaceOrAdd(name: "Host", value: self.host)
+
+		// allow the user to write the final headers (overriding anything they may want)
+		for curHeader in upgradeRequestHeaders {
+			upgradeRequestHeaders.replaceOrAdd(name: curHeader.name, value: curHeader.value)
+		}
 	}
 
 	/// Allow or deny the upgrade based on the upgrade HTTP response
