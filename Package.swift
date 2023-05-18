@@ -5,7 +5,13 @@ import PackageDescription
 
 let package = Package(
     name: "hummingbird-websocket",
-    platforms: [.iOS(.v12), .tvOS(.v12)],
+	// these platforms are required by swift-crypto 
+    platforms: [
+		.macOS(.v10_15),
+		.iOS(.v13),
+		.watchOS(.v6),
+		.tvOS(.v13)
+	],
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
         .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
@@ -17,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.1"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
+		.package(url: "https://github.com/apple/swift-crypto.git", exact: "1.0.0") // only insecure implementations referenced, so maximum compatibility can be targeted
     ],
     targets: [
         .target(name: "HummingbirdWSCore", dependencies: [
@@ -29,6 +36,7 @@ let package = Package(
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "ExtrasBase64", package: "swift-extras-base64"),
             .product(name: "NIOSSL", package: "swift-nio-ssl"),
+			.product(name: "Crypto", package:"swift-crypto")
         ]),
         .target(name: "HummingbirdWebSocket", dependencies: [
             .byName(name: "HummingbirdWSCore"),
