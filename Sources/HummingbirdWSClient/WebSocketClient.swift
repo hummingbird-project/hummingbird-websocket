@@ -112,8 +112,8 @@ public enum HBWebSocketClient {
         let websocketUpgrader = NIOWebSocketClientUpgrader(
             requestKey: base64Key,
             maxFrameSize: configuration.maxFrameSize
-        ) { channel, _ in
-            let webSocket = HBWebSocket(channel: channel, type: .client)
+        ) { channel, head in
+            let webSocket = HBWebSocket(channel: channel, type: .client, extensions: WebSocketExtension.parseHeaders(head.headers, type: .client))
             if let readCallback = readCallback {
                 webSocket.onRead(readCallback)
             }

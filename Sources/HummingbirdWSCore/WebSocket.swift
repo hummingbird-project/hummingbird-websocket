@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2021 the Hummingbird authors
+// Copyright (c) 2021-2023 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CompressNIO
 import NIOCore
 import NIOWebSocket
 
@@ -28,18 +29,20 @@ public final class HBWebSocket {
     }
 
     let type: SocketType
+    let extensions: [WebSocketExtension]
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
 
-    public init(channel: Channel, type: SocketType) {
+    public init(channel: Channel, type: SocketType, extensions: [WebSocketExtension] = []) {
         self.channel = channel
         self.isClosed = false
         self.pongCallback = nil
         self.readCallback = nil
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
+        self.extensions = extensions
     }
 
     /// Set callback to be called whenever WebSocket receives data

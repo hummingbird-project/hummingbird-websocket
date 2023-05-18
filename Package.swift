@@ -17,12 +17,14 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.1"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
+        .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "0.5.0"),
     ],
     targets: [
         .target(name: "HummingbirdWSCore", dependencies: [
             .product(name: "HummingbirdCore", package: "hummingbird-core"),
             .product(name: "NIO", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
+            .product(name: "CompressNIO", package: "compress-nio"),
         ]),
         .target(name: "HummingbirdWSClient", dependencies: [
             .byName(name: "HummingbirdWSCore"),
