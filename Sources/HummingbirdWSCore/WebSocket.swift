@@ -34,11 +34,7 @@ public final class HBWebSocket {
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
-    #if compiler(>=5.8)
     private let decompressor: (any NIODecompressor)?
-    #else
-    private let decompressor: NIODecompressor?
-    #endif
 
     public init(channel: Channel, type: SocketType, extensions: [WebSocketExtension] = []) {
         self.channel = channel
@@ -48,11 +44,7 @@ public final class HBWebSocket {
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
         self.extensions = extensions
-        #if compiler(>=5.8)
         var decompressor: (any NIODecompressor)?
-        #else
-        var decompressor: NIODecompressor?
-        #endif
         for ext in self.extensions {
             switch ext {
             case .perMessageDeflate(let requestMaxWindow, _, _, _):
