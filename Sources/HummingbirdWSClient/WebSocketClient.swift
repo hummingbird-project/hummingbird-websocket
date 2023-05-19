@@ -94,7 +94,7 @@ public enum HBWebSocketClient {
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
 
         var headers = headers
-        headers.add(contentsOf: configuration.extensions.map { (name: "Sec-WebSocket-Extensions", value: $0.requestExtension.header(type: .client)) })
+        headers.add(contentsOf: configuration.extensions.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
 
         // initial HTTP request handler, before upgrade
         let httpHandler: WebSocketInitialRequestHandler
@@ -116,7 +116,7 @@ public enum HBWebSocketClient {
             requestKey: base64Key,
             maxFrameSize: configuration.maxFrameSize
         ) { channel, head in
-            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, type: .client)
+            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .server)
             let webSocket = HBWebSocket(
                 channel: channel,
                 type: .client, extensions:

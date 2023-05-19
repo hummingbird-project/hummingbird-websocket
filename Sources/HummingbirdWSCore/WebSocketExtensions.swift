@@ -22,85 +22,83 @@ public enum WebSocketExtensionConfig: Sendable {
         switch self {
         case .perMessageDeflate(let maxWindow, let noContextTakeover):
             switch request {
-            case .perMessageDeflate(let requestedMaxWindow, let requestedNoContextTakeover, let supportsMaxWindow, let supportsNoContextTakeover):
+            case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
                 return .perMessageDeflate(
-                    requestMaxWindow: requestedMaxWindow,
-                    requestNoContextTakeover: requestedNoContextTakeover || noContextTakeover,
-                    responseMaxWindow: supportsMaxWindow ? maxWindow : nil,
-                    responseNoContextTakeover: noContextTakeover
+                    sendMaxWindow: min(sendMaxWindow, maxWindow),
+                    sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
+                    receiveMaxWindow: min(receiveMaxWindow, maxWindow) ?? receiveMaxWindow,
+                    receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
                 )
             }
         }
     }
 
-    public var requestExtension: WebSocketExtension {
+    /// Construct header value for extension
+    /// - Parameter type: client or server
+    /// - Returns: `Sec-WebSocket-Extensions` header
+    public func clientRequestHeader() -> String {
         switch self {
         case .perMessageDeflate(let maxWindow, let noContextTakeover):
-            return .perMessageDeflate(requestMaxWindow: maxWindow, requestNoContextTakeover: noContextTakeover, responseMaxWindow: nil, responseNoContextTakeover: false)
+            var header = "permessage-deflate"
+            if let maxWindow = maxWindow {
+                header += ";client_max_window_bits=\(maxWindow)"
+            }
+            if noContextTakeover {
+                header += ";client_no_context_takeover"
+            }
+            if let maxWindow = maxWindow {
+                header += ";server_max_window_bits=\(maxWindow)"
+            }
+            if noContextTakeover {
+                header += ";server_no_context_takeover"
+            }
+            return header
         }
     }
 }
 
 public enum WebSocketExtension: Sendable, Equatable {
-    case perMessageDeflate(requestMaxWindow: Int? = 15, requestNoContextTakeover: Bool, responseMaxWindow: Int? = 15, responseNoContextTakeover: Bool)
+    case perMessageDeflate(sendMaxWindow: Int?, sendNoContextTakeover: Bool, receiveMaxWindow: Int?, receiveNoContextTakeover: Bool)
 
     /// Construct header value for extension
     /// - Parameter type: client or server
     /// - Returns: `Sec-WebSocket-Extensions` header
-    public func header(type: HBWebSocket.SocketType) -> String {
+    public func serverResponseHeader() -> String {
         switch self {
-        case .perMessageDeflate(let maxWindow, let noContextTakeover, let responseMaxWindow, let responseNoContextTakeover):
-            switch type {
-            case .server:
-                var header = "permessage-deflate"
-                if let maxWindow = responseMaxWindow {
-                    header += ";server_max_window_bits=\(maxWindow)"
-                }
-                if responseNoContextTakeover {
-                    header += ";server_no_context_takeover"
-                }
-                if let maxWindow = maxWindow {
-                    header += ";client_max_window_bits=\(maxWindow)"
-                }
-                if noContextTakeover {
-                    header += ";client_no_context_takeover"
-                }
-                return header
-            case .client:
-                var header = "permessage-deflate"
-                if let maxWindow = responseMaxWindow {
-                    header += ";client_max_window_bits=\(maxWindow)"
-                }
-                if responseNoContextTakeover {
-                    header += ";client_no_context_takeover"
-                }
-                if let maxWindow = maxWindow {
-                    header += ";server_max_window_bits=\(maxWindow)"
-                }
-                if noContextTakeover {
-                    header += ";server_no_context_takeover"
-                }
-                return header
+        case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
+            var header = "permessage-deflate"
+            if let maxWindow = sendMaxWindow {
+                header += ";server_max_window_bits=\(maxWindow)"
             }
+            if sendNoContextTakeover {
+                header += ";server_no_context_takeover"
+            }
+            if let maxWindow = receiveMaxWindow {
+                header += ";client_max_window_bits=\(maxWindow)"
+            }
+            if receiveNoContextTakeover {
+                header += ";client_no_context_takeover"
+            }
+            return header
         }
     }
 }
 
 public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
-    case perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool, supportsMaxWindow: Bool, supportsNoContextTakeover: Bool)
+    case perMessageDeflate(sendMaxWindow: Int?, sendNoContextTakeover: Bool, receiveMaxWindow: Int?, receiveNoContextTakeover: Bool)
 
     /// Initialise WebSocketExtension from header value sent to either client or server
     /// - Parameters:
     ///   - header: header value
     ///   - type: client or server
-    init?<S: StringProtocol>(from header: S, type: HBWebSocket.SocketType) {
+    init?<S: StringProtocol>(from header: S, from type: HBWebSocket.SocketType) {
         var parameters = header.split(separator: ";", omittingEmptySubsequences: true).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }[...]
         switch parameters.first {
         case "permessage-deflate":
-            var maxWindow: Int?
-            var noContextTakeover = false
-            var supportsMaxWindow = false
-            var supportsNoContextTakeover = false
+            var sendMaxWindow: Int?
+            var receiveMaxWindow: Int?
+            var sendNoContextTakeover = false
+            var receiveNoContextTakeover = false
 
             parameters = parameters.dropFirst()
             while let parameter = parameters.first {
@@ -113,19 +111,22 @@ public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
                         value = nil
                     }
                     switch (key, type) {
-                    case ("client_max_window_bits", .client), ("server_max_window_bits", .server):
+                    case ("server_max_window_bits", .client), ("client_max_window_bits", .server):
                         guard let valueString = value, let valueNumber = Int(valueString) else { return nil }
-                        maxWindow = valueNumber
+                        sendMaxWindow = valueNumber
 
-                    case ("client_max_window_bits", .server), ("server_max_window_bits", .client):
-                        guard value == nil else { return nil }
-                        supportsMaxWindow = true
+                    case ("client_max_window_bits", .client):
+                        receiveMaxWindow = value.map { Int($0) } ?? 15
 
-                    case ("server_no_context_takeover", .server), ("client_no_context_takeover", .client):
-                        noContextTakeover = true
+                    case ("server_max_window_bits", .server):
+                        guard let valueString = value, let valueNumber = Int(valueString) else { return nil }
+                        receiveMaxWindow = valueNumber
 
                     case ("server_no_context_takeover", .client), ("client_no_context_takeover", .server):
-                        supportsNoContextTakeover = true
+                        sendNoContextTakeover = true
+
+                    case ("client_no_context_takeover", .client), ("server_no_context_takeover", .server):
+                        receiveNoContextTakeover = true
 
                     default:
                         return nil
@@ -133,12 +134,13 @@ public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
                 }
                 parameters = parameters.dropFirst()
             }
-            guard maxWindow == nil || (9...15).contains(maxWindow!) else { return nil }
+            guard sendMaxWindow == nil || (9...15).contains(sendMaxWindow!) else { return nil }
+            guard receiveMaxWindow == nil || (9...15).contains(receiveMaxWindow!) else { return nil }
             self = .perMessageDeflate(
-                maxWindow: maxWindow,
-                noContextTakeover: noContextTakeover,
-                supportsMaxWindow: supportsMaxWindow,
-                supportsNoContextTakeover: supportsNoContextTakeover
+                sendMaxWindow: sendMaxWindow,
+                sendNoContextTakeover: sendNoContextTakeover,
+                receiveMaxWindow: receiveMaxWindow,
+                receiveNoContextTakeover: receiveNoContextTakeover
             )
         default:
             return nil
@@ -150,9 +152,9 @@ public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
     ///   - headers: headers coming from other
     ///   - type: client or server
     /// - Returns: Array of extensions
-    public static func parseHeaders(_ headers: HTTPHeaders, type: HBWebSocket.SocketType) -> [WebSocketExtensionHTTPParameters] {
+    public static func parseHeaders(_ headers: HTTPHeaders, from type: HBWebSocket.SocketType) -> [WebSocketExtensionHTTPParameters] {
         let extHeaders = headers["Sec-WebSocket-Extensions"].flatMap { $0.split(separator: ",") }
-        return extHeaders.compactMap { .init(from: $0, type: type) }
+        return extHeaders.compactMap { .init(from: $0, from: type) }
     }
 }
 
@@ -167,4 +169,11 @@ extension Array where Element == WebSocketExtensionConfig {
             return nil
         }
     }
+}
+
+private func min(_ a: Int?, _ b: Int?) -> Int? {
+    if case .some(let a2) = a, case .some(let b2) = b {
+        return min(a2, b2)
+    }
+    return nil
 }

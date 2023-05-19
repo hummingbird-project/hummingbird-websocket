@@ -45,14 +45,14 @@ extension HBHTTPServer {
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> in
                 shouldUpgrade(channel, head).map { headers -> HTTPHeaders? in
                     var headers = headers ?? [:]
-                    let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, type: .server)
+                    let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .client)
                     let responseExtensions = extensions.respond(to: clientExtensions)
-                    headers.add(contentsOf: responseExtensions.map { (name: "Sec-WebSocket-Extensions", value: $0.header(type: .server)) })
+                    headers.add(contentsOf: responseExtensions.map { (name: "Sec-WebSocket-Extensions", value: $0.serverResponseHeader()) })
                     return headers
                 }
             },
             upgradePipelineHandler: { (channel: Channel, head: HTTPRequestHead) -> EventLoopFuture<Void> in
-                let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, type: .server)
+                let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .client)
                 let webSocket = HBWebSocket(channel: channel, type: .server, extensions: extensions.respond(to: clientExtensions))
                 return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                     onUpgrade(webSocket, head)

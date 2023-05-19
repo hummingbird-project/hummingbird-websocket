@@ -77,25 +77,25 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
     func testExtensionHeaderParsing() {
         let headers: HTTPHeaders = ["Sec-WebSocket-Extensions": "permessage-deflate; client_max_window_bits; server_max_window_bits=10, permessage-deflate;client_max_window_bits"]
-        let extensions = WebSocketExtensionHTTPParameters.parseHeaders(headers, type: .server)
+        let extensions = WebSocketExtensionHTTPParameters.parseHeaders(headers, from: .client)
         XCTAssertEqual(
             extensions,
             [
-                .perMessageDeflate(maxWindow: 10, noContextTakeover: false, supportsMaxWindow: true, supportsNoContextTakeover: false),
-                .perMessageDeflate(maxWindow: nil, noContextTakeover: false, supportsMaxWindow: true, supportsNoContextTakeover: false),
+                .perMessageDeflate(sendMaxWindow: 10, sendNoContextTakeover: false, receiveMaxWindow: 15, receiveNoContextTakeover: false),
+                .perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: false, receiveMaxWindow: 15, receiveNoContextTakeover: false),
             ]
         )
     }
 
     func testExtensionResponse() {
         let requestExt: [WebSocketExtensionHTTPParameters] = [
-            .perMessageDeflate(maxWindow: 10, noContextTakeover: false, supportsMaxWindow: false, supportsNoContextTakeover: true),
-            .perMessageDeflate(maxWindow: nil, noContextTakeover: false, supportsMaxWindow: false, supportsNoContextTakeover: false),
+            .perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: false, receiveMaxWindow: 10, receiveNoContextTakeover: false),
         ]
         let ext = WebSocketExtensionConfig.perMessageDeflate(maxWindow: nil, noContextTakeover: true)
+        let response = [ext].respond(to: requestExt)
         XCTAssertEqual(
-            [ext].respond(to: requestExt),
-            [.perMessageDeflate(requestMaxWindow: 10, requestNoContextTakeover: true, responseMaxWindow: nil, responseNoContextTakeover: true)]
+            response,
+            [.perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: true, receiveMaxWindow: 10, receiveNoContextTakeover: true)]
         )
     }
 

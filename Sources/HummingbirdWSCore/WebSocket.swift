@@ -50,9 +50,9 @@ public final class HBWebSocket {
         var compressor: (any NIOCompressor)?
         for ext in self.extensions {
             switch ext {
-            case .perMessageDeflate(let requestMaxWindow, _, let responseMaxWindow, _):
-                decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: requestMaxWindow ?? 15)
-                compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: responseMaxWindow ?? 15)
+            case .perMessageDeflate(let sendMaxWindow, _, let receiveMaxWindow, _):
+                decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: receiveMaxWindow ?? 15)
+                compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: sendMaxWindow ?? 15)
             }
         }
         self.decompressor = decompressor
@@ -207,11 +207,11 @@ public final class HBWebSocket {
         var bytes = frameSequence.bytes
         for ext in self.extensions {
             switch ext {
-            case .perMessageDeflate(_, let requestNoContextTakeover, _, _):
+            case .perMessageDeflate(_, _, _, let receiveNoContextTakeover):
                 if frameSequence.rsv1, let decompressor = self.decompressor {
                     do {
                         bytes = try bytes.decompressStream(with: decompressor, maxSize: 1 << 14, allocator: self.channel.allocator)
-                        if requestNoContextTakeover {
+                        if receiveNoContextTakeover {
                             try decompressor.resetStream()
                         }
                     } catch {
@@ -236,7 +236,7 @@ public final class HBWebSocket {
         var rsv1 = false
         for ext in self.extensions {
             switch ext {
-            case .perMessageDeflate(_, _, _, let noContextTakeover):
+            case .perMessageDeflate(_, let sendNoContextTakeover, _, _):
                 // if compressor is setup and we are sending text or binary data
                 if let compressor = self.compressor,
                    opcode == .text || opcode == .binary,
@@ -245,7 +245,7 @@ public final class HBWebSocket {
                     do {
                         rsv1 = true
                         buffer = try buffer.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
-                        if noContextTakeover {
+                        if sendNoContextTakeover {
                             try compressor.resetStream()
                         }
                     } catch {
