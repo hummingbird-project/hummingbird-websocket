@@ -215,7 +215,7 @@ public final class HBWebSocket {
                             try decompressor.resetStream()
                         }
                     } catch {
-                        self.close(code: .unexpectedServerError, promise: nil)
+                        self.close(code: .unacceptableData, promise: nil)
                     }
                 }
             }
@@ -237,7 +237,11 @@ public final class HBWebSocket {
         for ext in self.extensions {
             switch ext {
             case .perMessageDeflate(_, _, _, let noContextTakeover):
-                if let compressor = self.compressor {
+                // if compressor is setup and we are sending text or binary data
+                if let compressor = self.compressor,
+                   opcode == .text || opcode == .binary,
+                   buffer.readableBytes > 16
+                {
                     do {
                         rsv1 = true
                         buffer = try buffer.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
