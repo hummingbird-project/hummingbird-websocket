@@ -20,6 +20,30 @@ import NIOCore
 import NIOPosix
 import XCTest
 
+struct TimeoutPromise {
+    let task: Scheduled<Void>
+    let promise: EventLoopPromise<Void>
+
+    init(eventLoop: EventLoop, timeout: TimeAmount) {
+        let promise = eventLoop.makePromise(of: Void.self)
+        self.promise = promise
+        self.task = eventLoop.scheduleTask(in: timeout) { promise.fail(ChannelError.connectTimeout(timeout)) }
+    }
+
+    func succeed() {
+        self.promise.succeed(())
+    }
+
+    func fail(_ error: Error) {
+        self.promise.fail(error)
+    }
+
+    func wait() throws {
+        try self.promise.futureResult.wait()
+        self.task.cancel()
+    }
+}
+
 final class HummingbirdWebSocketTests: XCTestCase {
     static var eventLoopGroup: EventLoopGroup!
 
@@ -33,30 +57,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     enum Error: Swift.Error {
         case unexpectedClose
-    }
-
-    struct TimeoutPromise {
-        let task: Scheduled<Void>
-        let promise: EventLoopPromise<Void>
-
-        init(eventLoop: EventLoop, timeout: TimeAmount) {
-            let promise = eventLoop.makePromise(of: Void.self)
-            self.promise = promise
-            self.task = eventLoop.scheduleTask(in: timeout) { promise.fail(ChannelError.connectTimeout(timeout)) }
-        }
-
-        func succeed() {
-            self.promise.succeed(())
-        }
-
-        func fail(_ error: Error) {
-            self.promise.fail(error)
-        }
-
-        func wait() throws {
-            try self.promise.futureResult.wait()
-            self.task.cancel()
-        }
     }
 
     func createRandomBuffer(size: Int) -> ByteBuffer {

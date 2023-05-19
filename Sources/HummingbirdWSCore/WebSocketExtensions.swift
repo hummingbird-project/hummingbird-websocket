@@ -32,6 +32,13 @@ public enum WebSocketExtensionConfig: Sendable {
             }
         }
     }
+
+    public var requestExtension: WebSocketExtension {
+        switch self {
+        case .perMessageDeflate(let maxWindow, let noContextTakeover):
+            return .perMessageDeflate(requestMaxWindow: maxWindow, requestNoContextTakeover: noContextTakeover, responseMaxWindow: nil, responseNoContextTakeover: false)
+        }
+    }
 }
 
 public enum WebSocketExtension: Sendable, Equatable {
