@@ -35,6 +35,7 @@ public final class HBWebSocket {
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
     private let decompressor: (any NIODecompressor)?
+    private let compressor: (any NIOCompressor)?
 
     public init(channel: Channel, type: SocketType, extensions: [WebSocketExtension] = []) {
         self.channel = channel
@@ -44,18 +45,24 @@ public final class HBWebSocket {
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
         self.extensions = extensions
+
         var decompressor: (any NIODecompressor)?
+        var compressor: (any NIOCompressor)?
         for ext in self.extensions {
             switch ext {
-            case .perMessageDeflate(let requestMaxWindow, _, _, _):
+            case .perMessageDeflate(let requestMaxWindow, _, let responseMaxWindow, _):
                 decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: requestMaxWindow ?? 15)
+                compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: responseMaxWindow ?? 15)
             }
         }
         self.decompressor = decompressor
-        if let decompressor = self.decompressor {
+        self.compressor = compressor
+        if let decompressor = self.decompressor, let compressor = self.compressor {
             do {
                 try decompressor.startStream()
+                try compressor.startStream()
                 self.channel.closeFuture.whenComplete { _ in
+                    try? compressor.finishStream()
                     try? decompressor.finishStream()
                 }
             } catch {
@@ -225,7 +232,25 @@ public final class HBWebSocket {
         promise: EventLoopPromise<Void>? = nil
     ) {
         let maskKey = self.makeMaskKey()
-        let frame = WebSocketFrame(fin: fin, opcode: opcode, maskKey: maskKey, data: buffer)
+        var buffer = buffer
+        var rsv1 = false
+        for ext in self.extensions {
+            switch ext {
+            case .perMessageDeflate(_, _, _, let noContextTakeover):
+                if let compressor = self.compressor {
+                    do {
+                        rsv1 = true
+                        buffer = try buffer.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
+                        if noContextTakeover {
+                            try compressor.resetStream()
+                        }
+                    } catch {
+                        self.close(code: .unexpectedServerError, promise: nil)
+                    }
+                }
+            }
+        }
+        let frame = WebSocketFrame(fin: fin, rsv1: rsv1, opcode: opcode, maskKey: maskKey, data: buffer)
         self.channel.writeAndFlush(frame, promise: promise)
     }
 
