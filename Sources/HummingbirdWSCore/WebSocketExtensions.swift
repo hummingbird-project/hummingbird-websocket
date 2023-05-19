@@ -91,6 +91,20 @@ public enum WebSocketExtension: Sendable, Equatable {
             return header
         }
     }
+
+    public func getExtension() throws -> any HBWebSocketExtension {
+        switch self {
+        case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
+            return try PerMessageDeflateExtension(
+                configuration: .init(
+                    sendMaxWindow: sendMaxWindow,
+                    sendNoContextTakeover: sendNoContextTakeover,
+                    receiveMaxWindow: receiveMaxWindow,
+                    receiveNoContextTakeover: receiveNoContextTakeover
+                )
+            )
+        }
+    }
 }
 
 public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {

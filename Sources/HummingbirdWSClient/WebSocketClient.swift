@@ -117,17 +117,23 @@ public enum HBWebSocketClient {
             maxFrameSize: configuration.maxFrameSize
         ) { channel, head in
             let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .server)
-            let webSocket = HBWebSocket(
-                channel: channel,
-                type: .client, extensions:
-                configuration.extensions.respond(to: serverExtensions)
-            )
-            if let readCallback = readCallback {
-                webSocket.onRead(readCallback)
-            }
-            return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
-                wsPromise.succeed(webSocket)
-                upgradePromise.succeed(())
+            do {
+                let webSocket = try HBWebSocket(
+                    channel: channel,
+                    type: .client, extensions:
+                    configuration.extensions.respond(to: serverExtensions).map { try $0.getExtension() }
+                )
+                if let readCallback = readCallback {
+                    webSocket.onRead(readCallback)
+                }
+                return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
+                    wsPromise.succeed(webSocket)
+                    upgradePromise.succeed(())
+                }
+            } catch {
+                wsPromise.fail(error)
+                upgradePromise.fail(error)
+                return channel.eventLoop.makeFailedFuture(error)
             }
         }
 

@@ -29,15 +29,13 @@ public final class HBWebSocket {
     }
 
     let type: SocketType
-    let extensions: [WebSocketExtension]
+    let extensions: [any HBWebSocketExtension]
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
-    private let decompressor: (any NIODecompressor)?
-    private let compressor: (any NIOCompressor)?
 
-    public init(channel: Channel, type: SocketType, extensions: [WebSocketExtension] = []) {
+    public init(channel: Channel, type: SocketType, extensions: [any HBWebSocketExtension] = []) {
         self.channel = channel
         self.isClosed = false
         self.pongCallback = nil
@@ -46,30 +44,6 @@ public final class HBWebSocket {
         self.type = type
         self.extensions = extensions
 
-        var decompressor: (any NIODecompressor)?
-        var compressor: (any NIOCompressor)?
-        for ext in self.extensions {
-            switch ext {
-            case .perMessageDeflate(let sendMaxWindow, _, let receiveMaxWindow, _):
-                decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: receiveMaxWindow ?? 15)
-                compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: sendMaxWindow ?? 15)
-            }
-        }
-        self.decompressor = decompressor
-        self.compressor = compressor
-        if let decompressor = self.decompressor, let compressor = self.compressor {
-            do {
-                try decompressor.startStream()
-                try compressor.startStream()
-                self.channel.closeFuture.whenComplete { _ in
-                    try? compressor.finishStream()
-                    try? decompressor.finishStream()
-                }
-            } catch {
-                // if we failed to start a streamed compressor then close the websocket
-                self.close(code: .unexpectedServerError, promise: nil)
-            }
-        }
         self.channel.closeFuture.whenComplete { _ in
             self.autoPingTask?.cancel()
         }
@@ -205,20 +179,12 @@ public final class HBWebSocket {
 
     func read(_ frameSequence: WebSocketFrameSequence) {
         var frame = frameSequence.collapsed
-        for ext in self.extensions {
-            switch ext {
-            case .perMessageDeflate(_, _, _, let receiveNoContextTakeover):
-                if frame.rsv1, let decompressor = self.decompressor {
-                    do {
-                        frame.data = try frame.data.decompressStream(with: decompressor, maxSize: 1 << 14, allocator: self.channel.allocator)
-                        if receiveNoContextTakeover {
-                            try decompressor.resetStream()
-                        }
-                    } catch {
-                        self.close(code: .unacceptableData, promise: nil)
-                    }
-                }
+        do {
+            for ext in self.extensions {
+                frame = try ext.processReceivedFrame(frame, ws: self)
             }
+        } catch {
+            self.close(code: .unacceptableData, promise: nil)
         }
         if let webSocketData = WebSocketData(frame: frame) {
             self.readCallback?(webSocketData, self)
@@ -233,25 +199,12 @@ public final class HBWebSocket {
         promise: EventLoopPromise<Void>? = nil
     ) {
         var frame = WebSocketFrame(fin: fin, opcode: opcode, data: buffer)
-        for ext in self.extensions {
-            switch ext {
-            case .perMessageDeflate(_, let sendNoContextTakeover, _, _):
-                // if compressor is setup and we are sending text or binary data
-                if let compressor = self.compressor,
-                   opcode == .text || opcode == .binary,
-                   buffer.readableBytes > 16
-                {
-                    do {
-                        frame.data = try frame.data.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
-                        frame.rsv1 = true
-                        if sendNoContextTakeover {
-                            try compressor.resetStream()
-                        }
-                    } catch {
-                        self.close(code: .unexpectedServerError, promise: nil)
-                    }
-                }
+        do {
+            for ext in self.extensions {
+                frame = try ext.processSentFrame(frame, ws: self)
             }
+        } catch {
+            self.close(code: .unexpectedServerError, promise: nil)
         }
         frame.maskKey = self.makeMaskKey()
         self.channel.writeAndFlush(frame, promise: promise)
