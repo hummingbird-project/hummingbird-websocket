@@ -204,13 +204,13 @@ public final class HBWebSocket {
     }
 
     func read(_ frameSequence: WebSocketFrameSequence) {
-        var bytes = frameSequence.bytes
+        var frame = frameSequence.collapsed
         for ext in self.extensions {
             switch ext {
             case .perMessageDeflate(_, _, _, let receiveNoContextTakeover):
-                if frameSequence.rsv1, let decompressor = self.decompressor {
+                if frame.rsv1, let decompressor = self.decompressor {
                     do {
-                        bytes = try bytes.decompressStream(with: decompressor, maxSize: 1 << 14, allocator: self.channel.allocator)
+                        frame.data = try frame.data.decompressStream(with: decompressor, maxSize: 1 << 14, allocator: self.channel.allocator)
                         if receiveNoContextTakeover {
                             try decompressor.resetStream()
                         }
@@ -220,8 +220,9 @@ public final class HBWebSocket {
                 }
             }
         }
-        let webSocketData = frameSequence.type.webSocketData(for: bytes)
-        self.readCallback?(webSocketData, self)
+        if let webSocketData = WebSocketData(frame: frame) {
+            self.readCallback?(webSocketData, self)
+        }
     }
 
     /// Send web socket frame to server
@@ -231,9 +232,7 @@ public final class HBWebSocket {
         fin: Bool = true,
         promise: EventLoopPromise<Void>? = nil
     ) {
-        let maskKey = self.makeMaskKey()
-        var buffer = buffer
-        var rsv1 = false
+        var frame = WebSocketFrame(fin: fin, opcode: opcode, data: buffer)
         for ext in self.extensions {
             switch ext {
             case .perMessageDeflate(_, let sendNoContextTakeover, _, _):
@@ -243,8 +242,8 @@ public final class HBWebSocket {
                    buffer.readableBytes > 16
                 {
                     do {
-                        rsv1 = true
-                        buffer = try buffer.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
+                        frame.data = try frame.data.compressStream(with: compressor, flush: .finish, allocator: self.channel.allocator)
+                        frame.rsv1 = true
                         if sendNoContextTakeover {
                             try compressor.resetStream()
                         }
@@ -254,7 +253,7 @@ public final class HBWebSocket {
                 }
             }
         }
-        let frame = WebSocketFrame(fin: fin, rsv1: rsv1, opcode: opcode, maskKey: maskKey, data: buffer)
+        frame.maskKey = self.makeMaskKey()
         self.channel.writeAndFlush(frame, promise: promise)
     }
 

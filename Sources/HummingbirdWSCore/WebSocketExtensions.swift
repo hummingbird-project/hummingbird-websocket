@@ -13,6 +13,15 @@
 //===----------------------------------------------------------------------===//
 
 import NIOHTTP1
+import NIOWebSocket
+
+public protocol HBWebSocketExtension {
+    associatedtype Configuration
+
+    init(configuration: Configuration) throws
+    func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
+    func processSentFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
+}
 
 public enum WebSocketExtensionConfig: Sendable {
     case perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool)
