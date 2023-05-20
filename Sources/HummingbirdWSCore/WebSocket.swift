@@ -83,13 +83,7 @@ public final class HBWebSocket {
         switch data {
         case .text(let string):
             let buffer = self.channel.allocator.buffer(string: string)
-            if buffer.readableBytes > 18 {
-                var buffer = buffer
-                self.send(buffer: buffer.readSlice(length: 18)!, opcode: .text, fin: false, promise: promise)
-                self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
-            } else {
-                self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
-            }
+            self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
         case .binary(let buffer):
             self.send(buffer: buffer, opcode: .binary, fin: true, promise: promise)
         }

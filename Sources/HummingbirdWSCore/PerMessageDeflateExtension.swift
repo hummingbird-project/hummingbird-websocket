@@ -134,7 +134,9 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
                 frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
                 try self.decompressor.resetStream()
             } else {
-                frame.data.writeBytes([0, 0, 255, 255])
+                if frame.fin {
+                    frame.data.writeBytes([0, 0, 255, 255])
+                }
                 frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
             }
         }
