@@ -116,12 +116,13 @@ public enum HBWebSocketClient {
             requestKey: base64Key,
             maxFrameSize: configuration.maxFrameSize
         ) { channel, head in
-            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .server)
+            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
             do {
-                let webSocket = try HBWebSocket(
+                let extensions = try configuration.extensions.compactMap { try $0.clientExtension(from: serverExtensions) }
+                let webSocket = HBWebSocket(
                     channel: channel,
-                    type: .client, extensions:
-                    configuration.extensions.respond(to: serverExtensions).map { try $0.getExtension() }
+                    type: .client,
+                    extensions: extensions
                 )
                 if let readCallback = readCallback {
                     webSocket.onRead(readCallback)

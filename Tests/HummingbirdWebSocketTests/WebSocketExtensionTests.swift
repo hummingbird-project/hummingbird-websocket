@@ -77,25 +77,56 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
     func testExtensionHeaderParsing() {
         let headers: HTTPHeaders = ["Sec-WebSocket-Extensions": "permessage-deflate; client_max_window_bits; server_max_window_bits=10, permessage-deflate;client_max_window_bits"]
-        let extensions = WebSocketExtensionHTTPParameters.parseHeaders(headers, from: .client)
+        let extensions = WebSocketExtensionHTTPParameters.parseHeaders(headers)
         XCTAssertEqual(
             extensions,
             [
-                .perMessageDeflate(sendMaxWindow: 10, sendNoContextTakeover: false, receiveMaxWindow: 15, receiveNoContextTakeover: false),
-                .perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: false, receiveMaxWindow: 15, receiveNoContextTakeover: false),
+                .init("permessage-deflate", parameters: ["client_max_window_bits": .null, "server_max_window_bits": .value("10")]),
+                .init("permessage-deflate", parameters: ["client_max_window_bits": .null]),
             ]
         )
     }
 
-    func testExtensionResponse() {
-        let requestExt: [WebSocketExtensionHTTPParameters] = [
-            .perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: false, receiveMaxWindow: 10, receiveNoContextTakeover: false),
+    func testDeflateServerResponse() {
+        let requestHeaders: [WebSocketExtensionHTTPParameters] = [
+            .init("permessage-deflate", parameters: ["client_max_window_bits": .value("10")]),
         ]
         let ext = WebSocketExtensionConfig.perMessageDeflate(maxWindow: nil, noContextTakeover: true)
-        let response = [ext].respond(to: requestExt)
+        let serverResponse = ext.serverResponseHeader(to: requestHeaders)
         XCTAssertEqual(
-            response,
-            [.perMessageDeflate(sendMaxWindow: nil, sendNoContextTakeover: true, receiveMaxWindow: 10, receiveNoContextTakeover: true)]
+            serverResponse,
+            "permessage-deflate;client_max_window_bits=10;client_no_context_takeover;server_no_context_takeover"
+        )
+    }
+
+    func testDeflateServerResponseClientMaxWindowBits() {
+        let requestHeaders: [WebSocketExtensionHTTPParameters] = [
+            .init("permessage-deflate", parameters: ["client_max_window_bits": .null]),
+        ]
+        let ext1 = WebSocketExtensionConfig.perMessageDeflate(maxWindow: nil, noContextTakeover: true)
+        let serverResponse1 = ext1.serverResponseHeader(to: requestHeaders)
+        XCTAssertEqual(
+            serverResponse1,
+            "permessage-deflate;client_no_context_takeover;server_no_context_takeover"
+        )
+        let ext2 = WebSocketExtensionConfig.perMessageDeflate(maxWindow: 12, noContextTakeover: true)
+        let serverResponse2 = ext2.serverResponseHeader(to: requestHeaders)
+        XCTAssertEqual(
+            serverResponse2,
+            "permessage-deflate;client_max_window_bits=12;client_no_context_takeover;server_max_window_bits=12;server_no_context_takeover"
+        )
+    }
+
+    func testUnregonisedExtensionServerResponse() {
+        let requestHeaders: [WebSocketExtensionHTTPParameters] = [
+            .init("permessage-deflate", parameters: ["client_max_window_bits": .value("10")]),
+            .init("permessage-foo", parameters: ["bar": .value("baz")]),
+        ]
+        let ext = WebSocketExtensionConfig.perMessageDeflate(maxWindow: nil, noContextTakeover: true)
+        let serverResponse = ext.serverResponseHeader(to: requestHeaders)
+        XCTAssertEqual(
+            serverResponse,
+            "permessage-deflate;client_max_window_bits=10;client_no_context_takeover;server_no_context_takeover"
         )
     }
 
@@ -106,7 +137,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.perMessageDeflate(noContextTakeover: true)],
             clientExtensions: [.perMessageDeflate(noContextTakeover: true)],
             onServer: { ws in
-                XCTAssertTrue(ws.extensions.count > 0)
+                XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
                 let stream = ws.readStream()
                 Task {
                     for try await data in stream {
@@ -118,7 +149,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 }
             },
             onClient: { ws in
-                XCTAssertTrue(ws.extensions.count > 0)
+                XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
                 try await ws.write(.text("Hello, testing this is compressed"))
                 try await ws.close()
             }
@@ -136,7 +167,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.perMessageDeflate(noContextTakeover: true)],
             clientExtensions: [.perMessageDeflate(maxWindow: 10, noContextTakeover: true)],
             onServer: { ws in
-                XCTAssertTrue(ws.extensions.count > 0)
+                XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
                 let stream = ws.readStream()
                 Task {
                     for try await data in stream {
@@ -148,7 +179,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 }
             },
             onClient: { ws in
-                XCTAssertTrue(ws.extensions.count > 0)
+                XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
                 try await ws.write(.binary(buffer))
                 try await ws.close()
             }

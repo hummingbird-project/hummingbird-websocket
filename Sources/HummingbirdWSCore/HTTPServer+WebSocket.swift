@@ -36,7 +36,7 @@ extension HBHTTPServer {
     ///   - onUpgrade: Closure called once upgrade has happened. Includes the `HBWebSocket` created to service the WebSocket connection.
     public func addWebSocketUpgrade(
         maxFrameSize: Int,
-        extensions: [WebSocketExtensionConfig] = [],
+        extensions extensionConfigs: [WebSocketExtensionConfig] = [],
         shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
         onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
     ) {
@@ -45,17 +45,16 @@ extension HBHTTPServer {
             shouldUpgrade: { (channel: Channel, head: HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> in
                 shouldUpgrade(channel, head).map { headers -> HTTPHeaders? in
                     var headers = headers ?? [:]
-                    let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .client)
-                    let responseExtensions = extensions.respond(to: clientExtensions)
-                    headers.add(contentsOf: responseExtensions.map { (name: "Sec-WebSocket-Extensions", value: $0.serverResponseHeader()) })
+                    let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
+                    let responseHeaders = extensionConfigs.compactMap { $0.serverResponseHeader(to: clientHeaders) }
+                    headers.add(contentsOf: responseHeaders.map { (name: "Sec-WebSocket-Extensions", value: $0) })
                     return headers
                 }
             },
             upgradePipelineHandler: { (channel: Channel, head: HTTPRequestHead) -> EventLoopFuture<Void> in
-                let clientExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers, from: .client)
-                let response = extensions.respond(to: clientExtensions)
+                let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
                 do {
-                    let extensions = try response.map { try $0.getExtension() }
+                    let extensions = try extensionConfigs.compactMap { try $0.serverExtension(from: clientHeaders) }
                     let webSocket = HBWebSocket(channel: channel, type: .server, extensions: extensions)
                     return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                         onUpgrade(webSocket, head)

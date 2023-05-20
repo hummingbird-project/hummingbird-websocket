@@ -15,34 +15,19 @@
 import NIOHTTP1
 import NIOWebSocket
 
+/// Protocol for WebSocket extension
 public protocol HBWebSocketExtension {
-    associatedtype Configuration
-
-    init(configuration: Configuration) throws
+    /// Process frame received from websocket
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
+    /// Process frame about to be sent to websocket
     func processSentFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
 }
 
+/// WebSocket extension configuration
 public enum WebSocketExtensionConfig: Sendable {
     case perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool)
 
-    /// Negotiation response to extension request
-    public func respond(to request: WebSocketExtensionHTTPParameters) -> WebSocketExtension? {
-        switch self {
-        case .perMessageDeflate(let maxWindow, let noContextTakeover):
-            switch request {
-            case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
-                return .perMessageDeflate(
-                    sendMaxWindow: min(sendMaxWindow, maxWindow),
-                    sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
-                    receiveMaxWindow: min(receiveMaxWindow, maxWindow) ?? receiveMaxWindow,
-                    receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
-                )
-            }
-        }
-    }
-
-    /// Construct header value for extension
+    /// Construct client request header value for extension
     /// - Parameter type: client or server
     /// - Returns: `Sec-WebSocket-Extensions` header
     public func clientRequestHeader() -> String {
@@ -64,110 +49,158 @@ public enum WebSocketExtensionConfig: Sendable {
             return header
         }
     }
-}
 
-public enum WebSocketExtension: Sendable, Equatable {
-    case perMessageDeflate(sendMaxWindow: Int?, sendNoContextTakeover: Bool, receiveMaxWindow: Int?, receiveNoContextTakeover: Bool)
-
-    /// Construct header value for extension
+    /// Construct server response header value for extension
     /// - Parameter type: client or server
     /// - Returns: `Sec-WebSocket-Extensions` header
-    public func serverResponseHeader() -> String {
-        switch self {
-        case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
-            var header = "permessage-deflate"
-            if let maxWindow = sendMaxWindow {
-                header += ";server_max_window_bits=\(maxWindow)"
+    public func serverResponseHeader(to requests: [WebSocketExtensionHTTPParameters]) -> String? {
+        for request in requests {
+            switch (self, request.name) {
+            case (.perMessageDeflate(let maxWindow, let noContextTakeover), "permessage-deflate"):
+                let sendMaxWindow = request.parameters["server_max_window_bits"]
+                let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
+                let receiveMaxWindow = request.parameters["client_max_window_bits"]
+                let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
+
+                let configuration = PerMessageDeflateExtension.Configuration(
+                    sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
+                    sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
+                    receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? receiveMaxWindow?.integer ?? maxWindow,
+                    receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
+                )
+                var header = "permessage-deflate"
+                if let maxWindow = configuration.receiveMaxWindow {
+                    header += ";client_max_window_bits=\(maxWindow)"
+                }
+                if configuration.receiveNoContextTakeover {
+                    header += ";client_no_context_takeover"
+                }
+                if let maxWindow = configuration.sendMaxWindow {
+                    header += ";server_max_window_bits=\(maxWindow)"
+                }
+                if configuration.sendNoContextTakeover {
+                    header += ";server_no_context_takeover"
+                }
+                return header
+            default:
+                break
             }
-            if sendNoContextTakeover {
-                header += ";server_no_context_takeover"
-            }
-            if let maxWindow = receiveMaxWindow {
-                header += ";client_max_window_bits=\(maxWindow)"
-            }
-            if receiveNoContextTakeover {
-                header += ";client_no_context_takeover"
-            }
-            return header
         }
+        return nil
     }
 
-    public func getExtension() throws -> any HBWebSocketExtension {
-        switch self {
-        case .perMessageDeflate(let sendMaxWindow, let sendNoContextTakeover, let receiveMaxWindow, let receiveNoContextTakeover):
-            return try PerMessageDeflateExtension(
-                configuration: .init(
-                    sendMaxWindow: sendMaxWindow,
-                    sendNoContextTakeover: sendNoContextTakeover,
-                    receiveMaxWindow: receiveMaxWindow,
-                    receiveNoContextTakeover: receiveNoContextTakeover
-                )
-            )
+    /// Construct server extension from client request headers
+    /// - Parameter requests: client request headers
+    /// - Returns: server extension
+    public func serverExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
+        for request in requests {
+            switch self {
+            case .perMessageDeflate(let maxWindow, let noContextTakeover):
+                switch request.name {
+                case "permessage-deflate":
+                    let sendMaxWindow = request.parameters["server_max_window_bits"]
+                    let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
+                    let receiveMaxWindow = request.parameters["client_max_window_bits"]
+                    let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
+
+                    let configuration = PerMessageDeflateExtension.Configuration(
+                        sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
+                        sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
+                        receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? (receiveMaxWindow != nil ? maxWindow : nil),
+                        receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
+                    )
+                    return try PerMessageDeflateExtension(configuration: configuration)
+                default:
+                    break
+                }
+            }
         }
+        return nil
+    }
+
+    ///  Construct client extension from server reponse headers
+    /// - Parameter requests: server response headers
+    /// - Returns: client extension
+    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> HBWebSocketExtension? {
+        for request in requests {
+            switch self {
+            case .perMessageDeflate:
+                switch request.name {
+                case "permessage-deflate":
+                    let sendMaxWindow = request.parameters["client_max_window_bits"]?.integer
+                    let sendNoContextTakeover = request.parameters["client_no_context_takeover"] != .null
+                    let receiveMaxWindow = request.parameters["server_max_window_bits"]?.integer
+                    let receiveNoContextTakeover = request.parameters["server_no_context_takeover"] != .null
+                    return try PerMessageDeflateExtension(configuration: .init(
+                        sendMaxWindow: sendMaxWindow,
+                        sendNoContextTakeover: sendNoContextTakeover,
+                        receiveMaxWindow: receiveMaxWindow,
+                        receiveNoContextTakeover: receiveNoContextTakeover
+                    ))
+                default:
+                    break
+                }
+            }
+        }
+        return nil
     }
 }
 
-public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
-    case perMessageDeflate(sendMaxWindow: Int?, sendNoContextTakeover: Bool, receiveMaxWindow: Int?, receiveNoContextTakeover: Bool)
+/// Parsed parameters from `Sec-WebSocket-Extensions` header
+public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
+    /// A single parameter
+    enum Parameter: Sendable, Equatable {
+        // Parameter with a value
+        case value(String)
+        // Parameter with no value
+        case null
 
-    /// Initialise WebSocketExtension from header value sent to either client or server
-    /// - Parameters:
-    ///   - header: header value
-    ///   - type: client or server
-    init?<S: StringProtocol>(from header: S, from type: HBWebSocket.SocketType) {
-        var parameters = header.split(separator: ";", omittingEmptySubsequences: true).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }[...]
-        switch parameters.first {
-        case "permessage-deflate":
-            var sendMaxWindow: Int?
-            var receiveMaxWindow: Int?
-            var sendNoContextTakeover = false
-            var receiveNoContextTakeover = false
-
-            parameters = parameters.dropFirst()
-            while let parameter = parameters.first {
-                let keyValue = parameter.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                if let key = keyValue.first {
-                    let value: String?
-                    if keyValue.count > 1 {
-                        value = keyValue.last
-                    } else {
-                        value = nil
-                    }
-                    switch (key, type) {
-                    case ("server_max_window_bits", .client), ("client_max_window_bits", .server):
-                        guard let valueString = value, let valueNumber = Int(valueString) else { return nil }
-                        sendMaxWindow = valueNumber
-
-                    case ("client_max_window_bits", .client):
-                        receiveMaxWindow = value.map { Int($0) } ?? 15
-
-                    case ("server_max_window_bits", .server):
-                        guard let valueString = value, let valueNumber = Int(valueString) else { return nil }
-                        receiveMaxWindow = valueNumber
-
-                    case ("server_no_context_takeover", .client), ("client_no_context_takeover", .server):
-                        sendNoContextTakeover = true
-
-                    case ("client_no_context_takeover", .client), ("server_no_context_takeover", .server):
-                        receiveNoContextTakeover = true
-
-                    default:
-                        return nil
-                    }
-                }
-                parameters = parameters.dropFirst()
+        // Convert to optional
+        var optional: String? {
+            switch self {
+            case .value(let string):
+                return .some(string)
+            case .null:
+                return .none
             }
-            guard sendMaxWindow == nil || (9...15).contains(sendMaxWindow!) else { return nil }
-            guard receiveMaxWindow == nil || (9...15).contains(receiveMaxWindow!) else { return nil }
-            self = .perMessageDeflate(
-                sendMaxWindow: sendMaxWindow,
-                sendNoContextTakeover: sendNoContextTakeover,
-                receiveMaxWindow: receiveMaxWindow,
-                receiveNoContextTakeover: receiveNoContextTakeover
-            )
-        default:
+        }
+
+        // Convert to integer
+        var integer: Int? {
+            switch self {
+            case .value(let string):
+                return Int(string)
+            case .null:
+                return .none
+            }
+        }
+    }
+
+    let parameters: [String: Parameter]
+    let name: String
+
+    /// initialise WebSocket extension parameters from string
+    init?<S: StringProtocol>(from header: S) {
+        let split = header.split(separator: ";", omittingEmptySubsequences: true).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }[...]
+        if let name = split.first {
+            self.name = name
+        } else {
             return nil
         }
+        var index = split.index(after: split.startIndex)
+        var parameters: [String: Parameter] = [:]
+        while index != split.endIndex {
+            let keyValue = split[index].split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if let key = keyValue.first {
+                if keyValue.count > 1 {
+                    parameters[key] = .value(keyValue[1])
+                } else {
+                    parameters[key] = .null
+                }
+            }
+            index = split.index(after: index)
+        }
+        self.parameters = parameters
     }
 
     /// Parse all `Sec-WebSocket-Extensions` header values
@@ -175,25 +208,23 @@ public enum WebSocketExtensionHTTPParameters: Sendable, Equatable {
     ///   - headers: headers coming from other
     ///   - type: client or server
     /// - Returns: Array of extensions
-    public static func parseHeaders(_ headers: HTTPHeaders, from type: HBWebSocket.SocketType) -> [WebSocketExtensionHTTPParameters] {
+    public static func parseHeaders(_ headers: HTTPHeaders) -> [WebSocketExtensionHTTPParameters] {
         let extHeaders = headers["Sec-WebSocket-Extensions"].flatMap { $0.split(separator: ",") }
-        return extHeaders.compactMap { .init(from: $0, from: type) }
+        return extHeaders.compactMap { .init(from: $0) }
     }
 }
 
-extension Array where Element == WebSocketExtensionConfig {
-    public func respond(to requestedExtensions: [WebSocketExtensionHTTPParameters]) -> [WebSocketExtension] {
-        return self.compactMap { element in
-            for ext in requestedExtensions {
-                if let response = element.respond(to: ext) {
-                    return response
-                }
-            }
-            return nil
-        }
+extension WebSocketExtensionHTTPParameters {
+    /// Initialiser used by tests
+    init(_ name: String, parameters: [String: Parameter]) {
+        self.name = name
+        self.parameters = parameters
     }
 }
 
+/// Minimum of two optional integers.
+///
+/// Returns nil if either of them is nil
 private func min(_ a: Int?, _ b: Int?) -> Int? {
     if case .some(let a2) = a, case .some(let b2) = b {
         return min(a2, b2)

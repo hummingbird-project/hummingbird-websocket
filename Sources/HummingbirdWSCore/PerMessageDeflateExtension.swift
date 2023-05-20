@@ -26,14 +26,12 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
 
     private let decompressor: any NIODecompressor
     private let compressor: any NIOCompressor
-    private let receiveNoContextTakeover: Bool
-    private let sendNoContextTakeover: Bool
+    let configuration: Configuration
 
     required init(configuration: Configuration) throws {
         self.decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: configuration.receiveMaxWindow ?? 15)
         self.compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: configuration.sendMaxWindow ?? 15)
-        self.receiveNoContextTakeover = configuration.receiveNoContextTakeover
-        self.sendNoContextTakeover = configuration.sendNoContextTakeover
+        self.configuration = configuration
 
         try self.decompressor.startStream()
         try self.compressor.startStream()
@@ -48,7 +46,7 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
         var frame = frame
         if frame.rsv1 {
             frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
-            if self.receiveNoContextTakeover {
+            if self.configuration.receiveNoContextTakeover {
                 try self.decompressor.resetStream()
             }
         }
@@ -60,7 +58,7 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
         if frame.data.readableBytes > 16 {
             frame.rsv1 = true
             frame.data = try frame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
-            if self.sendNoContextTakeover {
+            if self.configuration.sendNoContextTakeover {
                 try self.compressor.resetStream()
             }
         }
