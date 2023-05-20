@@ -23,126 +23,52 @@ public protocol HBWebSocketExtension {
     func processSentFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
 }
 
-/// WebSocket extension configuration
-public enum WebSocketExtensionConfig: Sendable {
-    case perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool)
+public protocol HBWebSocketExtensionBuilder: Sendable {
+    static var name: String { get }
+    func clientRequestHeader() -> String
+    func serverReponseHeader(to: WebSocketExtensionHTTPParameters) -> String?
+    func serverExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
+    func clientExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
+}
 
-    /// Construct client request header value for extension
-    /// - Parameter type: client or server
-    /// - Returns: `Sec-WebSocket-Extensions` header
-    public func clientRequestHeader() -> String {
-        switch self {
-        case .perMessageDeflate(let maxWindow, let noContextTakeover):
-            var header = "permessage-deflate"
-            if let maxWindow = maxWindow {
-                header += ";client_max_window_bits=\(maxWindow)"
-            }
-            if noContextTakeover {
-                header += ";client_no_context_takeover"
-            }
-            if let maxWindow = maxWindow {
-                header += ";server_max_window_bits=\(maxWindow)"
-            }
-            if noContextTakeover {
-                header += ";server_no_context_takeover"
-            }
-            return header
-        }
-    }
-
-    /// Construct server response header value for extension
-    /// - Parameter type: client or server
-    /// - Returns: `Sec-WebSocket-Extensions` header
+extension HBWebSocketExtensionBuilder {
     public func serverResponseHeader(to requests: [WebSocketExtensionHTTPParameters]) -> String? {
         for request in requests {
-            switch (self, request.name) {
-            case (.perMessageDeflate(let maxWindow, let noContextTakeover), "permessage-deflate"):
-                let sendMaxWindow = request.parameters["server_max_window_bits"]
-                let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
-                let receiveMaxWindow = request.parameters["client_max_window_bits"]
-                let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
-
-                let configuration = PerMessageDeflateExtension.Configuration(
-                    sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
-                    sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
-                    receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? receiveMaxWindow?.integer ?? maxWindow,
-                    receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
-                )
-                var header = "permessage-deflate"
-                if let maxWindow = configuration.receiveMaxWindow {
-                    header += ";client_max_window_bits=\(maxWindow)"
-                }
-                if configuration.receiveNoContextTakeover {
-                    header += ";client_no_context_takeover"
-                }
-                if let maxWindow = configuration.sendMaxWindow {
-                    header += ";server_max_window_bits=\(maxWindow)"
-                }
-                if configuration.sendNoContextTakeover {
-                    header += ";server_no_context_takeover"
-                }
-                return header
-            default:
-                break
+            guard request.name == Self.name else { continue }
+            if let response = serverReponseHeader(to: request) {
+                return response
             }
         }
         return nil
     }
 
-    /// Construct server extension from client request headers
-    /// - Parameter requests: client request headers
-    /// - Returns: server extension
     public func serverExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
         for request in requests {
-            switch self {
-            case .perMessageDeflate(let maxWindow, let noContextTakeover):
-                switch request.name {
-                case "permessage-deflate":
-                    let sendMaxWindow = request.parameters["server_max_window_bits"]
-                    let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
-                    let receiveMaxWindow = request.parameters["client_max_window_bits"]
-                    let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
-
-                    let configuration = PerMessageDeflateExtension.Configuration(
-                        sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
-                        sendNoContextTakeover: sendNoContextTakeover || noContextTakeover,
-                        receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? (receiveMaxWindow != nil ? maxWindow : nil),
-                        receiveNoContextTakeover: receiveNoContextTakeover || noContextTakeover
-                    )
-                    return try PerMessageDeflateExtension(configuration: configuration)
-                default:
-                    break
-                }
+            guard request.name == Self.name else { continue }
+            if let ext = try serverExtension(from: request) {
+                return ext
             }
         }
         return nil
     }
 
-    ///  Construct client extension from server reponse headers
-    /// - Parameter requests: server response headers
-    /// - Returns: client extension
-    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> HBWebSocketExtension? {
+    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
         for request in requests {
-            switch self {
-            case .perMessageDeflate:
-                switch request.name {
-                case "permessage-deflate":
-                    let sendMaxWindow = request.parameters["client_max_window_bits"]?.integer
-                    let sendNoContextTakeover = request.parameters["client_no_context_takeover"] != .null
-                    let receiveMaxWindow = request.parameters["server_max_window_bits"]?.integer
-                    let receiveNoContextTakeover = request.parameters["server_no_context_takeover"] != .null
-                    return try PerMessageDeflateExtension(configuration: .init(
-                        sendMaxWindow: sendMaxWindow,
-                        sendNoContextTakeover: sendNoContextTakeover,
-                        receiveMaxWindow: receiveMaxWindow,
-                        receiveNoContextTakeover: receiveNoContextTakeover
-                    ))
-                default:
-                    break
-                }
+            guard request.name == Self.name else { continue }
+            if let ext = try clientExtension(from: request) {
+                return ext
             }
         }
         return nil
+    }
+}
+
+/// Build WebSocket extension builder
+public struct HBWebSocketExtensionFactory: Sendable {
+    public let build: @Sendable () -> any HBWebSocketExtensionBuilder
+
+    public init(_ build: @escaping @Sendable () -> any HBWebSocketExtensionBuilder) {
+        self.build = build
     }
 }
 
@@ -225,7 +151,7 @@ extension WebSocketExtensionHTTPParameters {
 /// Minimum of two optional integers.
 ///
 /// Returns nil if either of them is nil
-private func min(_ a: Int?, _ b: Int?) -> Int? {
+func min(_ a: Int?, _ b: Int?) -> Int? {
     if case .some(let a2) = a, case .some(let b2) = b {
         return min(a2, b2)
     }

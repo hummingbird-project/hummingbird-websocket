@@ -94,7 +94,8 @@ public enum HBWebSocketClient {
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
 
         var headers = headers
-        headers.add(contentsOf: configuration.extensions.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
+        let extensionBuilders = configuration.extensions.map { $0.build() }
+        headers.add(contentsOf: extensionBuilders.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
 
         // initial HTTP request handler, before upgrade
         let httpHandler: WebSocketInitialRequestHandler
@@ -118,7 +119,7 @@ public enum HBWebSocketClient {
         ) { channel, head in
             let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
             do {
-                let extensions = try configuration.extensions.compactMap { try $0.clientExtension(from: serverExtensions) }
+                let extensions = try extensionBuilders.compactMap { try $0.clientExtension(from: serverExtensions) }
                 let webSocket = HBWebSocket(
                     channel: channel,
                     type: .client,
@@ -166,13 +167,13 @@ public enum HBWebSocketClient {
         let maxFrameSize: Int
 
         /// Maximum size for a single frame
-        let extensions: [WebSocketExtensionConfig]
+        let extensions: [HBWebSocketExtensionFactory]
 
         /// initialize Configuration
         public init(
             maxFrameSize: Int = 1 << 14,
             tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration(),
-            extensions: [WebSocketExtensionConfig] = []
+            extensions: [HBWebSocketExtensionFactory] = []
         ) {
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = tlsConfiguration
