@@ -130,9 +130,12 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
-            frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
             if self.configuration.receiveNoContextTakeover {
+                frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
                 try self.decompressor.resetStream()
+            } else {
+                frame.data.writeBytes([0, 0, 255, 255])
+                frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
             }
         }
         return frame
@@ -142,9 +145,12 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
         var frame = frame
         if frame.data.readableBytes > 16 {
             frame.rsv1 = true
-            frame.data = try frame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
             if self.configuration.sendNoContextTakeover {
+                frame.data = try frame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
                 try self.compressor.resetStream()
+            } else {
+                frame.data = try frame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
+                frame.data = frame.data.getSlice(at: frame.data.readerIndex, length: frame.data.readableBytes - 4) ?? frame.data
             }
         }
         return frame
@@ -152,10 +158,13 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
 }
 
 extension HBWebSocketExtensionFactory {
-    public static func perMessageDeflate(maxWindow: Int? = 15) -> HBWebSocketExtensionFactory {
+    ///  permessage-deflate websocket extension
+    /// - Parameters:
+    ///   - maxWindow: Max window to be used for decompression and compression
+    ///   - noContextTakeover: Should we reset window on every message
+    public static func perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool = false) -> HBWebSocketExtensionFactory {
         return .init {
-            // default noContextTakeover to true as I can't get it to work when false yet
-            PerMessageDeflateExtensionBuilder(maxWindow: maxWindow, noContextTakeover: true)
+            PerMessageDeflateExtensionBuilder(maxWindow: maxWindow, noContextTakeover: noContextTakeover)
         }
     }
 }
