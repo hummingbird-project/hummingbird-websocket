@@ -152,9 +152,10 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
 }
 
 extension HBWebSocketExtensionFactory {
-    public static func perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool = true) -> HBWebSocketExtensionFactory {
+    public static func perMessageDeflate(maxWindow: Int? = 15) -> HBWebSocketExtensionFactory {
         return .init {
-            PerMessageDeflateExtensionBuilder(maxWindow: maxWindow, noContextTakeover: noContextTakeover)
+            // default noContextTakeover to true as I can't get it to work when false yet
+            PerMessageDeflateExtensionBuilder(maxWindow: maxWindow, noContextTakeover: true)
         }
     }
 }

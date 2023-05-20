@@ -72,7 +72,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         onServer: @escaping (HBWebSocket) -> Void,
         onClient: @escaping (HBWebSocket) -> Void
     ) throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -82,7 +82,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try app.start()
 
         let eventLoop = app.eventLoopGroup.next()
-        HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).whenComplete { result in
+        HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
+            configuration: .init(),
+            on: eventLoop
+        ).whenComplete { result in
             switch result {
             case .failure(let error):
                 XCTFail("\(error)")
@@ -94,7 +98,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func setupClientAndServer(onServer: @escaping (HBWebSocket) async throws -> Void, onClient: @escaping (HBWebSocket) async throws -> Void) async throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -105,7 +109,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try app.start()
 
         let eventLoop = app.eventLoopGroup.next()
-        let ws = try await HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
+        let ws = try await HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
+            configuration: .init(),
+            on: eventLoop
+        )
         try await onClient(ws)
         return app
     }

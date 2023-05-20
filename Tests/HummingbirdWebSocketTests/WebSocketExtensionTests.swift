@@ -55,7 +55,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         onServer: @escaping (HBWebSocket) async throws -> Void,
         onClient: @escaping (HBWebSocket) async throws -> Void
     ) async throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade(maxFrameSize: 1 << 14, extensions: serverExtensions)
         // on websocket connect.
@@ -67,7 +67,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let ws = try await HBWebSocketClient.connect(
-            url: "ws://localhost:8080/test",
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
             configuration: .init(extensions: clientExtensions),
             on: eventLoop
         )
@@ -119,10 +119,10 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
     func testUnregonisedExtensionServerResponse() {
         let requestHeaders: [WebSocketExtensionHTTPParameters] = [
-            .init("permessage-deflate", parameters: ["client_max_window_bits": .value("10")]),
             .init("permessage-foo", parameters: ["bar": .value("baz")]),
+            .init("permessage-deflate", parameters: ["client_max_window_bits": .value("10")]),
         ]
-        let ext = PerMessageDeflateExtensionBuilder(maxWindow: nil, noContextTakeover: true)
+        let ext = PerMessageDeflateExtensionBuilder(maxWindow: nil)
         let serverResponse = ext.serverResponseHeader(to: requestHeaders)
         XCTAssertEqual(
             serverResponse,
@@ -134,8 +134,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
         let app = try await self.setupClientAndServer(
-            serverExtensions: [.perMessageDeflate(noContextTakeover: true)],
-            clientExtensions: [.perMessageDeflate(noContextTakeover: true)],
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate()],
             onServer: { ws in
                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
                 let stream = ws.readStream()
@@ -164,8 +164,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         let app = try await self.setupClientAndServer(
-            serverExtensions: [.perMessageDeflate(noContextTakeover: true)],
-            clientExtensions: [.perMessageDeflate(maxWindow: 10, noContextTakeover: true)],
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate(maxWindow: 10)],
             onServer: { ws in
                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
                 let stream = ws.readStream()
