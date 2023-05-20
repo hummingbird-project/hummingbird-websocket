@@ -53,7 +53,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         let configuration = PerMessageDeflateExtension.Configuration(
             sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
             sendNoContextTakeover: sendNoContextTakeover || self.noContextTakeover,
-            receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? receiveMaxWindow?.integer ?? maxWindow,
+            receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? receiveMaxWindow?.integer ?? (receiveMaxWindow != nil ? maxWindow : nil),
             receiveNoContextTakeover: receiveNoContextTakeover || self.noContextTakeover
         )
         var header = "permessage-deflate"
