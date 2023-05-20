@@ -20,18 +20,25 @@ public protocol HBWebSocketExtension {
     /// Process frame received from websocket
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
-    func processSentFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
+    func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
 }
 
+/// Protocol for WebSocket extension builder
 public protocol HBWebSocketExtensionBuilder: Sendable {
+    /// name of WebSocket extension name
     static var name: String { get }
+    /// construct client request header
     func clientRequestHeader() -> String
+    /// construct server response header based of client request
     func serverReponseHeader(to: WebSocketExtensionHTTPParameters) -> String?
+    /// construct server version of extension based of client request
     func serverExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
+    /// construct client version of extension based of server response
     func clientExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
 }
 
 extension HBWebSocketExtensionBuilder {
+    /// construct server response header based of all client requests
     public func serverResponseHeader(to requests: [WebSocketExtensionHTTPParameters]) -> String? {
         for request in requests {
             guard request.name == Self.name else { continue }
@@ -42,6 +49,7 @@ extension HBWebSocketExtensionBuilder {
         return nil
     }
 
+    /// construct all server extensions based of all client requests
     public func serverExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }
@@ -52,6 +60,7 @@ extension HBWebSocketExtensionBuilder {
         return nil
     }
 
+    /// construct all client extensions based of all server responses
     public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }

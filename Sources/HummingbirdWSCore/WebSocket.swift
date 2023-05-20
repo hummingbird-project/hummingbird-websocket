@@ -83,7 +83,13 @@ public final class HBWebSocket {
         switch data {
         case .text(let string):
             let buffer = self.channel.allocator.buffer(string: string)
-            self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
+            if buffer.readableBytes > 18 {
+                var buffer = buffer
+                self.send(buffer: buffer.readSlice(length: 18)!, opcode: .text, fin: false, promise: promise)
+                self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
+            } else {
+                self.send(buffer: buffer, opcode: .text, fin: true, promise: promise)
+            }
         case .binary(let buffer):
             self.send(buffer: buffer, opcode: .binary, fin: true, promise: promise)
         }
@@ -201,7 +207,7 @@ public final class HBWebSocket {
         var frame = WebSocketFrame(fin: fin, opcode: opcode, data: buffer)
         do {
             for ext in self.extensions {
-                frame = try ext.processSentFrame(frame, ws: self)
+                frame = try ext.processFrameToSend(frame, ws: self)
             }
         } catch {
             self.close(code: .unexpectedServerError, promise: nil)

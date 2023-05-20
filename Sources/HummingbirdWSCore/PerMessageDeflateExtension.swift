@@ -141,7 +141,7 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
         return frame
     }
 
-    func processSentFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.data.readableBytes > 16 {
             frame.rsv1 = true
@@ -150,7 +150,9 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
                 try self.compressor.resetStream()
             } else {
                 frame.data = try frame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
-                frame.data = frame.data.getSlice(at: frame.data.readerIndex, length: frame.data.readableBytes - 4) ?? frame.data
+                if frame.fin {
+                    frame.data = frame.data.getSlice(at: frame.data.readerIndex, length: frame.data.readableBytes - 4) ?? frame.data
+                }
             }
         }
         return frame
