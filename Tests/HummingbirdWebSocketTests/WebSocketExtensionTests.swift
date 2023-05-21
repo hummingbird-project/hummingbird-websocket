@@ -188,4 +188,34 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
         try promise.wait()
     }
+
+    func testPerMessageDeflateNoContextTakeover() async throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+
+        let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
+        let app = try await self.setupClientAndServer(
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate(noContextTakeover: true)],
+            onServer: { ws in
+                XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
+                let stream = ws.readStream()
+                Task {
+                    for try await data in stream {
+                        XCTAssertEqual(data, .binary(buffer))
+                    }
+                    ws.onClose { _ in
+                        promise.succeed()
+                    }
+                }
+            },
+            onClient: { ws in
+                XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
+                try await ws.write(.binary(buffer))
+                try await ws.close()
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
+    }
 }
