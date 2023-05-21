@@ -101,7 +101,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     }
 }
 
-class PerMessageDeflateExtension: HBWebSocketExtension {
+final class PerMessageDeflateExtension: HBWebSocketExtension {
     struct Configuration {
         let sendMaxWindow: Int?
         let sendNoContextTakeover: Bool
@@ -144,20 +144,20 @@ class PerMessageDeflateExtension: HBWebSocketExtension {
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
-        var frame = frame
-        if frame.data.readableBytes > 16 {
-            frame.rsv1 = true
+        var newFrame = frame
+        if newFrame.data.readableBytes > 16 {
+            newFrame.rsv1 = true
             if self.configuration.sendNoContextTakeover {
-                frame.data = try frame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
+                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
                 try self.compressor.resetStream()
             } else {
-                frame.data = try frame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
-                if frame.fin {
-                    frame.data = frame.data.getSlice(at: frame.data.readerIndex, length: frame.data.readableBytes - 4) ?? frame.data
+                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
+                if newFrame.fin {
+                    newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
                 }
             }
         }
-        return frame
+        return newFrame.data.readableBytes < frame.data.readableBytes ? newFrame : frame
     }
 }
 
