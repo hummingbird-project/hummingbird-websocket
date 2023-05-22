@@ -141,9 +141,12 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
                 let stream = ws.readStream()
                 Task {
-                    for try await data in stream {
-                        XCTAssertEqual(data, .text("Hello, testing this is compressed"))
-                    }
+                    var iterator = stream.makeAsyncIterator()
+                    let firstMessage = await iterator.next()
+                    XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+                    let secondMessage = await iterator.next()
+                    XCTAssertEqual(secondMessage, .text("Hello"))
+                    for await _ in stream {}
                     ws.onClose { _ in
                         promise.succeed()
                     }
@@ -152,6 +155,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             onClient: { ws in
                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
                 try await ws.write(.text("Hello, testing this is compressed"))
+                try await ws.write(.text("Hello"))
                 try await ws.close()
             }
         )

@@ -142,8 +142,8 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
-        var newFrame = frame
-        if newFrame.data.readableBytes > 16 {
+        if frame.data.readableBytes > 16, frame.opcode == .text || frame.opcode == .binary {
+            var newFrame = frame
             newFrame.rsv1 = true
             if self.configuration.sendNoContextTakeover {
                 newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
@@ -154,8 +154,11 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
                     newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
                 }
             }
+            if newFrame.data.readableBytes > frame.data.readableBytes {
+                return newFrame
+            }
         }
-        return newFrame.data.readableBytes < frame.data.readableBytes ? newFrame : frame
+        return frame
     }
 }
 
