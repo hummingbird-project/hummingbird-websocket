@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Atomics
 import CompressNIO
 import Logging
 import NIOCore
@@ -47,7 +48,7 @@ public final class HBWebSocket {
         self.type = type
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions
-        self.logger = logger
+        self.logger = logger.with(metadataKey: "hb_ws_id", value: .stringConvertible(Self.globalRequestID.loadThenWrappingIncrement(by: 1, ordering: .relaxed)))
 
         self.channel.closeFuture.whenComplete { _ in
             self.autoPingTask?.cancel()
@@ -113,6 +114,8 @@ public final class HBWebSocket {
             return
         }
         self.isClosed = true
+
+        self.logger.debug("Closing WebSocket")
 
         var buffer = self.channel.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
@@ -184,15 +187,16 @@ public final class HBWebSocket {
 
     func read(_ frameSequence: WebSocketFrameSequence) {
         var frame = frameSequence.collapsed
+        self.logger.trace("Read: \(frame.debugDescription)")
         do {
             for ext in self.extensions.reversed() {
                 frame = try ext.processReceivedFrame(frame, ws: self)
             }
         } catch {
+            self.logger.debug("Closing as we received invalid frame data")
             self.close(code: .unacceptableData, promise: nil)
         }
         if let webSocketData = WebSocketData(frame: frame) {
-            self.logger.trace("Read: \(frame.debugDescription)")
             self.readCallback?(webSocketData, self)
         }
     }
@@ -210,6 +214,7 @@ public final class HBWebSocket {
                 frame = try ext.processFrameToSend(frame, ws: self)
             }
         } catch {
+            self.logger.debug("Closing as we failed to generate valid frame data")
             self.close(code: .unexpectedServerError, promise: nil)
         }
         self.logger.trace("Sent: \(frame.debugDescription)")
@@ -219,8 +224,10 @@ public final class HBWebSocket {
 
     /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
     func receivedPong(frame: WebSocketFrame) {
+        self.logger.trace("Received pong")
         let frameData = frame.unmaskedData
         guard frameData == self.pingData else {
+            self.logger.debug("Pong data is invalid, closing")
             self.close(code: .goingAway, promise: nil)
             return
         }
@@ -230,6 +237,7 @@ public final class HBWebSocket {
 
     /// Respond to ping from client
     func receivedPing(frame: WebSocketFrame) {
+        self.logger.trace("Received ping")
         if frame.fin {
             self.send(buffer: frame.unmaskedData, opcode: .pong, fin: true, promise: nil)
         } else {
@@ -238,6 +246,7 @@ public final class HBWebSocket {
     }
 
     func receivedClose(frame: WebSocketFrame) {
+        self.logger.trace("Received close")
         // Handle a received close frame. We're just going to close.
         self.isClosed = true
         self.channel.close(promise: nil)
@@ -267,6 +276,7 @@ public final class HBWebSocket {
     private var pongCallback: PongCallback?
     private var readCallback: ReadCallback?
     private var isClosed: Bool = false
+    private static let globalRequestID = ManagedAtomic(0)
 }
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
@@ -306,15 +316,26 @@ extension HBWebSocket {
     }
 }
 
-#if compiler(>=5.6)
 // HBWebSocket can be set to Sendable because ping data which is mutable is
 // managed internally and is only ever changed on the event loop
 extension HBWebSocket: @unchecked Sendable {}
-#endif // compiler(>=5.6)
 
 /// Extend WebSocketFrame to conform to CustomDebugStringConvertible
 extension WebSocketFrame: CustomDebugStringConvertible {
     public var debugDescription: String {
         "fin:\(self.fin), rsv1:\(self.rsv1), opcode:\(self.opcode), data: \(self.data.debugDescription)"
+    }
+}
+
+extension Logger {
+    /// Create new Logger with additional metadata value
+    /// - Parameters:
+    ///   - metadataKey: Metadata key
+    ///   - value: Metadata value
+    /// - Returns: Logger
+    func with(metadataKey: String, value: MetadataValue) -> Logger {
+        var logger = self
+        logger[metadataKey: metadataKey] = value
+        return logger
     }
 }
