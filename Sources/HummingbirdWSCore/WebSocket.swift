@@ -180,7 +180,7 @@ public final class HBWebSocket {
     func read(_ frameSequence: WebSocketFrameSequence) {
         var frame = frameSequence.collapsed
         do {
-            for ext in self.extensions {
+            for ext in self.extensions.reversed() {
                 frame = try ext.processReceivedFrame(frame, ws: self)
             }
         } catch {

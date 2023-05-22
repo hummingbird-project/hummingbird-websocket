@@ -18,6 +18,7 @@ import HummingbirdWSClient
 @testable import HummingbirdWSCore
 import NIOCore
 import NIOPosix
+import NIOWebSocket
 import XCTest
 
 final class HummingbirdWebSocketExtensionTests: XCTestCase {
@@ -217,5 +218,96 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         defer { app.stop() }
 
         try promise.wait()
+    }
+
+    func testPerMessageExtensionOrdering() async throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+
+        let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
+        let app = try await self.setupClientAndServer(
+            serverExtensions: [.xor(), .perMessageDeflate()],
+            clientExtensions: [.xor(value: 34), .perMessageDeflate()],
+            onServer: { ws in
+                // XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
+                let stream = ws.readStream()
+                Task {
+                    for try await data in stream {
+                        XCTAssertEqual(data, .binary(buffer))
+                    }
+                    ws.onClose { _ in
+                        promise.succeed()
+                    }
+                }
+            },
+            onClient: { ws in
+                // XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
+                try await ws.write(.binary(buffer))
+                try await ws.close()
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
+    }
+}
+
+struct XorWebSocketExtension: HBWebSocketExtension {
+    func xorFrame(_ frame: WebSocketFrame, ws: HBWebSocket) -> WebSocketFrame {
+        var newBuffer = ws.channel.allocator.buffer(capacity: frame.data.readableBytes)
+        for byte in frame.data.readableBytesView {
+            newBuffer.writeInteger(byte ^ self.value)
+        }
+        var frame = frame
+        frame.data = newBuffer
+        return frame
+    }
+
+    func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) -> WebSocketFrame {
+        return self.xorFrame(frame, ws: ws)
+    }
+
+    func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+        return self.xorFrame(frame, ws: ws)
+    }
+
+    let value: UInt8
+}
+
+struct XorWebSocketExtensionBuilder: HBWebSocketExtensionBuilder {
+    static var name = "permessage-xor"
+    let value: UInt8?
+
+    init(value: UInt8? = nil) {
+        self.value = value
+    }
+
+    func clientRequestHeader() -> String {
+        var header = Self.name
+        if let value = value {
+            header += ";value=\(value)"
+        }
+        return header
+    }
+
+    func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
+        var header = Self.name
+        if let value = request.parameters["value"]?.integer {
+            header += ";value=\(value)"
+        }
+        return header
+    }
+
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+        XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
+    }
+
+    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+        XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
+    }
+}
+
+extension HBWebSocketExtensionFactory {
+    static func xor(value: UInt8? = nil) -> HBWebSocketExtensionFactory {
+        .init { XorWebSocketExtensionBuilder(value: value) }
     }
 }
