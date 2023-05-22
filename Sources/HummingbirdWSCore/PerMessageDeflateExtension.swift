@@ -19,43 +19,51 @@ import NIOWebSocket
 struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     static var name = "permessage-deflate"
 
-    let maxWindow: Int?
-    let noContextTakeover: Bool
+    let sendMaxWindow: Int?
+    let sendNoContextTakeover: Bool
+    let receiveMaxWindow: Int?
+    let receiveNoContextTakeover: Bool
 
-    init(maxWindow: Int? = 15, noContextTakeover: Bool = true) {
-        self.maxWindow = maxWindow
-        self.noContextTakeover = noContextTakeover
+    internal init(sendMaxWindow: Int? = nil, sendNoContextTakeover: Bool = false, receiveMaxWindow: Int? = nil, receiveNoContextTakeover: Bool = false) {
+        self.sendMaxWindow = sendMaxWindow
+        self.sendNoContextTakeover = sendNoContextTakeover
+        self.receiveMaxWindow = receiveMaxWindow
+        self.receiveNoContextTakeover = receiveNoContextTakeover
     }
 
     func clientRequestHeader() -> String {
         var header = "permessage-deflate"
-        if let maxWindow = self.maxWindow {
+        if let maxWindow = self.sendMaxWindow {
             header += ";client_max_window_bits=\(maxWindow)"
         }
-        if self.noContextTakeover {
+        if self.sendNoContextTakeover {
             header += ";client_no_context_takeover"
         }
-        if let maxWindow = self.maxWindow {
+        if let maxWindow = self.receiveMaxWindow {
             header += ";server_max_window_bits=\(maxWindow)"
         }
-        if self.noContextTakeover {
+        if self.receiveNoContextTakeover {
             header += ";server_no_context_takeover"
         }
         return header
     }
 
-    func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
-        let sendMaxWindow = request.parameters["server_max_window_bits"]
-        let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
-        let receiveMaxWindow = request.parameters["client_max_window_bits"]
-        let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
+    func responseConfiguration(to request: WebSocketExtensionHTTPParameters) -> PerMessageDeflateExtension.Configuration {
+        let sendMaxWindowParam = request.parameters["server_max_window_bits"]
+        let sendNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
+        let receiveMaxWindowParam = request.parameters["client_max_window_bits"]
+        let receiveNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
 
-        let configuration = PerMessageDeflateExtension.Configuration(
-            sendMaxWindow: min(sendMaxWindow?.integer, maxWindow) ?? maxWindow,
-            sendNoContextTakeover: sendNoContextTakeover || self.noContextTakeover,
-            receiveMaxWindow: min(receiveMaxWindow?.integer, maxWindow) ?? receiveMaxWindow?.integer ?? (receiveMaxWindow != nil ? maxWindow : nil),
-            receiveNoContextTakeover: receiveNoContextTakeover || self.noContextTakeover
+        return PerMessageDeflateExtension.Configuration(
+            sendMaxWindow: min(sendMaxWindowParam?.integer, sendMaxWindow) ?? sendMaxWindow,
+            sendNoContextTakeover: sendNoContextTakeoverParam || self.sendNoContextTakeover,
+            receiveMaxWindow: min(receiveMaxWindowParam?.integer, receiveMaxWindow) ?? receiveMaxWindowParam?.integer ?? (receiveMaxWindowParam != nil ? receiveMaxWindow : nil),
+            receiveNoContextTakeover: receiveNoContextTakeoverParam || self.receiveNoContextTakeover
         )
+    }
+
+    func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
+        let configuration = self.responseConfiguration(to: request)
         var header = "permessage-deflate"
         if let maxWindow = configuration.receiveMaxWindow {
             header += ";client_max_window_bits=\(maxWindow)"
@@ -73,30 +81,20 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     }
 
     func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
-        let sendMaxWindow = request.parameters["server_max_window_bits"]
-        let sendNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
-        let receiveMaxWindow = request.parameters["client_max_window_bits"]
-        let receiveNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
-
-        let configuration = PerMessageDeflateExtension.Configuration(
-            sendMaxWindow: min(sendMaxWindow?.integer, self.maxWindow) ?? self.maxWindow,
-            sendNoContextTakeover: sendNoContextTakeover || self.noContextTakeover,
-            receiveMaxWindow: min(receiveMaxWindow?.integer, self.maxWindow) ?? (receiveMaxWindow != nil ? self.maxWindow : nil),
-            receiveNoContextTakeover: receiveNoContextTakeover || self.noContextTakeover
-        )
+        let configuration = self.responseConfiguration(to: request)
         return try PerMessageDeflateExtension(configuration: configuration)
     }
 
     func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
-        let sendMaxWindow = request.parameters["client_max_window_bits"]?.integer
-        let sendNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
-        let receiveMaxWindow = request.parameters["server_max_window_bits"]?.integer
-        let receiveNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
+        let sendMaxWindowParam = request.parameters["client_max_window_bits"]?.integer
+        let sendNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
+        let receiveMaxWindowParam = request.parameters["server_max_window_bits"]?.integer
+        let receiveNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
         return try PerMessageDeflateExtension(configuration: .init(
-            sendMaxWindow: sendMaxWindow,
-            sendNoContextTakeover: sendNoContextTakeover,
-            receiveMaxWindow: receiveMaxWindow,
-            receiveNoContextTakeover: receiveNoContextTakeover
+            sendMaxWindow: sendMaxWindowParam,
+            sendNoContextTakeover: sendNoContextTakeoverParam,
+            receiveMaxWindow: receiveMaxWindowParam,
+            receiveNoContextTakeover: receiveNoContextTakeoverParam
         ))
     }
 }
@@ -168,7 +166,32 @@ extension HBWebSocketExtensionFactory {
     ///   - noContextTakeover: Should we reset window on every message
     public static func perMessageDeflate(maxWindow: Int? = 15, noContextTakeover: Bool = false) -> HBWebSocketExtensionFactory {
         return .init {
-            PerMessageDeflateExtensionBuilder(maxWindow: maxWindow, noContextTakeover: noContextTakeover)
+            PerMessageDeflateExtensionBuilder(
+                sendMaxWindow: maxWindow,
+                sendNoContextTakeover: noContextTakeover,
+                receiveMaxWindow: maxWindow,
+                receiveNoContextTakeover: noContextTakeover
+            )
+        }
+    }
+
+    ///  permessage-deflate websocket extension
+    /// - Parameters:
+    ///   - maxWindow: Max window to be used for decompression and compression
+    ///   - noContextTakeover: Should we reset window on every message
+    public static func perMessageDeflate(
+        sendMaxWindow: Int? = 15,
+        sendNoContextTakeover: Bool = false,
+        receiveMaxWindow: Int? = 15,
+        receiveNoContextTakeover: Bool = false
+    ) -> HBWebSocketExtensionFactory {
+        return .init {
+            PerMessageDeflateExtensionBuilder(
+                sendMaxWindow: sendMaxWindow,
+                sendNoContextTakeover: sendNoContextTakeover,
+                receiveMaxWindow: receiveMaxWindow,
+                receiveNoContextTakeover: receiveNoContextTakeover
+            )
         }
     }
 }
