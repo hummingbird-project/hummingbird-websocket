@@ -56,7 +56,7 @@ extension HBHTTPServer {
                 let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
                 do {
                     let extensions = try extensionBuilder.compactMap { try $0.serverExtension(from: clientHeaders) }
-                    let webSocket = HBWebSocket(channel: channel, type: .server, extensions: extensions)
+                    let webSocket = HBWebSocket(channel: channel, type: .server, maxFrameSize: maxFrameSize, extensions: extensions)
                     return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                         onUpgrade(webSocket, head)
                     }

@@ -28,20 +28,22 @@ public final class HBWebSocket {
         return self.channel.eventLoop
     }
 
-    let type: SocketType
+    public let type: SocketType
+    public let maxFrameSize: Int
     let extensions: [any HBWebSocketExtension]
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
 
-    public init(channel: Channel, type: SocketType, extensions: [any HBWebSocketExtension] = []) {
+    public init(channel: Channel, type: SocketType, maxFrameSize: Int = 1 << 14, extensions: [any HBWebSocketExtension] = []) {
         self.channel = channel
         self.isClosed = false
         self.pongCallback = nil
         self.readCallback = nil
         self.pingData = channel.allocator.buffer(capacity: 16)
         self.type = type
+        self.maxFrameSize = maxFrameSize
         self.extensions = extensions
 
         self.channel.closeFuture.whenComplete { _ in
