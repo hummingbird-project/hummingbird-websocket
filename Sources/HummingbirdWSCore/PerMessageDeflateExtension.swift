@@ -100,6 +100,11 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
 }
 
 final class PerMessageDeflateExtension: HBWebSocketExtension {
+    enum SendState {
+        case idle
+        case sendingMessage
+    }
+
     struct Configuration {
         let sendMaxWindow: Int?
         let sendNoContextTakeover: Bool
@@ -110,11 +115,13 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     private let decompressor: any NIODecompressor
     private let compressor: any NIOCompressor
     let configuration: Configuration
+    var sendState: SendState
 
     required init(configuration: Configuration) throws {
         self.decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: configuration.receiveMaxWindow ?? 15)
         self.compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: configuration.sendMaxWindow ?? 15)
         self.configuration = configuration
+        self.sendState = .idle
 
         try self.decompressor.startStream()
         try self.compressor.startStream()
@@ -128,35 +135,38 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
-            if self.configuration.receiveNoContextTakeover {
-                frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
-                try self.decompressor.resetStream()
-            } else {
-                if frame.fin {
-                    frame.data.writeBytes([0, 0, 255, 255])
+            if frame.fin {
+                frame.data.writeBytes([0, 0, 255, 255])
+            }
+            frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
+            if frame.fin {
+                if self.configuration.receiveNoContextTakeover {
+                    try self.decompressor.resetStream()
                 }
-                frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: 1 << 14, allocator: ws.channel.allocator)
             }
         }
         return frame
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
-        if frame.data.readableBytes > 16, frame.opcode == .text || frame.opcode == .binary {
+        // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
+        // compress the data
+        if frame.data.readableBytes > 16 || !frame.fin || self.sendState != .idle, frame.opcode == .text || frame.opcode == .binary {
             var newFrame = frame
-            newFrame.rsv1 = true
-            if self.configuration.sendNoContextTakeover {
-                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .finish, allocator: ws.channel.allocator)
-                try self.compressor.resetStream()
-            } else {
-                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
-                if newFrame.fin {
-                    newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
+            if self.sendState == .idle {
+                newFrame.rsv1 = true
+                self.sendState = .sendingMessage
+            }
+            newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
+            // if final frame then remove last four bytes 0x00 0x00 0xff 0xff (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
+            if newFrame.fin {
+                newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
+                self.sendState = .idle
+                if self.configuration.sendNoContextTakeover {
+                    try self.compressor.resetStream()
                 }
             }
-            if newFrame.data.readableBytes > frame.data.readableBytes {
-                return newFrame
-            }
+            return newFrame
         }
         return frame
     }

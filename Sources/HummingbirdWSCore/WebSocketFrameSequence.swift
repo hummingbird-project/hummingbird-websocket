@@ -67,6 +67,7 @@ struct WebSocketFrameSequence {
         var frame = self.first
         frame.maskKey = nil
         frame.data = self.bytes
+        frame.fin = true
         return frame
     }
 }
