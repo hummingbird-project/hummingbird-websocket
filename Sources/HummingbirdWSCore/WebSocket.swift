@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import CompressNIO
+import Logging
 import NIOCore
 import NIOWebSocket
 
@@ -31,12 +32,13 @@ public final class HBWebSocket {
     public let type: SocketType
     public let maxFrameSize: Int
     let extensions: [any HBWebSocketExtension]
+    var logger: Logger
 
     private var waitingOnPong: Bool = false
     private var pingData: ByteBuffer
     private var autoPingTask: Scheduled<Void>?
 
-    public init(channel: Channel, type: SocketType, maxFrameSize: Int = 1 << 14, extensions: [any HBWebSocketExtension] = []) {
+    public init(channel: Channel, type: SocketType, maxFrameSize: Int = 1 << 14, extensions: [any HBWebSocketExtension] = [], logger: Logger) {
         self.channel = channel
         self.isClosed = false
         self.pongCallback = nil
@@ -45,6 +47,7 @@ public final class HBWebSocket {
         self.type = type
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions
+        self.logger = logger
 
         self.channel.closeFuture.whenComplete { _ in
             self.autoPingTask?.cancel()
@@ -189,6 +192,7 @@ public final class HBWebSocket {
             self.close(code: .unacceptableData, promise: nil)
         }
         if let webSocketData = WebSocketData(frame: frame) {
+            self.logger.trace("Read: \(frame.debugDescription)")
             self.readCallback?(webSocketData, self)
         }
     }
@@ -208,6 +212,7 @@ public final class HBWebSocket {
         } catch {
             self.close(code: .unexpectedServerError, promise: nil)
         }
+        self.logger.trace("Sent: \(frame.debugDescription)")
         frame.maskKey = self.makeMaskKey()
         self.channel.writeAndFlush(frame, promise: promise)
     }
@@ -306,3 +311,10 @@ extension HBWebSocket {
 // managed internally and is only ever changed on the event loop
 extension HBWebSocket: @unchecked Sendable {}
 #endif // compiler(>=5.6)
+
+/// Extend WebSocketFrame to conform to CustomDebugStringConvertible
+extension WebSocketFrame: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        "fin:\(self.fin), rsv1:\(self.rsv1), opcode:\(self.opcode), data: \(self.data.debugDescription)"
+    }
+}

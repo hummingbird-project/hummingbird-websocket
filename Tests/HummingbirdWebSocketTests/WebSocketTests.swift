@@ -377,7 +377,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testQuery() throws {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -393,12 +393,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { app.stop() }
 
         let eventLoop = app.eventLoopGroup.next()
-        let wsFuture = HBWebSocketClient.connect(url: "ws://localhost:8080/test?connect", configuration: .init(), on: eventLoop)
+        let wsFuture = HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test?connect"),
+            configuration: .init(),
+            on: eventLoop
+        )
         _ = try wsFuture.wait()
     }
 
     func testAdditionalHeaders() throws {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -415,7 +419,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let wsFuture = HBWebSocketClient.connect(
-            url: "ws://localhost:8080/test",
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
             headers: ["Sec-WebSocket-Extensions": "foo"],
             configuration: .init(),
             on: eventLoop

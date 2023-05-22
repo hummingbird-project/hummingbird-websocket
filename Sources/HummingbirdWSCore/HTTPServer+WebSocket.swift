@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HummingbirdCore
+import Logging
 import NIOCore
 import NIOHTTP1
 import NIOWebSocket
@@ -20,23 +21,13 @@ import NIOWebSocket
 extension HBHTTPServer {
     /// Add WebSocket upgrade option
     /// - Parameters:
-    ///   - shouldUpgrade: Closure returning whether upgrade should happen
-    ///   - onUpgrade: Closure called once upgrade has happened. Includes the `HBWebSocket` created to service the WebSocket connection.
-    public func addWebSocketUpgrade(
-        shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
-        onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
-    ) {
-        return self.addWebSocketUpgrade(maxFrameSize: 1 << 14, shouldUpgrade: shouldUpgrade, onUpgrade: onUpgrade)
-    }
-
-    /// Add WebSocket upgrade option
-    /// - Parameters:
     ///   - maxFrameSize: Maximum size for a single frame
     ///   - shouldUpgrade: Closure returning whether upgrade should happen
     ///   - onUpgrade: Closure called once upgrade has happened. Includes the `HBWebSocket` created to service the WebSocket connection.
     public func addWebSocketUpgrade(
-        maxFrameSize: Int,
+        maxFrameSize: Int = 1 << 14,
         extensions extensionConfigs: [HBWebSocketExtensionFactory] = [],
+        logger: Logger,
         shouldUpgrade: @escaping (Channel, HTTPRequestHead) -> EventLoopFuture<HTTPHeaders?> = { channel, _ in return channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
         onUpgrade: @escaping (HBWebSocket, HTTPRequestHead) -> Void
     ) {
@@ -56,7 +47,7 @@ extension HBHTTPServer {
                 let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
                 do {
                     let extensions = try extensionBuilder.compactMap { try $0.serverExtension(from: clientHeaders) }
-                    let webSocket = HBWebSocket(channel: channel, type: .server, maxFrameSize: maxFrameSize, extensions: extensions)
+                    let webSocket = HBWebSocket(channel: channel, type: .server, maxFrameSize: maxFrameSize, extensions: extensions, logger: logger)
                     return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                         onUpgrade(webSocket, head)
                     }
