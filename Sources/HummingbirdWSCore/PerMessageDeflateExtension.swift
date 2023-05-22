@@ -135,14 +135,11 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
-            if frame.fin {
-                frame.data.writeBytes([0, 0, 255, 255])
-            }
+            precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
+            frame.data.writeBytes([0, 0, 255, 255])
             frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
-            if frame.fin {
-                if self.configuration.receiveNoContextTakeover {
-                    try self.decompressor.resetStream()
-                }
+            if self.configuration.receiveNoContextTakeover {
+                try self.decompressor.resetStream()
             }
         }
         return frame
