@@ -92,7 +92,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         let requestHeaders: [WebSocketExtensionHTTPParameters] = [
             .init("permessage-deflate", parameters: ["client_max_window_bits": .value("10")]),
         ]
-        let ext = PerMessageDeflateExtensionBuilder(sendNoContextTakeover: true, receiveNoContextTakeover: true)
+        let ext = PerMessageDeflateExtensionBuilder(clientNoContextTakeover: true, serverNoContextTakeover: true)
         let serverResponse = ext.serverResponseHeader(to: requestHeaders)
         XCTAssertEqual(
             serverResponse,
@@ -104,13 +104,13 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         let requestHeaders: [WebSocketExtensionHTTPParameters] = [
             .init("permessage-deflate", parameters: ["client_max_window_bits": .null]),
         ]
-        let ext1 = PerMessageDeflateExtensionBuilder(sendNoContextTakeover: true)
+        let ext1 = PerMessageDeflateExtensionBuilder(serverNoContextTakeover: true)
         let serverResponse1 = ext1.serverResponseHeader(to: requestHeaders)
         XCTAssertEqual(
             serverResponse1,
             "permessage-deflate;server_no_context_takeover"
         )
-        let ext2 = PerMessageDeflateExtensionBuilder(sendMaxWindow: 12, receiveNoContextTakeover: true)
+        let ext2 = PerMessageDeflateExtensionBuilder(clientNoContextTakeover: true, serverMaxWindow: 12)
         let serverResponse2 = ext2.serverResponseHeader(to: requestHeaders)
         XCTAssertEqual(
             serverResponse2,
@@ -200,7 +200,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         let app = try await self.setupClientAndServer(
             serverExtensions: [.perMessageDeflate()],
-            clientExtensions: [.perMessageDeflate(sendNoContextTakeover: true)],
+            clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true)],
             onServer: { ws in
                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
                 let stream = ws.readStream()
