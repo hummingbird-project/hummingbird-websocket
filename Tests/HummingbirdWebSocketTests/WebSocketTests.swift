@@ -346,6 +346,24 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try promise.wait()
     }
 
+    func testUnsolicitedPong() throws {
+        let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+
+        let app = try self.setupClientAndServer(
+            onServer: { ws in
+                ws.onPong { ws in
+                    promise.succeed()
+                }
+            },
+            onClient: { ws in
+                ws.sendPong(.init(), promise: nil)
+            }
+        )
+        defer { app.stop() }
+
+        try promise.wait()
+    }
+
     func testQuery() throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
         // add HTTP to WebSocket upgrade
