@@ -351,7 +351,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let app = try self.setupClientAndServer(
             onServer: { ws in
-                ws.onPong { ws in
+                ws.onPong { _ in
                     promise.succeed()
                 }
             },
