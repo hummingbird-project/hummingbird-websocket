@@ -133,6 +133,17 @@ public final class HBWebSocket {
         }
     }
 
+    /// Send an unsolicited Pong message
+    ///
+    /// This can be used as a unidirectional heartbeat.
+    /// See [RFC6455](https://www.rfc-editor.org/rfc/rfc6455.html#section-5.5.3)
+    /// - Parameter promise: promise that is completed when pong message has been sent
+    public func sendPong(_ buffer: ByteBuffer, promise: EventLoopPromise<Void>?) {
+        self.channel.eventLoop.execute {
+            self.send(buffer: buffer, opcode: .pong)
+        }
+    }
+
     /// Send ping and setup task to check for pong and send new ping
     public func initiateAutoPing(interval: TimeAmount) {
         guard self.channel.isActive else {
