@@ -46,7 +46,7 @@ public struct HBWebSocketBuilder {
                     context: WebSocketContext(eventLoop: channel.eventLoop, allocator: channel.allocator)
                 )
                 request.webSocketTestShouldUpgrade = true
-                return responder.respond(to: request).flatMapThrowing {
+                return self.responder.respond(to: request).flatMapThrowing {
                     if $0.status == .ok {
                         return $0.headers
                     }
@@ -61,7 +61,7 @@ public struct HBWebSocketBuilder {
                     context: WebSocketContext(eventLoop: ws.channel.eventLoop, allocator: ws.channel.allocator)
                 )
                 request.webSocket = ws
-                _ = responder.respond(to: request)
+                _ = self.responder.respond(to: request)
             }
         )
         self.routerGroup = .init(router: HBRouterBuilder())

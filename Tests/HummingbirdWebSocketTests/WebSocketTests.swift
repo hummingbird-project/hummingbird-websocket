@@ -111,8 +111,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testClientAndServerConnection() throws {
-        var serverHello: Bool = false
-        var clientHello: Bool = false
+        var serverHello = false
+        var clientHello = false
         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(5))
         let app = try self.setupClientAndServer(
             onServer: { ws in

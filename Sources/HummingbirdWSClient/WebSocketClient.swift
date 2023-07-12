@@ -117,7 +117,7 @@ public enum HBWebSocketClient {
             if let readCallback = readCallback {
                 webSocket.onRead(readCallback)
             }
-            return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ -> Void in
+            return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                 wsPromise.succeed(webSocket)
                 upgradePromise.succeed(())
             }
