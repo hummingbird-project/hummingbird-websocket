@@ -118,8 +118,16 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     var sendState: SendState
 
     required init(configuration: Configuration) throws {
-        self.decompressor = CompressionAlgorithm.rawDeflate.decompressor(windowBits: configuration.receiveMaxWindow ?? 15)
-        self.compressor = CompressionAlgorithm.rawDeflate.compressor(windowBits: configuration.sendMaxWindow ?? 15)
+        self.decompressor = CompressionAlgorithm.deflate(
+            configuration: .init(
+                windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
+            )
+        ).decompressor
+        self.compressor = CompressionAlgorithm.deflate(
+            configuration: .init(
+                windowSize: numericCast(configuration.sendMaxWindow ?? 15)
+            )
+        ).compressor
         self.configuration = configuration
         self.sendState = .idle
 
