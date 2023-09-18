@@ -24,12 +24,23 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     let clientNoContextTakeover: Bool
     let serverMaxWindow: Int?
     let serverNoContextTakeover: Bool
+    let compressionLevel: Int?
+    let memoryLevel: Int?
 
-    internal init(clientMaxWindow: Int? = nil, clientNoContextTakeover: Bool = false, serverMaxWindow: Int? = nil, serverNoContextTakeover: Bool = false) {
+    internal init(
+        clientMaxWindow: Int? = nil,
+        clientNoContextTakeover: Bool = false,
+        serverMaxWindow: Int? = nil,
+        serverNoContextTakeover: Bool = false,
+        compressionLevel: Int? = nil,
+        memoryLevel: Int? = nil
+    ) {
         self.clientMaxWindow = clientMaxWindow
         self.clientNoContextTakeover = clientNoContextTakeover
         self.serverMaxWindow = serverMaxWindow
         self.serverNoContextTakeover = serverNoContextTakeover
+        self.compressionLevel = compressionLevel
+        self.memoryLevel = memoryLevel
     }
 
     /// Return client request header
@@ -90,10 +101,12 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         let serverMaxWindowParam = request.parameters["server_max_window_bits"]?.integer
         let serverNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
         return try PerMessageDeflateExtension(configuration: .init(
+            receiveMaxWindow: serverMaxWindowParam,
+            receiveNoContextTakeover: serverNoContextTakeoverParam,
             sendMaxWindow: clientMaxWindowParam,
             sendNoContextTakeover: clientNoContextTakeoverParam,
-            receiveMaxWindow: serverMaxWindowParam,
-            receiveNoContextTakeover: serverNoContextTakeoverParam
+            compressionLevel: self.compressionLevel,
+            memoryLevel: self.memoryLevel
         ), eventLoop: eventLoop)
     }
 
@@ -104,17 +117,19 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
 
         return PerMessageDeflateExtension.Configuration(
+            receiveMaxWindow: min(clientMaxWindowParam?.integer, self.clientMaxWindow) ?? clientMaxWindowParam?.integer ?? (clientMaxWindowParam != nil ? self.clientMaxWindow : nil),
+            receiveNoContextTakeover: clientNoContextTakeoverParam || self.clientNoContextTakeover,
             sendMaxWindow: min(serverMaxWindowParam?.integer, self.serverMaxWindow) ?? self.serverMaxWindow,
             sendNoContextTakeover: serverNoContextTakeoverParam || self.serverNoContextTakeover,
-            receiveMaxWindow: min(clientMaxWindowParam?.integer, self.clientMaxWindow) ?? clientMaxWindowParam?.integer ?? (clientMaxWindowParam != nil ? self.clientMaxWindow : nil),
-            receiveNoContextTakeover: clientNoContextTakeoverParam || self.clientNoContextTakeover
+            compressionLevel: self.compressionLevel,
+            memoryLevel: self.memoryLevel
         )
     }
 }
 
 /// PerMessageDeflate websocket extension
 ///
-/// Uses deflate to compression to compress messages sent across a WebSocket
+/// Uses deflate to compress messages sent across a WebSocket
 /// See RFC 7692 for more details https://www.rfc-editor.org/rfc/rfc7692
 struct PerMessageDeflateExtension: HBWebSocketExtension {
     enum SendState: Sendable {
@@ -123,12 +138,15 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
     }
 
     struct Configuration: Sendable {
-        let sendMaxWindow: Int?
-        let sendNoContextTakeover: Bool
         let receiveMaxWindow: Int?
         let receiveNoContextTakeover: Bool
+        let sendMaxWindow: Int?
+        let sendNoContextTakeover: Bool
+        let compressionLevel: Int?
+        let memoryLevel: Int?
     }
 
+    /// Internal mutable state and referenced types, that cannot be set to Sendable
     class InternalState {
         fileprivate let decompressor: any NIODecompressor
         fileprivate let compressor: any NIOCompressor
@@ -140,9 +158,12 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
                     windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
                 )
             ).decompressor
+            // compression level -1 will setup the default compression level, 8 is the default memory level
             self.compressor = CompressionAlgorithm.deflate(
                 configuration: .init(
-                    windowSize: numericCast(configuration.sendMaxWindow ?? 15)
+                    windowSize: numericCast(configuration.sendMaxWindow ?? 15),
+                    compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
+                    memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
                 )
             ).compressor
             self.sendState = .idle
@@ -218,27 +239,39 @@ extension HBWebSocketExtensionFactory {
                 clientMaxWindow: maxWindow,
                 clientNoContextTakeover: noContextTakeover,
                 serverMaxWindow: maxWindow,
-                serverNoContextTakeover: noContextTakeover
+                serverNoContextTakeover: noContextTakeover,
+                compressionLevel: nil,
+                memoryLevel: nil
             )
         }
     }
 
     ///  permessage-deflate websocket extension
     /// - Parameters:
-    ///   - maxWindow: Max window to be used for decompression and compression
-    ///   - noContextTakeover: Should we reset window on every message
+    ///   - clientMaxWindow: Max window to be used for client compression
+    ///   - clientNoContextTakeover: Should client reset window on every message
+    ///   - serverMaxWindow: Max window to be used for server compression
+    ///   - serverNoContextTakeover: Should server reset window on every message
+    ///   - compressionLevel: Zlib compression level. Value between 0 and 9 where 1 gives best speed, 9 gives
+    ///         give best compression and 0 gives no compression.
+    ///   - memoryLevel: Defines how much memory should be given to compression. Value between 1 and 9 where 1
+    ///         uses least memory and 9 give best compression and optimal speed.
     public static func perMessageDeflate(
         clientMaxWindow: Int? = nil,
         clientNoContextTakeover: Bool = false,
         serverMaxWindow: Int? = nil,
-        serverNoContextTakeover: Bool = false
+        serverNoContextTakeover: Bool = false,
+        compressionLevel: Int? = nil,
+        memoryLevel: Int? = nil
     ) -> HBWebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
                 clientMaxWindow: clientMaxWindow,
                 clientNoContextTakeover: clientNoContextTakeover,
                 serverMaxWindow: serverMaxWindow,
-                serverNoContextTakeover: serverNoContextTakeover
+                serverNoContextTakeover: serverNoContextTakeover,
+                compressionLevel: compressionLevel,
+                memoryLevel: memoryLevel
             )
         }
     }
