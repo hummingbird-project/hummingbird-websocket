@@ -127,7 +127,9 @@ public enum HBWebSocketClient {
         ) { channel, head in
             let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
             do {
-                let extensions = try extensionBuilders.compactMap { try $0.clientExtension(from: serverExtensions) }
+                let extensions = try extensionBuilders.compactMap {
+                    try $0.clientExtension(from: serverExtensions, eventLoop: channel.eventLoop)
+                }
                 let webSocket = HBWebSocket(
                     channel: channel,
                     type: .client,

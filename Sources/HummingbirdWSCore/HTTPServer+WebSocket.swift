@@ -46,7 +46,9 @@ extension HBHTTPServer {
             upgradePipelineHandler: { (channel: Channel, head: HTTPRequestHead) -> EventLoopFuture<Void> in
                 let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
                 do {
-                    let extensions = try extensionBuilder.compactMap { try $0.serverExtension(from: clientHeaders) }
+                    let extensions = try extensionBuilder.compactMap {
+                        try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
+                    }
                     let webSocket = HBWebSocket(channel: channel, type: .server, maxFrameSize: maxFrameSize, extensions: extensions, logger: logger)
                     return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
                         onUpgrade(webSocket, head)

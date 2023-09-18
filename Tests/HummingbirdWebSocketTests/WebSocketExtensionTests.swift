@@ -256,6 +256,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 }
 
 struct XorWebSocketExtension: HBWebSocketExtension {
+    func shutdown() {}
+
     func xorFrame(_ frame: WebSocketFrame, ws: HBWebSocket) -> WebSocketFrame {
         var newBuffer = ws.channel.allocator.buffer(capacity: frame.data.readableBytes)
         for byte in frame.data.readableBytesView {
@@ -301,11 +303,11 @@ struct XorWebSocketExtensionBuilder: HBWebSocketExtensionBuilder {
         return header
     }
 
-    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 
-    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 }

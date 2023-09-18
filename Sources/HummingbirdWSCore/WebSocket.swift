@@ -52,6 +52,9 @@ public final class HBWebSocket {
 
         self.channel.closeFuture.whenComplete { _ in
             self.autoPingTask?.cancel()
+            for ext in self.extensions {
+                ext.shutdown()
+            }
         }
     }
 
@@ -207,6 +210,22 @@ public final class HBWebSocket {
         opcode: WebSocketOpcode,
         fin: Bool = true,
         promise: EventLoopPromise<Void>? = nil
+    ) {
+        // make sure we are sending on the channel EventLoop
+        if self.channel.eventLoop.inEventLoop {
+            self._send(buffer: buffer, opcode: opcode, fin: fin, promise: promise)
+        } else {
+            self.channel.eventLoop.execute {
+                self._send(buffer: buffer, opcode: opcode, fin: fin, promise: promise)
+            }
+        }
+    }
+
+    private func _send(
+        buffer: ByteBuffer,
+        opcode: WebSocketOpcode,
+        fin: Bool,
+        promise: EventLoopPromise<Void>?
     ) {
         var frame = WebSocketFrame(fin: fin, opcode: opcode, data: buffer)
         do {

@@ -12,19 +12,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+import NIOCore
 import NIOHTTP1
 import NIOWebSocket
 
 /// Protocol for WebSocket extension
-public protocol HBWebSocketExtension {
+public protocol HBWebSocketExtension: Sendable {
     /// Process frame received from websocket
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame
+    /// shutdown extension
+    func shutdown()
 }
 
 /// Protocol for WebSocket extension builder
-public protocol HBWebSocketExtensionBuilder: Sendable {
+public protocol HBWebSocketExtensionBuilder {
     /// name of WebSocket extension name
     static var name: String { get }
     /// construct client request header
@@ -32,9 +35,9 @@ public protocol HBWebSocketExtensionBuilder: Sendable {
     /// construct server response header based of client request
     func serverReponseHeader(to: WebSocketExtensionHTTPParameters) -> String?
     /// construct server version of extension based of client request
-    func serverExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
+    func serverExtension(from: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (any HBWebSocketExtension)?
     /// construct client version of extension based of server response
-    func clientExtension(from: WebSocketExtensionHTTPParameters) throws -> (any HBWebSocketExtension)?
+    func clientExtension(from: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (any HBWebSocketExtension)?
 }
 
 extension HBWebSocketExtensionBuilder {
@@ -50,10 +53,10 @@ extension HBWebSocketExtensionBuilder {
     }
 
     /// construct all server extensions based of all client requests
-    public func serverExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
+    public func serverExtension(from requests: [WebSocketExtensionHTTPParameters], eventLoop: EventLoop) throws -> (any HBWebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }
-            if let ext = try serverExtension(from: request) {
+            if let ext = try serverExtension(from: request, eventLoop: eventLoop) {
                 return ext
             }
         }
@@ -61,10 +64,10 @@ extension HBWebSocketExtensionBuilder {
     }
 
     /// construct all client extensions based of all server responses
-    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any HBWebSocketExtension)? {
+    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters], eventLoop: EventLoop) throws -> (any HBWebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }
-            if let ext = try clientExtension(from: request) {
+            if let ext = try clientExtension(from: request, eventLoop: eventLoop) {
                 return ext
             }
         }

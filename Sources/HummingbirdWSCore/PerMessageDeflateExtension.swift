@@ -16,6 +16,7 @@ import CompressNIO
 import NIOCore
 import NIOWebSocket
 
+/// PerMessageDeflate Websocket extension builder
 struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     static var name = "permessage-deflate"
 
@@ -31,6 +32,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         self.serverNoContextTakeover = serverNoContextTakeover
     }
 
+    /// Return client request header
     func clientRequestHeader() -> String {
         var header = "permessage-deflate"
         if let maxWindow = self.clientMaxWindow {
@@ -48,20 +50,9 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         return header
     }
 
-    func responseConfiguration(to request: WebSocketExtensionHTTPParameters) -> PerMessageDeflateExtension.Configuration {
-        let serverMaxWindowParam = request.parameters["server_max_window_bits"]
-        let serverNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
-        let clientMaxWindowParam = request.parameters["client_max_window_bits"]
-        let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
-
-        return PerMessageDeflateExtension.Configuration(
-            sendMaxWindow: min(serverMaxWindowParam?.integer, self.serverMaxWindow) ?? self.serverMaxWindow,
-            sendNoContextTakeover: serverNoContextTakeoverParam || self.serverNoContextTakeover,
-            receiveMaxWindow: min(clientMaxWindowParam?.integer, self.clientMaxWindow) ?? clientMaxWindowParam?.integer ?? (clientMaxWindowParam != nil ? self.clientMaxWindow : nil),
-            receiveNoContextTakeover: clientNoContextTakeoverParam || self.clientNoContextTakeover
-        )
-    }
-
+    /// Return server response header, given a client request
+    /// - Parameter request: Client request header parameters
+    /// - Returns: Server response parameters
     func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
         let configuration = self.responseConfiguration(to: request)
         var header = "permessage-deflate"
@@ -80,12 +71,20 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         return header
     }
 
-    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+    /// Create server PerMessageDeflateExtension based off request headers
+    /// - Parameters:
+    ///   - request: Client request
+    ///   - eventLoop: EventLoop it is bound to
+    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
         let configuration = self.responseConfiguration(to: request)
-        return try PerMessageDeflateExtension(configuration: configuration)
+        return try PerMessageDeflateExtension(configuration: configuration, eventLoop: eventLoop)
     }
 
-    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (HBWebSocketExtension)? {
+    /// Create client PerMessageDeflateExtension based off response headers
+    /// - Parameters:
+    ///   - request: Server response
+    ///   - eventLoop: EventLoop it is bound to
+    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
         let clientMaxWindowParam = request.parameters["client_max_window_bits"]?.integer
         let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
         let serverMaxWindowParam = request.parameters["server_max_window_bits"]?.integer
@@ -95,59 +94,89 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
             sendNoContextTakeover: clientNoContextTakeoverParam,
             receiveMaxWindow: serverMaxWindowParam,
             receiveNoContextTakeover: serverNoContextTakeoverParam
-        ))
+        ), eventLoop: eventLoop)
+    }
+
+    private func responseConfiguration(to request: WebSocketExtensionHTTPParameters) -> PerMessageDeflateExtension.Configuration {
+        let serverMaxWindowParam = request.parameters["server_max_window_bits"]
+        let serverNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
+        let clientMaxWindowParam = request.parameters["client_max_window_bits"]
+        let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
+
+        return PerMessageDeflateExtension.Configuration(
+            sendMaxWindow: min(serverMaxWindowParam?.integer, self.serverMaxWindow) ?? self.serverMaxWindow,
+            sendNoContextTakeover: serverNoContextTakeoverParam || self.serverNoContextTakeover,
+            receiveMaxWindow: min(clientMaxWindowParam?.integer, self.clientMaxWindow) ?? clientMaxWindowParam?.integer ?? (clientMaxWindowParam != nil ? self.clientMaxWindow : nil),
+            receiveNoContextTakeover: clientNoContextTakeoverParam || self.clientNoContextTakeover
+        )
     }
 }
 
-final class PerMessageDeflateExtension: HBWebSocketExtension {
-    enum SendState {
+/// PerMessageDeflate websocket extension
+///
+/// Uses deflate to compression to compress messages sent across a WebSocket
+/// See RFC 7692 for more details https://www.rfc-editor.org/rfc/rfc7692
+struct PerMessageDeflateExtension: HBWebSocketExtension {
+    enum SendState: Sendable {
         case idle
         case sendingMessage
     }
 
-    struct Configuration {
+    struct Configuration: Sendable {
         let sendMaxWindow: Int?
         let sendNoContextTakeover: Bool
         let receiveMaxWindow: Int?
         let receiveNoContextTakeover: Bool
     }
 
-    private let decompressor: any NIODecompressor
-    private let compressor: any NIOCompressor
-    let configuration: Configuration
-    var sendState: SendState
+    class InternalState {
+        fileprivate let decompressor: any NIODecompressor
+        fileprivate let compressor: any NIOCompressor
+        fileprivate var sendState: SendState
 
-    required init(configuration: Configuration) throws {
-        self.decompressor = CompressionAlgorithm.deflate(
-            configuration: .init(
-                windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
-            )
-        ).decompressor
-        self.compressor = CompressionAlgorithm.deflate(
-            configuration: .init(
-                windowSize: numericCast(configuration.sendMaxWindow ?? 15)
-            )
-        ).compressor
-        self.configuration = configuration
-        self.sendState = .idle
+        init(configuration: Configuration) throws {
+            self.decompressor = CompressionAlgorithm.deflate(
+                configuration: .init(
+                    windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
+                )
+            ).decompressor
+            self.compressor = CompressionAlgorithm.deflate(
+                configuration: .init(
+                    windowSize: numericCast(configuration.sendMaxWindow ?? 15)
+                )
+            ).compressor
+            self.sendState = .idle
+            try self.decompressor.startStream()
+            try self.compressor.startStream()
+        }
 
-        try self.decompressor.startStream()
-        try self.compressor.startStream()
+        func shutdown() {
+            try? self.compressor.finishStream()
+            try? self.decompressor.finishStream()
+        }
     }
 
-    deinit {
-        try? compressor.finishStream()
-        try? decompressor.finishStream()
+    let configuration: Configuration
+    let internalState: NIOLoopBound<InternalState>
+
+    init(configuration: Configuration, eventLoop: EventLoop) throws {
+        self.configuration = configuration
+        self.internalState = try .init(.init(configuration: configuration), eventLoop: eventLoop)
+    }
+
+    func shutdown() {
+        self.internalState.value.shutdown()
     }
 
     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
+            let state = self.internalState.value
             precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
             frame.data.writeBytes([0, 0, 255, 255])
-            frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
+            frame.data = try frame.data.decompressStream(with: state.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
             if self.configuration.receiveNoContextTakeover {
-                try self.decompressor.resetStream()
+                try state.decompressor.resetStream()
             }
         }
         return frame
@@ -156,19 +185,20 @@ final class PerMessageDeflateExtension: HBWebSocketExtension {
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
         // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
         // compress the data
-        if frame.data.readableBytes > 16 || !frame.fin || self.sendState != .idle, frame.opcode == .text || frame.opcode == .binary {
+        let state = self.internalState.value
+        if frame.data.readableBytes > 16 || !frame.fin || state.sendState != .idle, frame.opcode == .text || frame.opcode == .binary {
             var newFrame = frame
-            if self.sendState == .idle {
+            if state.sendState == .idle {
                 newFrame.rsv1 = true
-                self.sendState = .sendingMessage
+                state.sendState = .sendingMessage
             }
-            newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ws.channel.allocator)
+            newFrame.data = try newFrame.data.compressStream(with: state.compressor, flush: .sync, allocator: ws.channel.allocator)
             // if final frame then remove last four bytes 0x00 0x00 0xff 0xff (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
             if newFrame.fin {
                 newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
-                self.sendState = .idle
+                state.sendState = .idle
                 if self.configuration.sendNoContextTakeover {
-                    try self.compressor.resetStream()
+                    try state.compressor.resetStream()
                 }
             }
             return newFrame
