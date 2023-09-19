@@ -159,13 +159,3 @@ extension WebSocketExtensionHTTPParameters {
         self.parameters = parameters
     }
 }
-
-/// Minimum of two optional integers.
-///
-/// Returns nil if either of them is nil
-func min(_ a: Int?, _ b: Int?) -> Int? {
-    if case .some(let a2) = a, case .some(let b2) = b {
-        return min(a2, b2)
-    }
-    return nil
-}

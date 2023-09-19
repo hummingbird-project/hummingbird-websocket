@@ -190,7 +190,7 @@ public final class HBWebSocket {
 
     func read(_ frameSequence: WebSocketFrameSequence) {
         var frame = frameSequence.collapsed
-        self.logger.trace("Read: \(frame.debugDescription)")
+        self.logger.trace("Read: \(frame.traceDescription)")
         do {
             for ext in self.extensions.reversed() {
                 frame = try ext.processReceivedFrame(frame, ws: self)
@@ -236,7 +236,7 @@ public final class HBWebSocket {
             self.logger.debug("Closing as we failed to generate valid frame data")
             self.close(code: .unexpectedServerError, promise: nil)
         }
-        self.logger.trace("Sent: \(frame.debugDescription)")
+        self.logger.trace("Sent: \(frame.traceDescription)")
         frame.maskKey = self.makeMaskKey()
         self.channel.writeAndFlush(frame, promise: promise)
     }
@@ -339,10 +339,24 @@ extension HBWebSocket {
 // managed internally and is only ever changed on the event loop
 extension HBWebSocket: @unchecked Sendable {}
 
-/// Extend WebSocketFrame to conform to CustomDebugStringConvertible
-extension WebSocketFrame: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        "fin:\(self.fin), rsv1:\(self.rsv1), opcode:\(self.opcode), data: \(self.data.debugDescription)"
+/// Extend WebSocketFrame to provide debug description for trace logs
+extension WebSocketFrame {
+    fileprivate var traceDescription: String {
+        var flags: [String] = []
+        if self.fin {
+            flags.append("FIN")
+        }
+        if self.rsv1 {
+            flags.append("RSV1")
+        }
+        if self.rsv2 {
+            flags.append("RSV2")
+        }
+        if self.rsv3 {
+            flags.append("RSV3")
+        }
+
+        return "WebSocketFrame(\(self.opcode), flags: \(flags.joined(separator: ",")), data: \(self.data.debugDescription))"
     }
 }
 

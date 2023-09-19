@@ -93,13 +93,13 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
 
     /// Create client PerMessageDeflateExtension based off response headers
     /// - Parameters:
-    ///   - request: Server response
+    ///   - response: Server response
     ///   - eventLoop: EventLoop it is bound to
-    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> HBWebSocketExtension? {
-        let clientMaxWindowParam = request.parameters["client_max_window_bits"]?.integer
-        let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
-        let serverMaxWindowParam = request.parameters["server_max_window_bits"]?.integer
-        let serverNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
+    func clientExtension(from response: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> HBWebSocketExtension? {
+        let clientMaxWindowParam = response.parameters["client_max_window_bits"]?.integer
+        let clientNoContextTakeoverParam = response.parameters["client_no_context_takeover"] != nil
+        let serverMaxWindowParam = response.parameters["server_max_window_bits"]?.integer
+        let serverNoContextTakeoverParam = response.parameters["server_no_context_takeover"] != nil
         return try PerMessageDeflateExtension(configuration: .init(
             receiveMaxWindow: serverMaxWindowParam,
             receiveNoContextTakeover: serverNoContextTakeoverParam,
@@ -111,16 +111,26 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     }
 
     private func responseConfiguration(to request: WebSocketExtensionHTTPParameters) -> PerMessageDeflateExtension.Configuration {
-        let serverMaxWindowParam = request.parameters["server_max_window_bits"]
-        let serverNoContextTakeoverParam = request.parameters["server_no_context_takeover"] != nil
-        let clientMaxWindowParam = request.parameters["client_max_window_bits"]
-        let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
+        let requestServerMaxWindow = request.parameters["server_max_window_bits"]
+        let requestServerNoContextTakeover = request.parameters["server_no_context_takeover"] != nil
+        let requestClientMaxWindow = request.parameters["client_max_window_bits"]
+        let requestClientNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
+
+        let receiveMaxWindow: Int?
+        // calculate client max window. If parameter doesn't exist then server cannot set it, if it does
+        // exist then the value should be set to minimum of both values, or the value of the other if
+        // one is nil
+        if let requestClientMaxWindow = requestClientMaxWindow {
+            receiveMaxWindow = optionalMin(requestClientMaxWindow.integer, self.clientMaxWindow)
+        } else {
+            receiveMaxWindow = nil
+        }
 
         return PerMessageDeflateExtension.Configuration(
-            receiveMaxWindow: min(clientMaxWindowParam?.integer, self.clientMaxWindow) ?? clientMaxWindowParam?.integer ?? (clientMaxWindowParam != nil ? self.clientMaxWindow : nil),
-            receiveNoContextTakeover: clientNoContextTakeoverParam || self.clientNoContextTakeover,
-            sendMaxWindow: min(serverMaxWindowParam?.integer, self.serverMaxWindow) ?? self.serverMaxWindow,
-            sendNoContextTakeover: serverNoContextTakeoverParam || self.serverNoContextTakeover,
+            receiveMaxWindow: receiveMaxWindow,
+            receiveNoContextTakeover: requestClientNoContextTakeover || self.clientNoContextTakeover,
+            sendMaxWindow: optionalMin(requestServerMaxWindow?.integer, self.serverMaxWindow),
+            sendNoContextTakeover: requestServerNoContextTakeover || self.serverNoContextTakeover,
             compressionLevel: self.compressionLevel,
             memoryLevel: self.memoryLevel
         )
@@ -194,6 +204,8 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
         if frame.rsv1 {
             let state = self.internalState.value
             precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
+            // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
+            // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
             frame.data.writeBytes([0, 0, 255, 255])
             frame.data = try frame.data.decompressStream(with: state.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
             if self.configuration.receiveNoContextTakeover {
@@ -204,17 +216,20 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+        let state = self.internalState.value
         // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
         // compress the data
-        let state = self.internalState.value
-        if frame.data.readableBytes > 16 || !frame.fin || state.sendState != .idle, frame.opcode == .text || frame.opcode == .binary {
+        let shouldWeCompress = frame.data.readableBytes > 16 || !frame.fin || state.sendState != .idle
+        let isCorrectType = frame.opcode == .text || frame.opcode == .binary
+        if shouldWeCompress, isCorrectType {
             var newFrame = frame
             if state.sendState == .idle {
                 newFrame.rsv1 = true
                 state.sendState = .sendingMessage
             }
             newFrame.data = try newFrame.data.compressStream(with: state.compressor, flush: .sync, allocator: ws.channel.allocator)
-            // if final frame then remove last four bytes 0x00 0x00 0xff 0xff (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
+            // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
+            // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
             if newFrame.fin {
                 newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
                 state.sendState = .idle
@@ -274,5 +289,21 @@ extension HBWebSocketExtensionFactory {
                 memoryLevel: memoryLevel
             )
         }
+    }
+}
+
+/// Minimum of two optional integers.
+///
+/// Returns the other is one of them is nil
+private func optionalMin(_ a: Int?, _ b: Int?) -> Int? {
+    switch (a, b) {
+    case (.some(let a), .some(let b)):
+        return min(a, b)
+    case (.some(a), .none):
+        return a
+    case (.none, .some(b)):
+        return b
+    default:
+        return nil
     }
 }

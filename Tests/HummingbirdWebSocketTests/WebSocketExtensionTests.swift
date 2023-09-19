@@ -57,6 +57,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         onClient: @escaping (HBWebSocket) async throws -> Void
     ) async throws -> HBApplication {
         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
+        app.logger.logLevel = .trace
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade(maxFrameSize: 1 << 14, extensions: serverExtensions)
         // on websocket connect.

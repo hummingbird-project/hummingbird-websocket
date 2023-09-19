@@ -73,6 +73,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         onClient: @escaping (HBWebSocket) -> Void
     ) throws -> HBApplication {
         let app = HBApplication(configuration: .init(address: .hostname(port: 0)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
+        app.logger.logLevel = .trace
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
