@@ -95,7 +95,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     /// - Parameters:
     ///   - request: Server response
     ///   - eventLoop: EventLoop it is bound to
-    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
+    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> HBWebSocketExtension? {
         let clientMaxWindowParam = request.parameters["client_max_window_bits"]?.integer
         let clientNoContextTakeoverParam = request.parameters["client_no_context_takeover"] != nil
         let serverMaxWindowParam = request.parameters["server_max_window_bits"]?.integer
