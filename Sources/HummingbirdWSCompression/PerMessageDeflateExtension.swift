@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import CompressNIO
+import HummingbirdWSCore
 import NIOCore
 import NIOWebSocket
 

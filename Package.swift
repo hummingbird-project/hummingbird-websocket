@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
         .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
+        .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
         .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
@@ -24,7 +25,6 @@ let package = Package(
             .product(name: "HummingbirdCore", package: "hummingbird-core"),
             .product(name: "NIO", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
-            .product(name: "CompressNIO", package: "compress-nio"),
         ]),
         .target(name: "HummingbirdWSClient", dependencies: [
             .byName(name: "HummingbirdWSCore"),
@@ -36,9 +36,14 @@ let package = Package(
             .byName(name: "HummingbirdWSCore"),
             .product(name: "Hummingbird", package: "hummingbird"),
         ]),
+        .target(name: "HummingbirdWSCompression", dependencies: [
+            .byName(name: "HummingbirdWSCore"),
+            .product(name: "CompressNIO", package: "compress-nio"),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
             .byName(name: "HummingbirdWSClient"),
+            .byName(name: "HummingbirdWSCompression"),
         ]),
     ]
 )

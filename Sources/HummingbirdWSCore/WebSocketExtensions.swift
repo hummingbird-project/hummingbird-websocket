@@ -87,14 +87,14 @@ public struct HBWebSocketExtensionFactory: Sendable {
 /// Parsed parameters from `Sec-WebSocket-Extensions` header
 public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
     /// A single parameter
-    enum Parameter: Sendable, Equatable {
+    public enum Parameter: Sendable, Equatable {
         // Parameter with a value
         case value(String)
         // Parameter with no value
         case null
 
         // Convert to optional
-        var optional: String? {
+        public var optional: String? {
             switch self {
             case .value(let string):
                 return .some(string)
@@ -104,7 +104,7 @@ public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
         }
 
         // Convert to integer
-        var integer: Int? {
+        public var integer: Int? {
             switch self {
             case .value(let string):
                 return Int(string)
@@ -114,7 +114,7 @@ public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
         }
     }
 
-    let parameters: [String: Parameter]
+    public let parameters: [String: Parameter]
     let name: String
 
     /// initialise WebSocket extension parameters from string

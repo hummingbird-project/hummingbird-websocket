@@ -15,6 +15,7 @@
 import Hummingbird
 import HummingbirdWebSocket
 import HummingbirdWSClient
+@testable import HummingbirdWSCompression
 @testable import HummingbirdWSCore
 import NIOCore
 import NIOPosix
