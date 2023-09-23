@@ -22,6 +22,61 @@ public final class HBWebSocket {
         case server
     }
 
+    private class AutoPingTaskManager {
+        private var waitingOnPong: Bool
+        private var pingData: ByteBuffer
+        private var autoPingTask: Scheduled<Void>?
+
+        init(channel: Channel) {
+            self.waitingOnPong = false
+            self.pingData = channel.allocator.buffer(capacity: 16)
+            self.autoPingTask = nil
+        }
+
+        func shutdown() {
+            self.autoPingTask?.cancel()
+        }
+
+        /// Send ping and setup task to check for pong and send new ping
+        func initiateAutoPing(interval: TimeAmount, ws: HBWebSocket) {
+            self.autoPingTask = ws.channel.eventLoop.scheduleTask(in: interval) {
+                if self.waitingOnPong {
+                    // We never received a pong from our last ping, so the connection has timed out
+                    let promise = ws.channel.eventLoop.makePromise(of: Void.self)
+                    ws.close(code: .goingAway, promise: promise)
+                    promise.futureResult.whenComplete { _ in
+                        // Usually, closing a WebSocket is done by sending the close frame and waiting
+                        // for the peer to respond with their close frame. We are in a timeout situation,
+                        // so the other side likely will never send the close frame. We just close the
+                        // channel ourselves.
+                        ws.channel.close(mode: .all, promise: nil)
+                    }
+
+                } else {
+                    ws.sendPing().whenSuccess {
+                        self.waitingOnPong = true
+                        self.initiateAutoPing(interval: interval, ws: ws)
+                    }
+                }
+            }
+        }
+
+        /// Send ping message
+        /// - Parameter promise: promise that is completed when ping message has been sent
+        func sendPing(ws: HBWebSocket, promise: EventLoopPromise<Void>?) {
+            if self.waitingOnPong {
+                promise?.succeed(())
+                return
+            }
+            // creating random payload
+            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
+            self.pingData.clear()
+            self.pingData.writeBytes(random)
+
+            ws.send(buffer: self.pingData, opcode: .ping, promise: promise)
+        }
+    }
+
     public let channel: Channel
     @inlinable public var eventLoop: EventLoop {
         return self.channel.eventLoop
