@@ -73,7 +73,7 @@ public final class HBWebSocket: Sendable {
                 return
             }
             self.waitingOnPong = false
-            ws.pongCallback.load(ordering: .relaxed).value?(ws)
+            ws.pongCallback.load(ordering: .relaxed).wrapped?(ws)
         }
 
         /// Send ping message
@@ -101,11 +101,12 @@ public final class HBWebSocket: Sendable {
     public typealias CloseCallback = @Sendable (HBWebSocket) -> Void
     public typealias PongCallback = @Sendable (HBWebSocket) -> Void
 
+    // wrapper class for type that conforms to AtomicReference
     final class AtomicContainer<Value: Sendable>: AtomicReference, Sendable {
-        let value: Value
+        let wrapped: Value
 
         init(_ value: Value) {
-            self.value = value
+            self.wrapped = value
         }
     }
 
@@ -235,7 +236,7 @@ public final class HBWebSocket: Sendable {
     }
 
     func read(_ data: WebSocketData) {
-        self.readCallback.load(ordering: .relaxed).value?(data, self)
+        self.readCallback.load(ordering: .relaxed).wrapped?(data, self)
     }
 
     /// Send web socket frame to server
