@@ -48,11 +48,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
     static var eventLoopGroup: EventLoopGroup!
 
     override class func setUp() {
-        Self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     override class func tearDown() {
-        XCTAssertNoThrow(try Self.eventLoopGroup.syncShutdownGracefully())
+        XCTAssertNoThrow(try self.eventLoopGroup.syncShutdownGracefully())
     }
 
     enum Error: Swift.Error {

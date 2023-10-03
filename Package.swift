@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", from: "1.1.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.1"),
@@ -34,6 +35,7 @@ let package = Package(
         ]),
         .target(name: "HummingbirdWebSocket", dependencies: [
             .byName(name: "HummingbirdWSCore"),
+            .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
         ]),
         .target(name: "HummingbirdWSCompression", dependencies: [
@@ -44,6 +46,7 @@ let package = Package(
             .byName(name: "HummingbirdWebSocket"),
             .byName(name: "HummingbirdWSClient"),
             .byName(name: "HummingbirdWSCompression"),
+            .product(name: "Atomics", package: "swift-atomics"),
         ]),
     ]
 )

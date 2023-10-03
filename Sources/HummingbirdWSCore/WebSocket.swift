@@ -13,16 +13,84 @@
 //===----------------------------------------------------------------------===//
 
 import Atomics
-import CompressNIO
 import Logging
 import NIOCore
 import NIOWebSocket
 
 /// WebSocket object
-public final class HBWebSocket {
+public final class HBWebSocket: Sendable {
     public enum SocketType: Sendable {
         case client
         case server
+    }
+
+    private class AutoPingTaskManager {
+        private var waitingOnPong: Bool
+        private var pingData: ByteBuffer
+        private var autoPingTask: Scheduled<Void>?
+
+        init(channel: Channel) {
+            self.waitingOnPong = false
+            self.pingData = channel.allocator.buffer(capacity: 16)
+            self.autoPingTask = nil
+            channel.closeFuture.whenComplete { _ in
+                self.shutdown()
+            }
+        }
+
+        func shutdown() {
+            self.autoPingTask?.cancel()
+        }
+
+        /// Send ping and setup task to check for pong and send new ping
+        func initiateAutoPing(interval: TimeAmount, ws: HBWebSocket) {
+            self.autoPingTask = ws.channel.eventLoop.scheduleTask(in: interval) {
+                if self.waitingOnPong {
+                    // We never received a pong from our last ping, so the connection has timed out
+                    let promise = ws.channel.eventLoop.makePromise(of: Void.self)
+                    ws.close(code: .goingAway, promise: promise)
+                    promise.futureResult.whenComplete { _ in
+                        // Usually, closing a WebSocket is done by sending the close frame and waiting
+                        // for the peer to respond with their close frame. We are in a timeout situation,
+                        // so the other side likely will never send the close frame. We just close the
+                        // channel ourselves.
+                        ws.channel.close(mode: .all, promise: nil)
+                    }
+
+                } else {
+                    ws.sendPing().whenSuccess {
+                        self.waitingOnPong = true
+                        self.initiateAutoPing(interval: interval, ws: ws)
+                    }
+                }
+            }
+        }
+
+        /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
+        func receivedPong(frame: WebSocketFrame, ws: HBWebSocket) {
+            let frameData = frame.unmaskedData
+            guard frameData == self.pingData else {
+                ws.close(code: .goingAway, promise: nil)
+                return
+            }
+            self.waitingOnPong = false
+            ws.pongCallback.load(ordering: .relaxed).wrapped?(ws)
+        }
+
+        /// Send ping message
+        /// - Parameter promise: promise that is completed when ping message has been sent
+        func sendPing(ws: HBWebSocket, promise: EventLoopPromise<Void>?) {
+            if self.waitingOnPong {
+                promise?.succeed(())
+                return
+            }
+            // creating random payload
+            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
+            self.pingData.clear()
+            self.pingData.writeBytes(random)
+
+            ws.send(buffer: self.pingData, opcode: .ping, promise: promise)
+        }
     }
 
     public let channel: Channel
@@ -30,28 +98,40 @@ public final class HBWebSocket {
         return self.channel.eventLoop
     }
 
-    public let type: SocketType
+    public typealias ReadCallback = @Sendable (WebSocketData, HBWebSocket) -> Void
+    public typealias CloseCallback = @Sendable (HBWebSocket) -> Void
+    public typealias PongCallback = @Sendable (HBWebSocket) -> Void
+
+    // wrapper class for type that conforms to AtomicReference
+    final class AtomicContainer<Value: Sendable>: AtomicReference, Sendable {
+        let wrapped: Value
+
+        init(_ value: Value) {
+            self.wrapped = value
+        }
+    }
+
+    let type: SocketType
     public let maxFrameSize: Int
     let extensions: [any HBWebSocketExtension]
-    var logger: Logger
-
-    private var waitingOnPong: Bool = false
-    private var pingData: ByteBuffer
-    private var autoPingTask: Scheduled<Void>?
+    let logger: Logger
+    private let autoPingManager: NIOLoopBound<AutoPingTaskManager>
+    private let isClosed: ManagedAtomic<Bool>
+    private let pongCallback: ManagedAtomic<AtomicContainer<PongCallback?>>
+    private let readCallback: ManagedAtomic<AtomicContainer<ReadCallback?>>
 
     public init(channel: Channel, type: SocketType, maxFrameSize: Int = 1 << 14, extensions: [any HBWebSocketExtension] = [], logger: Logger) {
         self.channel = channel
-        self.isClosed = false
-        self.pongCallback = nil
-        self.readCallback = nil
-        self.pingData = channel.allocator.buffer(capacity: 16)
+        self.isClosed = .init(false)
+        self.pongCallback = .init(.init(nil))
+        self.readCallback = .init(.init(nil))
+        self.autoPingManager = .init(.init(channel: channel), eventLoop: channel.eventLoop)
         self.type = type
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions
         self.logger = logger.with(metadataKey: "hb_ws_id", value: .stringConvertible(Self.globalRequestID.loadThenWrappingIncrement(by: 1, ordering: .relaxed)))
 
         self.channel.closeFuture.whenComplete { _ in
-            self.autoPingTask?.cancel()
             for ext in self.extensions {
                 ext.shutdown()
             }
@@ -59,17 +139,17 @@ public final class HBWebSocket {
     }
 
     /// Set callback to be called whenever WebSocket receives data
-    public func onRead(_ cb: @escaping ReadCallback) {
-        self.readCallback = cb
+    @preconcurrency public func onRead(_ cb: @escaping ReadCallback) {
+        self.readCallback.store(.init(cb), ordering: .relaxed)
     }
 
     /// Set callback to be called whenever WebSocket receives a pong
-    public func onPong(_ cb: @escaping PongCallback) {
-        self.pongCallback = cb
+    @preconcurrency public func onPong(_ cb: @escaping PongCallback) {
+        self.pongCallback.store(.init(cb), ordering: .relaxed)
     }
 
     /// Set callback to be called whenever WebSocket channel is closed
-    public func onClose(_ cb: @escaping CloseCallback) {
+    @preconcurrency public func onClose(_ cb: @escaping CloseCallback) {
         self.channel.closeFuture.whenComplete { _ in
             cb(self)
         }
@@ -112,11 +192,11 @@ public final class HBWebSocket {
     ///   - code: Close reason
     ///   - promise: promise that is completed when close has been sent
     public func close(code: WebSocketErrorCode = .normalClosure, promise: EventLoopPromise<Void>?) {
-        guard self.isClosed == false else {
+        guard self.isClosed.load(ordering: .relaxed) == false else {
             promise?.succeed(())
             return
         }
-        self.isClosed = true
+        self.isClosed.store(true, ordering: .relaxed)
 
         self.logger.debug("Closing WebSocket")
 
@@ -136,17 +216,12 @@ public final class HBWebSocket {
     /// Send ping message
     /// - Parameter promise: promise that is completed when ping message has been sent
     public func sendPing(promise: EventLoopPromise<Void>?) {
-        self.channel.eventLoop.execute {
-            if self.waitingOnPong {
-                promise?.succeed(())
-                return
+        if self.channel.eventLoop.inEventLoop {
+            self.autoPingManager.value.sendPing(ws: self, promise: promise)
+        } else {
+            self.channel.eventLoop.execute {
+                self.autoPingManager.value.sendPing(ws: self, promise: promise)
             }
-            // creating random payload
-            let random = (0..<16).map { _ in UInt8.random(in: 0...255) }
-            self.pingData.clear()
-            self.pingData.writeBytes(random)
-
-            self.send(buffer: self.pingData, opcode: .ping, promise: promise)
         }
     }
 
@@ -166,24 +241,11 @@ public final class HBWebSocket {
         guard self.channel.isActive else {
             return
         }
-        self.autoPingTask = self.channel.eventLoop.scheduleTask(in: interval) {
-            if self.waitingOnPong {
-                // We never received a pong from our last ping, so the connection has timed out
-                let promise = self.channel.eventLoop.makePromise(of: Void.self)
-                self.close(code: .goingAway, promise: promise)
-                promise.futureResult.whenComplete { _ in
-                    // Usually, closing a WebSocket is done by sending the close frame and waiting
-                    // for the peer to respond with their close frame. We are in a timeout situation,
-                    // so the other side likely will never send the close frame. We just close the
-                    // channel ourselves.
-                    self.channel.close(mode: .all, promise: nil)
-                }
-
-            } else {
-                self.sendPing().whenSuccess {
-                    self.waitingOnPong = true
-                    self.initiateAutoPing(interval: interval)
-                }
+        if self.channel.eventLoop.inEventLoop {
+            self.autoPingManager.value.initiateAutoPing(interval: interval, ws: self)
+        } else {
+            self.channel.eventLoop.execute {
+                self.autoPingManager.value.initiateAutoPing(interval: interval, ws: self)
             }
         }
     }
@@ -200,7 +262,7 @@ public final class HBWebSocket {
             self.close(code: .unacceptableData, promise: nil)
         }
         if let webSocketData = WebSocketData(frame: frame) {
-            self.readCallback?(webSocketData, self)
+            self.readCallback.load(ordering: .relaxed).wrapped?(webSocketData, self)
         }
     }
 
@@ -244,14 +306,7 @@ public final class HBWebSocket {
     /// Respond to pong from client. Verify contents of pong and clear waitingOnPong flag
     func receivedPong(frame: WebSocketFrame) {
         self.logger.trace("Received pong")
-        let frameData = frame.unmaskedData
-        guard frameData == self.pingData else {
-            self.logger.debug("Pong data is invalid, closing")
-            self.close(code: .goingAway, promise: nil)
-            return
-        }
-        self.waitingOnPong = false
-        self.pongCallback?(self)
+        self.autoPingManager.value.receivedPong(frame: frame, ws: self)
     }
 
     /// Respond to ping from client
@@ -267,7 +322,7 @@ public final class HBWebSocket {
     func receivedClose(frame: WebSocketFrame) {
         self.logger.trace("Received close")
         // Handle a received close frame. We're just going to close.
-        self.isClosed = true
+        self.isClosed.store(true, ordering: .relaxed)
         self.channel.close(promise: nil)
     }
 
@@ -288,13 +343,6 @@ public final class HBWebSocket {
         return WebSocketMaskingKey(bytes)
     }
 
-    public typealias ReadCallback = (WebSocketData, HBWebSocket) -> Void
-    public typealias CloseCallback = (HBWebSocket) -> Void
-    public typealias PongCallback = (HBWebSocket) -> Void
-
-    private var pongCallback: PongCallback?
-    private var readCallback: ReadCallback?
-    private var isClosed: Bool = false
     private static let globalRequestID = ManagedAtomic(0)
 }
 
@@ -334,10 +382,6 @@ extension HBWebSocket {
         }
     }
 }
-
-// HBWebSocket can be set to Sendable because ping data which is mutable is
-// managed internally and is only ever changed on the event loop
-extension HBWebSocket: @unchecked Sendable {}
 
 /// Extend WebSocketFrame to provide debug description for trace logs
 extension WebSocketFrame {

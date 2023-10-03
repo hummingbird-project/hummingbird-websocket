@@ -28,7 +28,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     let compressionLevel: Int?
     let memoryLevel: Int?
 
-    internal init(
+    init(
         clientMaxWindow: Int? = nil,
         clientNoContextTakeover: Bool = false,
         serverMaxWindow: Int? = nil,
