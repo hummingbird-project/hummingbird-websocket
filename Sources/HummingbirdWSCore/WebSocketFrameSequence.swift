@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CompressNIO
 import NIOCore
 import NIOWebSocket
 
