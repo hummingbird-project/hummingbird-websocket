@@ -9,14 +9,17 @@ let package = Package(
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
         .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
+        .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
         .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird-core.git", from: "1.1.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.1"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
+        .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
     ],
     targets: [
         .target(name: "HummingbirdWSCore", dependencies: [
@@ -32,11 +35,18 @@ let package = Package(
         ]),
         .target(name: "HummingbirdWebSocket", dependencies: [
             .byName(name: "HummingbirdWSCore"),
+            .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
+        ]),
+        .target(name: "HummingbirdWSCompression", dependencies: [
+            .byName(name: "HummingbirdWSCore"),
+            .product(name: "CompressNIO", package: "compress-nio"),
         ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
             .byName(name: "HummingbirdWSClient"),
+            .byName(name: "HummingbirdWSCompression"),
+            .product(name: "Atomics", package: "swift-atomics"),
         ]),
     ]
 )

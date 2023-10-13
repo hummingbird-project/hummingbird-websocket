@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2021 the Hummingbird authors
+// Copyright (c) 2021-2023 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -20,43 +20,43 @@ import NIOCore
 import NIOPosix
 import XCTest
 
+struct TimeoutPromise {
+    let task: Scheduled<Void>
+    let promise: EventLoopPromise<Void>
+
+    init(eventLoop: EventLoop, timeout: TimeAmount) {
+        let promise = eventLoop.makePromise(of: Void.self)
+        self.promise = promise
+        self.task = eventLoop.scheduleTask(in: timeout) { promise.fail(ChannelError.connectTimeout(timeout)) }
+    }
+
+    func succeed() {
+        self.promise.succeed(())
+    }
+
+    func fail(_ error: Error) {
+        self.promise.fail(error)
+    }
+
+    func wait() throws {
+        try self.promise.futureResult.wait()
+        self.task.cancel()
+    }
+}
+
 final class HummingbirdWebSocketTests: XCTestCase {
     static var eventLoopGroup: EventLoopGroup!
 
     override class func setUp() {
-        Self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     override class func tearDown() {
-        XCTAssertNoThrow(try Self.eventLoopGroup.syncShutdownGracefully())
+        XCTAssertNoThrow(try self.eventLoopGroup.syncShutdownGracefully())
     }
 
     enum Error: Swift.Error {
         case unexpectedClose
-    }
-
-    struct TimeoutPromise {
-        let task: Scheduled<Void>
-        let promise: EventLoopPromise<Void>
-
-        init(eventLoop: EventLoop, timeout: TimeAmount) {
-            let promise = eventLoop.makePromise(of: Void.self)
-            self.promise = promise
-            self.task = eventLoop.scheduleTask(in: timeout) { promise.fail(ChannelError.connectTimeout(timeout)) }
-        }
-
-        func succeed() {
-            self.promise.succeed(())
-        }
-
-        func fail(_ error: Error) {
-            self.promise.fail(error)
-        }
-
-        func wait() throws {
-            try self.promise.futureResult.wait()
-            self.task.cancel()
-        }
     }
 
     func createRandomBuffer(size: Int) -> ByteBuffer {
@@ -72,7 +72,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
         onServer: @escaping (HBWebSocket) -> Void,
         onClient: @escaping (HBWebSocket) -> Void
     ) throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)), eventLoopGroupProvider: .shared(Self.eventLoopGroup))
+        app.logger.logLevel = .trace
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -82,7 +83,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try app.start()
 
         let eventLoop = app.eventLoopGroup.next()
-        HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop).whenComplete { result in
+        HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
+            configuration: .init(),
+            on: eventLoop
+        ).whenComplete { result in
             switch result {
             case .failure(let error):
                 XCTFail("\(error)")
@@ -94,7 +99,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func setupClientAndServer(onServer: @escaping (HBWebSocket) async throws -> Void, onClient: @escaping (HBWebSocket) async throws -> Void) async throws -> HBApplication {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -105,7 +110,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try app.start()
 
         let eventLoop = app.eventLoopGroup.next()
-        let ws = try await HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
+        let ws = try await HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
+            configuration: .init(),
+            on: eventLoop
+        )
         try await onClient(ws)
         return app
     }
@@ -163,7 +172,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
         let buffer = self.createRandomBuffer(size: 600_000)
 
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade(maxFrameSize: 1_000_000)
         // on websocket connect.
@@ -181,7 +190,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let wsFuture = HBWebSocketClient.connect(
-            url: "ws://localhost:8080/test",
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
             configuration: .init(maxFrameSize: 1_000_000),
             on: eventLoop
         ).map { ws in
@@ -201,7 +210,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testServerImmediateWrite() throws {
         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
 
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade(maxFrameSize: 1_000_000)
         // on websocket connect.
@@ -216,7 +225,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let wsFuture = HBWebSocketClient.connect(
-            url: "ws://localhost:8080/test",
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
             configuration: .init(maxFrameSize: 1_000_000),
             on: eventLoop
         ) { data, _ in
@@ -232,7 +241,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testNotWebSocket() throws {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         app.router.get("/test") { _ in
             "hello"
         }
@@ -240,7 +249,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { app.stop() }
 
         let eventLoop = Self.eventLoopGroup.next()
-        let clientWS = HBWebSocketClient.connect(url: "ws://localhost:8080/test", configuration: .init(), on: eventLoop)
+        let clientWS = HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
+            configuration: .init(),
+            on: eventLoop
+        )
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
             case HBWebSocketClient.Error.websocketUpgradeFailed:
@@ -253,7 +266,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testNoConnection() throws {
         let eventLoop = Self.eventLoopGroup.next()
-        let clientWS = HBWebSocketClient.connect(url: "http://localhost:8080", configuration: .init(), on: eventLoop)
+        let clientWS = HBWebSocketClient.connect(url: "http://localhost:10245", configuration: .init(), on: eventLoop)
         XCTAssertThrowsError(try clientWS.wait()) { error in
             switch error {
             case is NIOConnectionError:
@@ -365,7 +378,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testQuery() throws {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -381,12 +394,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
         defer { app.stop() }
 
         let eventLoop = app.eventLoopGroup.next()
-        let wsFuture = HBWebSocketClient.connect(url: "ws://localhost:8080/test?connect", configuration: .init(), on: eventLoop)
+        let wsFuture = HBWebSocketClient.connect(
+            url: HBURL("ws://localhost:\(app.server.port!)/test?connect"),
+            configuration: .init(),
+            on: eventLoop
+        )
         _ = try wsFuture.wait()
     }
 
     func testAdditionalHeaders() throws {
-        let app = HBApplication(configuration: .init(address: .hostname(port: 8080)))
+        let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         // add HTTP to WebSocket upgrade
         app.ws.addUpgrade()
         // on websocket connect.
@@ -403,7 +420,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
         let eventLoop = app.eventLoopGroup.next()
         let wsFuture = HBWebSocketClient.connect(
-            url: "ws://localhost:8080/test",
+            url: HBURL("ws://localhost:\(app.server.port!)/test"),
             headers: ["Sec-WebSocket-Extensions": "foo"],
             configuration: .init(),
             on: eventLoop

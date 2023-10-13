@@ -38,23 +38,12 @@ public final class WebSocketHandler: ChannelInboundHandler {
             self.webSocket.receivedPong(frame: frame)
         case .ping:
             self.webSocket.receivedPing(frame: frame)
-        case .text:
+        case .text, .binary:
             if var frameSeq = self.webSocketFrameSequence {
                 frameSeq.append(frame)
                 self.webSocketFrameSequence = frameSeq
             } else {
-                var frameSeq = WebSocketFrameSequence(type: .text)
-                frameSeq.append(frame)
-                self.webSocketFrameSequence = frameSeq
-            }
-        case .binary:
-            if var frameSeq = self.webSocketFrameSequence {
-                frameSeq.append(frame)
-                self.webSocketFrameSequence = frameSeq
-            } else {
-                var frameSeq = WebSocketFrameSequence(type: .binary)
-                frameSeq.append(frame)
-                self.webSocketFrameSequence = frameSeq
+                self.webSocketFrameSequence = WebSocketFrameSequence(frame: frame)
             }
         case .continuation:
             if var frameSeq = self.webSocketFrameSequence {
@@ -71,7 +60,7 @@ public final class WebSocketHandler: ChannelInboundHandler {
         }
 
         if let frameSeq = self.webSocketFrameSequence, frame.fin {
-            self.webSocket.read(frameSeq.combinedResult)
+            self.webSocket.read(frameSeq)
             self.webSocketFrameSequence = nil
         }
     }

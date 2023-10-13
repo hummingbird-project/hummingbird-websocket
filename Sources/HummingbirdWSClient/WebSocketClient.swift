@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2021 the Hummingbird authors
+// Copyright (c) 2021-2023 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -15,6 +15,7 @@
 import ExtrasBase64
 import Hummingbird
 import HummingbirdWSCore
+import Logging
 import NIOCore
 import NIOHTTP1
 import NIOPosix
@@ -23,12 +24,16 @@ import NIOWebSocket
 
 /// Manages WebSocket client creation
 public enum HBWebSocketClient {
+    /// Default logger that logs nothing
+    public static let loggingDisabled = Logger(label: "WebSocket-logging-disabled", factory: { _ in SwiftLogNoOpLogHandler() })
+
     /// Connect to WebSocket
     /// - Parameters:
     ///   - url: URL of websocket
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
+    ///   - logger: Logger to be used by websocket
     ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
     ///         between the WebSocket connection being setup and the EventLoopFuture completing
     /// - Returns: EventLoopFuture which will be fulfilled with `HBWebSocket` once connection is made
@@ -37,6 +42,7 @@ public enum HBWebSocketClient {
         headers: HTTPHeaders = [:],
         configuration: Configuration,
         on eventLoop: EventLoop,
+        logger: Logger = Self.loggingDisabled,
         readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
     ) -> EventLoopFuture<HBWebSocket> {
         let wsPromise = eventLoop.makePromise(of: HBWebSocket.self)
@@ -54,6 +60,7 @@ public enum HBWebSocketClient {
                         channel: channel,
                         wsPromise: wsPromise,
                         on: eventLoop,
+                        logger: logger,
                         readCallback: readCallback
                     )
                 }
@@ -88,10 +95,15 @@ public enum HBWebSocketClient {
         channel: Channel,
         wsPromise: EventLoopPromise<HBWebSocket>,
         on eventLoop: EventLoop,
+        logger: Logger,
         readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
     ) -> EventLoopFuture<Void> {
         let upgradePromise = eventLoop.makePromise(of: Void.self)
         upgradePromise.futureResult.cascadeFailure(to: wsPromise)
+
+        var headers = headers
+        let extensionBuilders = configuration.extensions.map { $0.build() }
+        headers.add(contentsOf: extensionBuilders.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
 
         // initial HTTP request handler, before upgrade
         let httpHandler: WebSocketInitialRequestHandler
@@ -112,14 +124,29 @@ public enum HBWebSocketClient {
         let websocketUpgrader = NIOWebSocketClientUpgrader(
             requestKey: base64Key,
             maxFrameSize: configuration.maxFrameSize
-        ) { channel, _ in
-            let webSocket = HBWebSocket(channel: channel, type: .client)
-            if let readCallback = readCallback {
-                webSocket.onRead(readCallback)
-            }
-            return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
-                wsPromise.succeed(webSocket)
-                upgradePromise.succeed(())
+        ) { channel, head in
+            let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(head.headers)
+            do {
+                let extensions = try extensionBuilders.compactMap {
+                    try $0.clientExtension(from: serverExtensions, eventLoop: channel.eventLoop)
+                }
+                let webSocket = HBWebSocket(
+                    channel: channel,
+                    type: .client,
+                    extensions: extensions,
+                    logger: logger
+                )
+                if let readCallback = readCallback {
+                    webSocket.onRead(readCallback)
+                }
+                return channel.pipeline.addHandler(WebSocketHandler(webSocket: webSocket)).map { _ in
+                    wsPromise.succeed(webSocket)
+                    upgradePromise.succeed(())
+                }
+            } catch {
+                wsPromise.fail(error)
+                upgradePromise.fail(error)
+                return channel.eventLoop.makeFailedFuture(error)
             }
         }
 
@@ -150,13 +177,18 @@ public enum HBWebSocketClient {
         /// Maximum size for a single frame
         let maxFrameSize: Int
 
+        /// Maximum size for a single frame
+        let extensions: [HBWebSocketExtensionFactory]
+
         /// initialize Configuration
         public init(
             maxFrameSize: Int = 1 << 14,
-            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration()
+            tlsConfiguration: TLSConfiguration = TLSConfiguration.makeClientConfiguration(),
+            extensions: [HBWebSocketExtensionFactory] = []
         ) {
             self.maxFrameSize = maxFrameSize
             self.tlsConfiguration = tlsConfiguration
+            self.extensions = extensions
         }
     }
 
@@ -201,6 +233,7 @@ extension HBWebSocketClient {
     ///   - headers: Additional headers to send in initial HTTP request
     ///   - configuration: Configuration of connection
     ///   - eventLoop: eventLoop to run connection on
+    ///   - logger: Logger to be used by websocket
     ///   - readCallback: Setup read callback immediately. Use this if you need to be sure you don't miss any reads
     ///         between the WebSocket connection being setup and the EventLoopFuture completing
     public static func connect(
@@ -208,6 +241,7 @@ extension HBWebSocketClient {
         headers: HTTPHeaders = [:],
         configuration: Configuration,
         on eventLoop: EventLoop,
+        logger: Logger = Self.loggingDisabled,
         readCallback: ((WebSocketData, HBWebSocket) -> Void)? = nil
     ) async throws -> HBWebSocket {
         return try await self.connect(
@@ -215,6 +249,7 @@ extension HBWebSocketClient {
             headers: headers,
             configuration: configuration,
             on: eventLoop,
+            logger: logger,
             readCallback: readCallback
         ).get()
     }
