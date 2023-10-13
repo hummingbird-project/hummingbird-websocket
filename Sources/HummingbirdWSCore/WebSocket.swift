@@ -231,9 +231,7 @@ public final class HBWebSocket: Sendable {
     /// See [RFC6455](https://www.rfc-editor.org/rfc/rfc6455.html#section-5.5.3)
     /// - Parameter promise: promise that is completed when pong message has been sent
     public func sendPong(_ buffer: ByteBuffer, promise: EventLoopPromise<Void>?) {
-        self.channel.eventLoop.execute {
-            self.send(buffer: buffer, opcode: .pong)
-        }
+        self.send(buffer: buffer, opcode: .pong, promise: promise)
     }
 
     /// Send ping and setup task to check for pong and send new ping
