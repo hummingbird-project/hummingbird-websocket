@@ -19,22 +19,38 @@ import NIOHTTP1
 extension HBHTTPChannelBuilder {
     public static func httpAndWebSocket(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
-        maxFrameSize: Int = 1 << 14
+        maxFrameSize: Int = 1 << 14,
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<WebSocketHandler>
     ) -> HBHTTPChannelBuilder<HTTP1AndWebSocketChannel> {
         return .init { responder in
-            let handler: WebSocketHandler = { inbound, outbound in
-                for try await data in inbound {
-                    if case .text("disconnect") = data {
-                        break
-                    }
-                    try await outbound.write(data)
-                }
-            }
             return HTTP1AndWebSocketChannel(
                 additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
                 maxFrameSize: maxFrameSize,
-                shouldUpgrade: { channel, _ in channel.eventLoop.makeSucceededFuture(.upgraded(.init(), handler)) }
+                shouldUpgrade: { channel, head in
+                    let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketHandler>.self)
+                    promise.completeWithTask {
+                        try await shouldUpgrade(channel, head)
+                    }
+                    return promise.futureResult
+                }
+            )
+        }
+    }
+
+    public static func httpAndWebSocket(
+        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
+        maxFrameSize: Int = 1 << 14,
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<WebSocketHandler>
+    ) -> HBHTTPChannelBuilder<HTTP1AndWebSocketChannel> {
+        return .init { responder in
+            return HTTP1AndWebSocketChannel(
+                additionalChannelHandlers: additionalChannelHandlers,
+                responder: responder,
+                maxFrameSize: maxFrameSize,
+                shouldUpgrade: { channel, head in 
+                    channel.eventLoop.makeCompletedFuture { try shouldUpgrade(channel, head) } 
+                }
             )
         }
     }

@@ -18,8 +18,8 @@ import NIOHTTP1
 import NIOWebSocket
 
 public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
-    case notUpgraded
-    case upgraded(HTTPHeaders, Value)
+    case dontUpgrade
+    case upgrade(HTTPHeaders, Value)
 }
 
 extension NIOTypedWebSocketServerUpgrader {
@@ -57,9 +57,9 @@ extension NIOTypedWebSocketServerUpgrader {
             shouldUpgrade: { channel, head in
                 shouldUpgrade(channel, head).map { result in
                     switch result {
-                    case .notUpgraded:
+                    case .dontUpgrade:
                         return nil
-                    case .upgraded(let headers, let value):
+                    case .upgrade(let headers, let value):
                         shouldUpgradeResult.withLockedValue { $0 = value }
                         return headers 
                     }
