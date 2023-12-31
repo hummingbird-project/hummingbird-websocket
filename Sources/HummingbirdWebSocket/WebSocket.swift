@@ -16,8 +16,8 @@ import Logging
 import NIOCore
 import NIOWebSocket
 
-public actor HBWebSocket: Sendable {
-    public enum SocketType: Sendable {
+actor HBWebSocket: Sendable {
+    enum SocketType: Sendable {
         case client
         case server
     }
@@ -27,7 +27,7 @@ public actor HBWebSocket: Sendable {
     let asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
     var closed = false
 
-    public init(
+    init(
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, 
         type: HBWebSocket.SocketType, 
         logger: Logger
@@ -37,7 +37,7 @@ public actor HBWebSocket: Sendable {
         self.type = type
     }
 
-    public func handle(_ handler: @escaping WebSocketHandler) async {
+    func handle(_ handler: @escaping WebSocketHandler) async {
         try? await self.asyncChannel.executeThenClose { inbound, outbound in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
@@ -83,6 +83,7 @@ public actor HBWebSocket: Sendable {
                     }
                     group.addTask {
                         try await handler(webSocketHandlerInbound, webSocketHandlerOutbound)
+                        try await self.close(code: .normalClosure, outbound: outbound)
                     }
                     try await group.next()
                 }

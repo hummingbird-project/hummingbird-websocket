@@ -14,15 +14,27 @@
 
 import HummingbirdCore
 import NIOCore
+import NIOHTTP1
 
 extension HBHTTPChannelBuilder {
     public static func httpAndWebSocket(
-        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
+        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
+        maxFrameSize: Int = 1 << 14
     ) -> HBHTTPChannelBuilder<HTTP1AndWebSocketChannel> {
         return .init { responder in
+            let handler: WebSocketHandler = { inbound, outbound in
+                for try await data in inbound {
+                    if case .text("disconnect") = data {
+                        break
+                    }
+                    try await outbound.write(data)
+                }
+            }
             return HTTP1AndWebSocketChannel(
                 additionalChannelHandlers: additionalChannelHandlers,
-                responder: responder
+                responder: responder,
+                maxFrameSize: maxFrameSize,
+                shouldUpgrade: { channel, _ in channel.eventLoop.makeSucceededFuture(.upgraded(.init(), handler)) }
             )
         }
     }

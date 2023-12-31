@@ -21,7 +21,7 @@ public struct WebSocketHandlerOutbound {
     let webSocket: HBWebSocket
     let outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
 
-    func write(_ data: WebSocketData) async throws {
+    public func write(_ data: WebSocketData) async throws {
         try Task.checkCancellation()
         switch data {
         case .text(let string):
