@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Hummingbird
 import Logging
 import NIOCore
 import NIOWebSocket
