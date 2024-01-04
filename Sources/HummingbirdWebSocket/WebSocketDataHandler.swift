@@ -14,6 +14,7 @@
 
 import AsyncAlgorithms
 import NIOCore
+import NIOHTTP1
 import NIOWebSocket
 
 /// Protocol for web socket data handling
@@ -53,6 +54,13 @@ public struct HBWebSocketDataCallbackHandler: HBWebSocketDataHandler {
     ///  Handler WebSocket data packets by passing directly to the callback
     public func handle(_ inbound: WebSocketHandlerInbound, _ outbound: WebSocketHandlerOutboundWriter, context: HBWebSocketContext) async throws {
         try await self.callback(inbound, outbound, context)
+    }
+}
+
+extension ShouldUpgradeResult where Value == HBWebSocketDataCallbackHandler {
+    /// Extension to ShouldUpgradeResult that takes just a callback
+    public static func upgrade(_ headers: HTTPHeaders, _ callback: @escaping HBWebSocketDataCallbackHandler.Callback) -> Self {
+        .upgrade(headers, HBWebSocketDataCallbackHandler(callback))
     }
 }
 

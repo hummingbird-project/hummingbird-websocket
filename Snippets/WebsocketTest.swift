@@ -1,6 +1,7 @@
 import Hummingbird
 import HummingbirdFoundation
 import HummingbirdWebSocket
+import NIOHTTP1
 
 let router = HBRouter()
 router.get { _, _ in
@@ -10,16 +11,19 @@ router.get { _, _ in
 router.middlewares.add(HBFileMiddleware("Snippets/public"))
 let app = HBApplication(
     responder: router.buildResponder(),
-    server: .httpAndWebSocket { _, _ in
-        let handler = HBWebSocketDataCallbackHandler { inbound, outbound, _ in
-            for try await packet in inbound {
-                if case .text("disconnect") = packet {
-                    break
+    server: .httpAndWebSocket { channel, head in
+        if head.uri == "ws" {
+            return .upgrade(HTTPHeaders()) { inbound, outbound, _ in
+                for try await packet in inbound {
+                    if case .text("disconnect") = packet {
+                        break
+                    }
+                    try await outbound.write(.custom(packet.webSocketFrame))
                 }
-                try await outbound.write(.custom(packet.webSocketFrame))
             }
+        } else {
+            return .dontUpgrade
         }
-        return .upgrade(.init(), handler)
     }
 )
 try await app.runService()
