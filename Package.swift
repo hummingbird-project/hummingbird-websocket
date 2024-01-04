@@ -51,7 +51,7 @@ let package = Package(
             // .byName(name: "HummingbirdWSClient"),
             // .byName(name: "HummingbirdWSCompression"),
             .product(name: "Atomics", package: "swift-atomics"),
-            .product(name: "Hummingbird", package: "hummingbird")
+            .product(name: "Hummingbird", package: "hummingbird"),
         ]),
     ]
 )

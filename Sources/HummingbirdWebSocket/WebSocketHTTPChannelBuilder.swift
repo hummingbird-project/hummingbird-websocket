@@ -39,7 +39,7 @@ extension HBHTTPChannelBuilder {
         }
     }
 
-    public static func httpAndWebSocket<Handler: HBWebSocketDataHandler> (
+    public static func httpAndWebSocket<Handler: HBWebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>

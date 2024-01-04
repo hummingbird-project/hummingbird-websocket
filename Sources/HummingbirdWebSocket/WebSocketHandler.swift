@@ -31,7 +31,7 @@ actor HBWebSocketHandler: Sendable {
     var pingData: ByteBuffer
 
     init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: HBWebSocketHandler.SocketType) {
-        self.asyncChannel = asyncChannel 
+        self.asyncChannel = asyncChannel
         self.type = type
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
     }
@@ -41,7 +41,7 @@ actor HBWebSocketHandler: Sendable {
         handler: Handler,
         context: Handler.Context
     ) async {
-        try? await asyncChannel.executeThenClose { inbound, outbound in
+        try? await self.asyncChannel.executeThenClose { inbound, outbound in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     let webSocketHandlerInbound = WebSocketHandlerInbound()

@@ -17,18 +17,18 @@ import NIOCore
 import NIOWebSocket
 
 /// Protocol for web socket data handling
-/// 
+///
 /// The user needs to return a type conforming to this protocol in the `shouldUpgrade`
 /// closure in HTTP1AndWebSocketChannel.init
 public protocol HBWebSocketDataHandler: Sendable {
     /// Context type supplied to the handle function
     associatedtype Context: HBWebSocketContextProtocol = HBWebSocketContext
     /// If a `HBWebSocketDataHandler` requires a context with custom data it should
-    /// setup this variable on initialization 
+    /// setup this variable on initialization
     var alreadySetupContext: Context? { get }
     ///  Handler WebSocket data packets
     /// - Parameters:
-    ///   - inbound: An AsyncSequence of text or binary WebSocket frames. 
+    ///   - inbound: An AsyncSequence of text or binary WebSocket frames.
     ///   - outbound: An outbound Writer to write websocket frames to
     ///   - context: Associated context to this websocket channel
     func handle(_ inbound: WebSocketHandlerInbound, _ outbound: WebSocketHandlerOutboundWriter, context: Context) async throws
@@ -52,7 +52,7 @@ public struct HBWebSocketDataCallbackHandler: HBWebSocketDataHandler {
 
     ///  Handler WebSocket data packets by passing directly to the callback
     public func handle(_ inbound: WebSocketHandlerInbound, _ outbound: WebSocketHandlerOutboundWriter, context: HBWebSocketContext) async throws {
-        try await callback(inbound, outbound, context)
+        try await self.callback(inbound, outbound, context)
     }
 }
 
@@ -83,13 +83,13 @@ public struct WebSocketHandlerOutboundWriter {
         switch frame {
         case .binary(let buffer):
             // send binary data
-            try await self.webSocket.send(frame: .init(fin: true, opcode: .binary, data: buffer), outbound: outbound)
+            try await self.webSocket.send(frame: .init(fin: true, opcode: .binary, data: buffer), outbound: self.outbound)
         case .text(let string):
             // send text based data
             let buffer = self.webSocket.asyncChannel.channel.allocator.buffer(string: string)
-            try await self.webSocket.send(frame: .init(fin: true, opcode: .text, data: buffer), outbound: outbound)
+            try await self.webSocket.send(frame: .init(fin: true, opcode: .text, data: buffer), outbound: self.outbound)
         case .ping:
-            // send ping 
+            // send ping
             try await self.webSocket.ping(outbound: self.outbound)
         case .pong:
             // send unexplained pong as a heartbeat
@@ -144,4 +144,3 @@ public enum WebSocketDataFrame: Equatable, Sendable, CustomStringConvertible, Cu
         }
     }
 }
-

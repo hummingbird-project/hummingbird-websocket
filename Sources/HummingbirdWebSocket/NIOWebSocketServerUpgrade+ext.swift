@@ -36,7 +36,7 @@ extension NIOTypedWebSocketServerUpgrader {
     ///   - shouldUpgrade: A callback that determines whether the websocket request should be
     ///         upgraded. This callback is responsible for creating a `HTTPHeaders` object with
     ///         any headers that it needs on the response *except for* the `Upgrade`, `Connection`,
-    ///         and `Sec-WebSocket-Accept` headers, which this upgrader will handle. It also 
+    ///         and `Sec-WebSocket-Accept` headers, which this upgrader will handle. It also
     ///         creates state that is passed onto the `upgradePipelineHandler`. Should return
     ///         an `EventLoopFuture` containing `.notUpgraded` if the upgrade should be refused.
     ///   - upgradePipelineHandler: A function that will be called once the upgrade response is
@@ -52,8 +52,8 @@ extension NIOTypedWebSocketServerUpgrader {
     ) {
         let shouldUpgradeResult = NIOLockedValueBox<Value?>(nil)
         self.init(
-            maxFrameSize: maxFrameSize, 
-            enableAutomaticErrorHandling: enableAutomaticErrorHandling, 
+            maxFrameSize: maxFrameSize,
+            enableAutomaticErrorHandling: enableAutomaticErrorHandling,
             shouldUpgrade: { channel, head in
                 shouldUpgrade(channel, head).map { result in
                     switch result {
@@ -61,12 +61,12 @@ extension NIOTypedWebSocketServerUpgrader {
                         return nil
                     case .upgrade(let headers, let value):
                         shouldUpgradeResult.withLockedValue { $0 = value }
-                        return headers 
+                        return headers
                     }
                 }
-            }, 
-            upgradePipelineHandler: { channel, head in
-                let result = shouldUpgradeResult.withLockedValue{ $0 }
+            },
+            upgradePipelineHandler: { channel, _ in
+                let result = shouldUpgradeResult.withLockedValue { $0 }
                 if let result {
                     return upgradePipelineHandler(channel, result)
                 } else {
