@@ -10,12 +10,12 @@ router.middlewares.add(HBFileMiddleware("Snippets/public"))
 let app = HBApplication(
     responder: router.buildResponder(), 
     server: .httpAndWebSocket { _,_ in
-        let handler: WebSocketHandler = { inbound, outbound in
+        let handler = HBWebSocketDataCallbackHandler { inbound, outbound, context in
             for try await packet in inbound {
                 if case .text("disconnect") = packet {
                     break
                 }
-                try await outbound.write(packet)
+                try await outbound.write(.custom(packet.webSocketFrame))
             }
         }
         return .upgrade(.init(), handler)

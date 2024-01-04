@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2023 the Hummingbird authors
+// Copyright (c) 2023-2024 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -22,9 +22,10 @@ import NIOHTTPTypes
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
-public struct HTTP1AndWebSocketChannel: HBChildChannel, HTTPChannelHandler {
+/// Child channel supporting a web socket upgrade
+public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChildChannel, HTTPChannelHandler {
     public enum UpgradeResult {
-        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, WebSocketHandler)
+        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Handler)
         case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>)
     }
 
@@ -34,7 +35,7 @@ public struct HTTP1AndWebSocketChannel: HBChildChannel, HTTPChannelHandler {
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (HBRequest, Channel) async throws -> HBResponse = { _, _ in throw HBHTTPError(.notImplemented) },
         maxFrameSize: Int = (1 << 14),
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<WebSocketHandler>>
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.maxFrameSize = maxFrameSize
@@ -80,15 +81,16 @@ public struct HTTP1AndWebSocketChannel: HBChildChannel, HTTPChannelHandler {
         }
     }
 
-    public func handle(value upgradeResult: EventLoopFuture<UpgradeResult>, logger: Logging.Logger) async {
+    public func handle(value upgradeResult: EventLoopFuture<UpgradeResult>, logger: Logger) async {
         do {
             let result = try await upgradeResult.get()
             switch result {
             case .notUpgraded(let http1):
                 await handleHTTP(asyncChannel: http1, logger: logger)
             case .websocket(let asyncChannel, let handler):
-                let webSocket = HBWebSocket(asyncChannel: asyncChannel, type: .server, logger: logger)
-                await webSocket.handle(handler)
+                let webSocket = HBWebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                let context = handler.alreadySetupContext ?? .init(logger: logger, allocator: asyncChannel.channel.allocator)
+                await webSocket.handle(handler: handler, context: context)
             }
         } catch {
             logger.error("Error handling upgrade result: \(error)")
@@ -96,7 +98,7 @@ public struct HTTP1AndWebSocketChannel: HBChildChannel, HTTPChannelHandler {
     }
 
     public var responder: @Sendable (HBRequest, Channel) async throws -> HBResponse
-    let shouldUpgrade: @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<WebSocketHandler>>
+    let shouldUpgrade: @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     let maxFrameSize: Int
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
 }
