@@ -17,7 +17,8 @@ import NIOCore
 import NIOHTTP1
 
 extension HBHTTPChannelBuilder {
-    /// HTTP channel builder supporting a websocket upgrade
+    /// HTTP1 channel builder supporting a websocket upgrade
+    ///  - parameters
     public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
@@ -33,6 +34,7 @@ extension HBHTTPChannelBuilder {
         }
     }
 
+    /// HTTP1 channel builder supporting a websocket upgrade
     public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,

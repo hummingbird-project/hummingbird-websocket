@@ -17,6 +17,10 @@ import Logging
 import NIOCore
 import NIOWebSocket
 
+/// Handler processing raw WebSocket packets.
+/// 
+/// Manages ping, pong and close messages. Collates data and text messages into final frame
+/// and passes them onto the ``HBWebSocketDataHandler`` data handler setup by the user.
 actor HBWebSocketHandler: Sendable {
     enum SocketType: Sendable {
         case client
@@ -44,13 +48,14 @@ actor HBWebSocketHandler: Sendable {
         try? await self.asyncChannel.executeThenClose { inbound, outbound in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
-                    let webSocketHandlerInbound = WebSocketHandlerInbound()
+                    let webSocketHandlerInbound = HBWebSocketHandlerInbound()
                     defer {
                         asyncChannel.channel.close(promise: nil)
                         webSocketHandlerInbound.finish()
                     }
-                    let webSocketHandlerOutbound = WebSocketHandlerOutboundWriter(webSocket: self, outbound: outbound)
+                    let webSocketHandlerOutbound = HBWebSocketHandlerOutboundWriter(webSocket: self, outbound: outbound)
                     group.addTask {
+                        // parse messages coming from inbound 
                         var frameSequence: WebSocketFrameSequence?
                         for try await frame in inbound {
                             switch frame.opcode {
@@ -84,6 +89,7 @@ actor HBWebSocketHandler: Sendable {
                         }
                     }
                     group.addTask {
+                        // handle websocket data and text 
                         try await handler.handle(webSocketHandlerInbound, webSocketHandlerOutbound, context: context)
                         try await self.close(code: .normalClosure, outbound: outbound, context: context)
                     }
