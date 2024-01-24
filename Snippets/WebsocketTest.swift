@@ -10,7 +10,7 @@ router.get { _, _ in
 router.middlewares.add(HBFileMiddleware("Snippets/public"))
 let app = HBApplication(
     responder: router.buildResponder(),
-    server: .webSocketUpgrade { channel, head in
+    server: .webSocketUpgrade { _, head in
         if head.uri == "/ws" {
             return .upgrade(HTTPHeaders()) { inbound, outbound, _ in
                 for try await packet in inbound {

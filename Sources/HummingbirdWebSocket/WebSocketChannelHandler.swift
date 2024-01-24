@@ -80,7 +80,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
         self.responder = responder
     }
 
-    ///  Setup channel to accept HTTP1 with a WebSocket upgrade 
+    ///  Setup channel to accept HTTP1 with a WebSocket upgrade
     /// - Parameters:
     ///   - channel: Child channel
     ///   - configuration: Server configuration

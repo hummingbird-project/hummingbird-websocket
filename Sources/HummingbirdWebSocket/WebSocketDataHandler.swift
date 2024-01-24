@@ -19,12 +19,12 @@ import NIOWebSocket
 
 /// Protocol for web socket data handling
 ///
-/// This is the users interface into HummingbirdWebSocket. They provide an implementation of this protocol when 
-/// contructing their WebSocket upgrade handler. The user needs to return a type conforming to this protocol in 
+/// This is the users interface into HummingbirdWebSocket. They provide an implementation of this protocol when
+/// contructing their WebSocket upgrade handler. The user needs to return a type conforming to this protocol in
 /// the `shouldUpgrade` closure in HTTP1AndWebSocketChannel.init
 public protocol HBWebSocketDataHandler: Sendable {
     /// Context type supplied to the handle function.
-    /// 
+    ///
     /// The `HBWebSocketDataHandler` can chose to setup a context or accept the default one from
     /// ``HBWebSocketHandler``.
     associatedtype Context: HBWebSocketContextProtocol = HBWebSocketContext
