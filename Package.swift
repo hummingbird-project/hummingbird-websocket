@@ -25,7 +25,6 @@ let package = Package(
     targets: [
         .target(name: "HummingbirdWebSocket", dependencies: [
             .product(name: "Hummingbird", package: "hummingbird"),
-            .product(name: "HummingbirdFoundation", package: "hummingbird"),
             .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "NIOCore", package: "swift-nio"),
