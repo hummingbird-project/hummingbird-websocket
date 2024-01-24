@@ -22,8 +22,9 @@ import NIOHTTPTypes
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
-/// Child channel supporting a web socket upgrade
+/// Child channel supporting a web socket upgrade from HTTP1
 public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChildChannel, HTTPChannelHandler {
+    /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Handler)
         case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>)
@@ -31,18 +32,60 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
 
     public typealias Value = EventLoopFuture<UpgradeResult>
 
+    ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
+    /// - Parameters:
+    ///   - additionalChannelHandlers: Additional channel handlers to add
+    ///   - responder: HTTP responder
+    ///   - maxFrameSize: Max frame size WebSocket will allow
+    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    /// - Returns: Upgrade result future
     public init(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (HBRequest, Channel) async throws -> HBResponse = { _, _ in throw HBHTTPError(.notImplemented) },
         maxFrameSize: Int = (1 << 14),
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.maxFrameSize = maxFrameSize
-        self.shouldUpgrade = shouldUpgrade
+        self.shouldUpgrade = { channel, head in
+            channel.eventLoop.makeCompletedFuture {
+                try shouldUpgrade(channel, head)
+            }
+        }
         self.responder = responder
     }
 
+    ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
+    /// - Parameters:
+    ///   - additionalChannelHandlers: Additional channel handlers to add
+    ///   - responder: HTTP responder
+    ///   - maxFrameSize: Max frame size WebSocket will allow
+    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    /// - Returns: Upgrade result future
+    public init(
+        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
+        responder: @escaping @Sendable (HBRequest, Channel) async throws -> HBResponse = { _, _ in throw HBHTTPError(.notImplemented) },
+        maxFrameSize: Int = (1 << 14),
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
+    ) {
+        self.additionalChannelHandlers = additionalChannelHandlers
+        self.maxFrameSize = maxFrameSize
+        self.shouldUpgrade = { channel, head in
+            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<Handler>.self)
+            promise.completeWithTask {
+                try await shouldUpgrade(channel, head)
+            }
+            return promise.futureResult
+        }
+        self.responder = responder
+    }
+
+    ///  Setup channel to accept HTTP1 with a WebSocket upgrade 
+    /// - Parameters:
+    ///   - channel: Child channel
+    ///   - configuration: Server configuration
+    ///   - logger: Logger used by upgrade
+    /// - Returns: Negotiated result future
     public func setup(channel: Channel, configuration: HBServerConfiguration, logger: Logger) -> EventLoopFuture<Value> {
         return channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
@@ -81,6 +124,10 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
         }
     }
 
+    ///  Handle upgrade result output from channel
+    /// - Parameters:
+    ///   - upgradeResult: The upgrade result output by Channel
+    ///   - logger: Logger to use
     public func handle(value upgradeResult: EventLoopFuture<UpgradeResult>, logger: Logger) async {
         do {
             let result = try await upgradeResult.get()

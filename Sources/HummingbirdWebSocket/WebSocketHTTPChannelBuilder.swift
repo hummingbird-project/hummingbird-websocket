@@ -18,7 +18,7 @@ import NIOHTTP1
 
 extension HBHTTPChannelBuilder {
     /// HTTP channel builder supporting a websocket upgrade
-    public static func httpAndWebSocket<Handler: HBWebSocketDataHandler>(
+    public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
@@ -28,18 +28,12 @@ extension HBHTTPChannelBuilder {
                 additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
                 maxFrameSize: maxFrameSize,
-                shouldUpgrade: { channel, head in
-                    let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<Handler>.self)
-                    promise.completeWithTask {
-                        try await shouldUpgrade(channel, head)
-                    }
-                    return promise.futureResult
-                }
+                shouldUpgrade: shouldUpgrade
             )
         }
     }
 
-    public static func httpAndWebSocket<Handler: HBWebSocketDataHandler>(
+    public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
@@ -49,9 +43,7 @@ extension HBHTTPChannelBuilder {
                 additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
                 maxFrameSize: maxFrameSize,
-                shouldUpgrade: { channel, head in
-                    channel.eventLoop.makeCompletedFuture { try shouldUpgrade(channel, head) }
-                }
+                shouldUpgrade: shouldUpgrade
             )
         }
     }
