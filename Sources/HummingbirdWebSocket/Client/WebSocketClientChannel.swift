@@ -25,13 +25,17 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
     public typealias Value = EventLoopFuture<UpgradeResult>
 
     let handler: Handler
-
-    public init(handler: Handler) {
+    let maxFrameSize: Int
+    
+    init(handler: Handler, maxFrameSize: Int = 1 << 14) {
         self.handler = handler
+        self.maxFrameSize = maxFrameSize
     }
+
     public func setup(channel: any NIOCore.Channel) -> NIOCore.EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketClientUpgrader<UpgradeResult>(
+                maxFrameSize: maxFrameSize,
                 upgradePipelineHandler: { (channel, _) in
                     channel.eventLoop.makeCompletedFuture {
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)

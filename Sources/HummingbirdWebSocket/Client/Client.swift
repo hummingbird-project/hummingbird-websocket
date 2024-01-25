@@ -19,6 +19,14 @@ import NIOCore
 import NIOPosix
 import ServiceLifecycle
 
+/// Address to bind server to
+public enum HBServerAddress: Sendable {
+    /// bind address define by host and port
+    case hostname(_ host: String = "127.0.0.1", port: Int = 8080)
+    /// bind address defined by unxi domain socket
+    case unixDomainSocket(path: String)
+}
+
 /// HTTPServer child channel setup protocol
 public protocol HBClientChildChannel: Sendable {
     associatedtype Value: Sendable
@@ -42,15 +50,12 @@ public struct HBClient<ChildChannel: HBClientChildChannel> {
     let logger: Logger
     let eventLoopGroup: EventLoopGroup
     let childChannel: ChildChannel
-    let address: HBBindAddress
+    let address: HBServerAddress
 
-    /// Initialize Server
-    /// - Parameters:
-    ///   - group: EventLoopGroup server uses
-    ///   - configuration: Configuration for server
+    /// Initialize Client
     public init(
         childChannel: ChildChannel,
-        address: HBBindAddress,
+        address: HBServerAddress,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger
     ) {
@@ -69,49 +74,75 @@ public struct HBClient<ChildChannel: HBClientChildChannel> {
     }
 
     /// Connect to server
-    func makeClient(childChannel: ChildChannel, address: HBBindAddress) async throws -> ChannelResult {
-        guard case .hostname(let host, let port) = address else { preconditionFailure("Unix address not supported")}
-        return try await ClientBootstrap(group: self.eventLoopGroup)
-            .connect(host: host, port: port) { channel in
-                childChannel.setup(channel: channel)
-            }
+    func makeClient(childChannel: ChildChannel, address: HBServerAddress) async throws -> ChannelResult {
+        // get bootstrap
+        let bootstrap: ClientBootstrapProtocol
+        #if canImport(Network)
+        if let tsBootstrap = self.createTSBootstrap() {
+            bootstrap = tsBootstrap
+        } else {
+            #if os(iOS) || os(tvOS)
+            self.logger.warning("Running BSD sockets on iOS or tvOS is not recommended. Please use NIOTSEventLoopGroup, to run with the Network framework")
+            #endif
+/*            if configuration.tlsOptions.options != nil {
+                self.logger.warning("tlsOptions set in Configuration will not be applied to a BSD sockets server. Please use NIOTSEventLoopGroup, to run with the Network framework")
+            }*/
+            bootstrap = self.createSocketsBootstrap()
+        }
+        #else
+        bootstrap = self.createSocketsBootstrap()
+        #endif
+
+        // connect
+        switch address {
+        case .hostname(let host, let port):
+            return try await bootstrap
+                .connect(host: host, port: port) { channel in
+                    childChannel.setup(channel: channel)
+                }
+        case .unixDomainSocket(let path):
+            return try await bootstrap
+                .connect(unixDomainSocketPath: path) { channel in
+                    childChannel.setup(channel: channel)
+                }
+        }
     }
-/*
+
     /// create a BSD sockets based bootstrap
-    private func createSocketsBootstrap(
-        configuration: HBServerConfiguration
-    ) -> ServerBootstrap {
-        return ServerBootstrap(group: self.eventLoopGroup)
-            // Specify backlog and enable SO_REUSEADDR for the server itself
-            .serverChannelOption(ChannelOptions.backlog, value: numericCast(configuration.backlog))
-            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: configuration.reuseAddress ? 1 : 0)
-            .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: configuration.reuseAddress ? 1 : 0)
-            .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 1)
-            .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+    private func createSocketsBootstrap() -> some ClientBootstrapProtocol {
+        return ClientBootstrap(group: self.eventLoopGroup)
     }
 
     #if canImport(Network)
     /// create a NIOTransportServices bootstrap using Network.framework
-    @available(macOS 10.14, iOS 12, tvOS 12, *)
-    private func createTSBootstrap(
-        configuration: HBServerConfiguration
-    ) -> NIOTSListenerBootstrap? {
-        guard let bootstrap = NIOTSListenerBootstrap(validatingGroup: self.eventLoopGroup)?
-            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: configuration.reuseAddress ? 1 : 0)
-            // Set the handlers that are applied to the accepted Channels
-            .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: configuration.reuseAddress ? 1 : 0)
-            .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
-        else {
+    private func createTSBootstrap() -> some ClientBootstrapProtocol? {
+        guard let bootstrap = NIOTSClientBootstrap(validatingGroup: self.eventLoopGroup) else {
             return nil
         }
 
-        if let tlsOptions = configuration.tlsOptions.options {
+        /*if let tlsOptions = configuration.tlsOptions.options {
             return bootstrap.tlsOptions(tlsOptions)
-        }
+        }*/
         return bootstrap
     }
-    #endif*/
+    #endif
 }
+
+protocol ClientBootstrapProtocol {
+    func connect<Output: Sendable>(
+        host: String,
+        port: Int,
+        channelInitializer: @escaping @Sendable (Channel) -> EventLoopFuture<Output>
+    ) async throws -> Output
+
+    func connect<Output: Sendable>(
+        unixDomainSocketPath: String,
+        channelInitializer: @escaping @Sendable (Channel) -> EventLoopFuture<Output>
+    ) async throws -> Output
+}
+
+extension ClientBootstrap: ClientBootstrapProtocol {}
+
 /*
 /// Protocol for bootstrap.
 protocol ServerBootstrapProtocol {

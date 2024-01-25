@@ -17,6 +17,7 @@ import HummingbirdCore
 import HummingbirdWebSocket
 import Logging
 import NIOCore
+import NIOHTTP1
 import NIOPosix
 import ServiceLifecycle
 import XCTest
@@ -72,8 +73,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testClientAndServer(
-        server: @escaping HBWebSocketDataCallbackHandler.Callback,
-        client: @escaping HBWebSocketDataCallbackHandler.Callback
+        server serverHandler: @escaping HBWebSocketDataCallbackHandler.Callback,
+        shouldUpgrade: @escaping @Sendable (HTTPRequestHead) throws -> HTTPHeaders? = { _ in return [:] },
+        client clientHandler: @escaping HBWebSocketDataCallbackHandler.Callback
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -83,8 +85,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let router = HBRouter()
             let app = HBApplication(
                 router: router,
-                server: .webSocketUpgrade { _,_ in
-                    .upgrade(.init(), server)
+                server: .webSocketUpgrade { _,head in
+                    if let headers = try shouldUpgrade(head) {
+                        return .upgrade(headers, HBWebSocketDataCallbackHandler(serverHandler))
+                    } else {
+                        return .dontUpgrade
+                    }
                 },
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!)},
                 logger: logger
@@ -100,8 +106,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             group.addTask {
-                let client = await HBClient(
-                    childChannel: WebSocketClientChannel(handler: HBWebSocketDataCallbackHandler(client)), 
+                let client = await HBWebSocketClient(
+                    clientHandler, 
                     address: .hostname("localhost", port: promise.wait()),
                     logger: app.logger
                 )
@@ -110,9 +116,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await group.next()
             await serviceGroup.triggerGracefulShutdown()
         }
-     }
+    }
 
-     func testServerToClientMessage() async throws {
+    func testServerToClientMessage() async throws {
         try await testClientAndServer { inbound, outbound, context in
             try await outbound.write(.text("Hello"))
         } client: { inbound, outbound, context in
@@ -120,9 +126,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let msg = await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         }
-     }
+    }
 
-     func testClientToServerMessage() async throws {
+    func testClientToServerMessage() async throws {
         try await testClientAndServer { inbound, outbound, context in
             var inboundIterator = inbound.makeAsyncIterator()
             let msg = await inboundIterator.next()
@@ -130,9 +136,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
         } client: { inbound, outbound, context in
             try await outbound.write(.text("Hello"))
         }
-     }
+    }
 
-     func testClientToServerSplitPacket() async throws {
+    func testClientToServerSplitPacket() async throws {
         try await testClientAndServer { inbound, outbound, context in
             for try await packet in inbound {
                 try await outbound.write(.custom(packet.webSocketFrame))
@@ -147,102 +153,23 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let msg = await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello World!"))
         }
-     }
+    }
 
+    // test connection is closed when bufer is too large
+    func testTooLargeBuffer() async throws {
+        try await testClientAndServer { inbound, outbound, context in
+            let buffer = ByteBuffer(repeating: 1, count: (1 << 14) + 1 )
+            try await outbound.write(.binary(buffer))
+            for try await _ in inbound {}
+        } client: { inbound, outbound, context in
+            for try await _ in inbound {}
+        }        
+    }
+
+    func textNotWebSocket() async throws {
+
+    }
 /*
-     func testClientAndServerSplitPacket() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(5))
-         let app = try self.setupClientAndServer(
-             onServer: { ws in
-                 ws.onRead { data, _ in
-                     XCTAssertEqual(data, .text("Hello World!"))
-                     promise.succeed()
-                 }
-             },
-             onClient: { ws in
-                 let buffer = ByteBuffer(string: "Hello ")
-                 ws.send(buffer: buffer, opcode: .text, fin: false, promise: nil)
-                 let buffer2 = ByteBuffer(string: "World!")
-                 ws.send(buffer: buffer2, opcode: .text, fin: true, promise: nil)
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testClientAndServerLargeBuffer() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
-         let buffer = self.createRandomBuffer(size: 600_000)
-
-         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
-         // add HTTP to WebSocket upgrade
-         app.ws.addUpgrade(maxFrameSize: 1_000_000)
-         // on websocket connect.
-         app.ws.on(
-             "/test",
-             onUpgrade: { _, ws in
-                 ws.onRead { data, ws in
-                     XCTAssertEqual(data, .binary(buffer))
-                     ws.write(.binary(buffer), promise: nil)
-                 }
-             }
-         )
-         try app.start()
-         defer { app.stop() }
-
-         let eventLoop = app.eventLoopGroup.next()
-         let wsFuture = HBWebSocketClient.connect(
-             url: HBURL("ws://localhost:\(app.server.port!)/test"),
-             configuration: .init(maxFrameSize: 1_000_000),
-             on: eventLoop
-         ).map { ws in
-             ws.onRead { data, _ in
-                 XCTAssertEqual(data, .binary(buffer))
-                 promise.succeed()
-             }
-             ws.onClose { _ in
-                 promise.fail(Error.unexpectedClose)
-             }
-             ws.write(.binary(buffer), promise: nil)
-         }
-         wsFuture.cascadeFailure(to: promise.promise)
-         _ = try promise.wait()
-     }
-
-     func testServerImmediateWrite() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(50))
-
-         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
-         // add HTTP to WebSocket upgrade
-         app.ws.addUpgrade(maxFrameSize: 1_000_000)
-         // on websocket connect.
-         app.ws.on(
-             "/test",
-             onUpgrade: { _, ws in
-                 ws.write(.text("hello"), promise: nil)
-             }
-         )
-         try app.start()
-         defer { app.stop() }
-
-         let eventLoop = app.eventLoopGroup.next()
-         let wsFuture = HBWebSocketClient.connect(
-             url: HBURL("ws://localhost:\(app.server.port!)/test"),
-             configuration: .init(maxFrameSize: 1_000_000),
-             on: eventLoop
-         ) { data, _ in
-             XCTAssertEqual(data, .text("hello"))
-             promise.succeed()
-         }.map { ws in
-             ws.onClose { _ in
-                 promise.fail(Error.unexpectedClose)
-             }
-         }
-         wsFuture.cascadeFailure(to: promise.promise)
-         _ = try promise.wait()
-     }
-
      func testNotWebSocket() throws {
          let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
          app.router.get("/test") { _ in
