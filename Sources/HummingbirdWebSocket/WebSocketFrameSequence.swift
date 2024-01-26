@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2023 the Hummingbird authors
+// Copyright (c) 2021-2024 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -14,41 +14,6 @@
 
 import NIOCore
 import NIOWebSocket
-
-/// Enumeration holding WebSocket data
-public enum WebSocketData: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
-    case text(String)
-    case binary(ByteBuffer)
-
-    init?(frame: WebSocketFrame) {
-        switch frame.opcode {
-        case .text:
-            self = .text(String(buffer: frame.unmaskedData))
-        case .binary:
-            self = .binary(frame.unmaskedData)
-        default:
-            return nil
-        }
-    }
-
-    public var description: String {
-        switch self {
-        case .text(let string):
-            return "string(\"\(string)\")"
-        case .binary(let buffer):
-            return "binary(\(buffer.description))"
-        }
-    }
-
-    public var debugDescription: String {
-        switch self {
-        case .text(let string):
-            return "string(\"\(string)\")"
-        case .binary(let buffer):
-            return "binary(\(buffer.debugDescription))"
-        }
-    }
-}
 
 /// Sequence of fragmented WebSocket frames.
 struct WebSocketFrameSequence {
@@ -79,6 +44,12 @@ struct WebSocketFrameSequence {
             return result
         }
     }
+
+    var data: WebSocketDataFrame {
+        .init(frame: self.collapsed)!
+    }
+
+    var opcode: WebSocketOpcode { self.frames.first!.opcode }
 
     var collapsed: WebSocketFrame {
         var frame = self.first
