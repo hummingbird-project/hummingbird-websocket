@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HummingbirdCore
+import HummingbirdTLS
 import Logging
 import NIOCore
 import NIOPosix
@@ -34,8 +35,8 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
 
     /// Initialize client
     public init(
-        handler: Handler,
         url: HBURL,
+        handler: Handler,
         maxFrameSize: Int = 1 << 14,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger
@@ -43,23 +44,39 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         guard let host = url.host else { throw HBWebSocketClientError.invalidURL }
         let requiresTLS = url.scheme == .wss || url.scheme == .https
         let port = url.port ?? (requiresTLS ? 443 : 80)
-        self.client = HBClient(
-            childChannel: WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize),
-            address: .hostname(host, port: port),
-            eventLoopGroup: eventLoopGroup,
-            logger: logger
-        )
+        if requiresTLS {
+            self.client = HBClient(
+                childChannel: TLSChannel(WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize)),
+                address: .hostname(host, port: port),
+                eventLoopGroup: eventLoopGroup,
+                logger: logger
+            )
+        } else {
+            self.client = HBClient(
+                childChannel: WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize),
+                address: .hostname(host, port: port),
+                eventLoopGroup: eventLoopGroup,
+                logger: logger
+            )
+        }
     }
 
     /// Initialize client with callback
     public init(
-        _ handlerCallback: @escaping HBWebSocketDataCallbackHandler.Callback,
         url: HBURL,
+        maxFrameSize: Int = 1 << 14,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
-        logger: Logger
+        logger: Logger,
+        handlerCallback: @escaping HBWebSocketDataCallbackHandler.Callback
     ) throws where Handler == HBWebSocketDataCallbackHandler {
         let handler = HBWebSocketDataCallbackHandler(handlerCallback)
-        try self.init(handler: handler, url: url, eventLoopGroup: eventLoopGroup, logger: logger)
+        try self.init(
+            url: url, 
+            handler: handler, 
+            maxFrameSize: maxFrameSize, 
+            eventLoopGroup: eventLoopGroup, 
+            logger: logger
+        )
     }
 
     public func run() async throws {

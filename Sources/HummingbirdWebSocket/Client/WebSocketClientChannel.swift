@@ -59,6 +59,9 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
                 upgradeRequestHead: requestHead,
                 upgraders: [upgrader],
                 notUpgradingCompletionHandler: { channel in
+                    /*channel.close().map {
+                        UpgradeResult.notUpgraded
+                    }*/
                     channel.eventLoop.makeCompletedFuture {
                         return UpgradeResult.notUpgraded
                     }
