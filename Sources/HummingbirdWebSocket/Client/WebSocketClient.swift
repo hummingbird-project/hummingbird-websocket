@@ -18,33 +18,65 @@ import Logging
 import NIOCore
 import NIOPosix
 
-struct HBWebSocketClientError: Error {
-    private enum _Internal {
-        case invalidURL
-    }
-    private let value: _Internal
-    private init(_ value: _Internal) {
-        self.value = value
-    }
-
-    static var invalidURL: Self { .init(.invalidURL) }
-}
-
+/// WebSocket client
+/// 
+/// Connect to HTTP server with WebSocket upgrade available.
+/// 
+/// Supports TLS via both NIOSSL and Network framework.
+/// 
+/// Initialize the HBWebSocketClient with your handler and then call ``HBWebSocketClient/run`` 
+/// to connect. The handler is provider with an `inbound` stream of WebSocket packets coming
+/// from the server and an `outbound` writer that can be used to write packets to the server.
+/// ```swift
+/// let webSocket = HBWebSocketClient(url: "ws://test.org/ws", logger: logger) { inbound, outbound, context in
+///     for try await packet in inbound {
+///         if case .text(let string) = packet {
+///             try await outbound.write(.text(string))
+///         }
+///     }
+/// }
+/// ```
 public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
+    public struct Error: Swift.Error, Equatable {
+        private enum _Internal: Equatable {
+            case invalidURL
+        }
+        private let value: _Internal
+        private init(_ value: _Internal) {
+            self.value = value
+        }
+
+        public static var invalidURL: Self { .init(.invalidURL) }
+    }
+
     enum MultiPlatformTLSConfiguration {
         case niossl(TLSConfiguration)
         #if canImport(Network)
         case ts(TSTLSOptions)
         #endif
     }
+    /// WebSocket URL
     let url: HBURL
+    /// WebSocket data handler
     let handler: Handler
+    /// Max frame size for a single packet
     let maxFrameSize: Int
+    /// EventLoopGroup to use
     let eventLoopGroup: EventLoopGroup
+    /// Logger
     let logger: Logger
+    /// TLS configuration
     let tlsConfiguration: MultiPlatformTLSConfiguration?
 
-    /// Initialize client
+    /// Initialize websocket client
+    /// 
+    /// - Parametes:
+    ///   - url: URL of websocket
+    ///   - tlsConfiguration: TLS configuration
+    ///   - handler: WebSocket data handler
+    ///   - maxFrameSize: Max frame size for a single packet
+    ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
+    ///   - logger: Logger
     public init(
         url: HBURL,
         tlsConfiguration: TLSConfiguration? = nil,
@@ -61,7 +93,15 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         self.tlsConfiguration = tlsConfiguration.map { .niossl($0) }
     }
 
-    /// Initialize client with callback
+    /// Initialize websocket client with callback
+    /// 
+    /// - Parametes:
+    ///   - url: URL of websocket
+    ///   - tlsConfiguration: TLS configuration
+    ///   - maxFrameSize: Max frame size for a single packet
+    ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
+    ///   - logger: Logger
+    ///   - handlerCallback: Closure handling webSocket
     public init(
         url: HBURL,
         tlsConfiguration: TLSConfiguration? = nil,
@@ -81,13 +121,21 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         )
     }
 #if canImport(Network)
-    /// Initialize client
+    /// Initialize websocket client
+    /// 
+    /// - Parametes:
+    ///   - url: URL of websocket
+    ///   - transportServicesTLSOptions: TLS options for NIOTransportServices
+    ///   - handler: WebSocket data handler
+    ///   - maxFrameSize: Max frame size for a single packet
+    ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
+    ///   - logger: Logger
     public init(
         url: HBURL,
         transportServicesTLSOptions: TSTLSOptions,
         handler: Handler,
         maxFrameSize: Int = 1 << 14,
-        eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
+        eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger
     ) throws {
         self.url = url
@@ -98,12 +146,20 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         self.tlsConfiguration = .ts(transportServicesTLSOptions)
     }
 
-    /// Initialize client with callback
+    /// Initialize websocket client with callback
+    /// 
+    /// - Parametes:
+    ///   - url: URL of websocket
+    ///   - transportServicesTLSOptions: TLS options for NIOTransportServices
+    ///   - maxFrameSize: Max frame size for a single packet
+    ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
+    ///   - logger: Logger
+    ///   - handlerCallback: Closure handling webSocket
     public init(
         url: HBURL,
         transportServicesTLSOptions: TSTLSOptions,
         maxFrameSize: Int = 1 << 14,
-        eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
+        eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handlerCallback: @escaping HBWebSocketDataCallbackHandler.Callback
     ) throws where Handler == HBWebSocketDataCallbackHandler {
@@ -119,8 +175,9 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     }
 #endif
 
+    ///  Connect and run handler
     public func run() async throws {
-        guard let host = url.host else { throw HBWebSocketClientError.invalidURL }
+        guard let host = url.host else { throw Error.invalidURL }
         let requiresTLS = url.scheme == .wss || url.scheme == .https
         let port = url.port ?? (requiresTLS ? 443 : 80)
         if requiresTLS {

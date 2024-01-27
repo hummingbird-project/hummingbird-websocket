@@ -8,9 +8,7 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17)],
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
-        // .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
         // .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
-        // .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "2.x.x-client"),
@@ -31,24 +29,12 @@ let package = Package(
             .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
-        /* .target(name: "HummingbirdWSClient", dependencies: [
-                .byName(name: "HummingbirdWSCore"),
-                .product(name: "Hummingbird", package: "hummingbird"),
-                .product(name: "ExtrasBase64", package: "swift-extras-base64"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
-            ]),
-            .target(name: "HummingbirdWebSocket", dependencies: [
-                .byName(name: "HummingbirdWSCore"),
-                .product(name: "Atomics", package: "swift-atomics"),
-                .product(name: "Hummingbird", package: "hummingbird"),
-            ]),
-            .target(name: "HummingbirdWSCompression", dependencies: [
+        /*    .target(name: "HummingbirdWSCompression", dependencies: [
                 .byName(name: "HummingbirdWSCore"),
                 .product(name: "CompressNIO", package: "compress-nio"),
             ]),*/
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
-            // .byName(name: "HummingbirdWSClient"),
             // .byName(name: "HummingbirdWSCompression"),
             .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
