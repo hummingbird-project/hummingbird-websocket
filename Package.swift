@@ -13,7 +13,7 @@ let package = Package(
         // .library(name: "HummingbirdWSCore", targets: ["HummingbirdWSCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "2.x.x"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "2.x.x-client"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
@@ -52,7 +52,7 @@ let package = Package(
             // .byName(name: "HummingbirdWSCompression"),
             .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
-            .product(name: "HummingbirdTLS", package: "hummingbird"), 
+            .product(name: "HummingbirdTLS", package: "hummingbird"),
         ]),
     ]
 )

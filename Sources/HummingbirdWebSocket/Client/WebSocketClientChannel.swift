@@ -12,12 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import HummingbirdCore
 import Logging
 import NIOCore
 import NIOHTTP1
 import NIOWebSocket
 
-public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientChildChannel {
+public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientChannel {
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>)
         case notUpgraded
@@ -32,7 +33,7 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
         self.maxFrameSize = maxFrameSize
     }
 
-    public func setup(channel: any NIOCore.Channel) -> NIOCore.EventLoopFuture<Value> {
+    public func setup(channel: any Channel, logger: Logger) -> NIOCore.EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketClientUpgrader<UpgradeResult>(
                 maxFrameSize: maxFrameSize,
