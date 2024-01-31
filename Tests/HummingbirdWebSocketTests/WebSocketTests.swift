@@ -77,7 +77,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         serverTLSConfiguration: TLSConfiguration? = nil,
         server serverHandler: @escaping HBWebSocketDataCallbackHandler.Callback,
         shouldUpgrade: @escaping @Sendable (HTTPRequestHead) throws -> HTTPHeaders? = { _ in return [:] },
-        getClient: @escaping @Sendable (Int, Logger) throws -> HBWebSocketClient<some HBWebSocketDataHandler>
+        getClient: @escaping @Sendable (Int, Logger) throws -> HBWebSocketClient
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -154,7 +154,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try HBWebSocketClient(
                     url: .init("ws://localhost:\(port)"),
                     logger: logger,
-                    handlerCallback: clientHandler
+                    process: clientHandler
                 )
             }
         )
@@ -249,142 +249,115 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
         }
     }
+
+    func testURLPath() async throws {
+        try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } shouldUpgrade: { head in
+            XCTAssertEqual(head.uri, "/ws")
+            return [:]
+        } getClient: { port, logger in
+            try HBWebSocketClient(
+                url: .init("ws://localhost:\(port)/ws"),
+                logger: logger
+            ) { _, _, _ in
+            }
+        }
+    }
+
+    func testQueryParameters() async throws {
+        try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } shouldUpgrade: { head in
+            let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
+            let request = HBRequest(head: httpRequest, body: .byteBuffer(ByteBuffer()))
+            XCTAssertEqual(request.uri.query, "query=parameters&test=true")
+            return [:]
+        } getClient: { port, logger in
+            try HBWebSocketClient(
+                url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
+                logger: logger
+            ) { _, _, _ in
+            }
+        }
+    }
+
+    func testAdditionalHeaders() async throws {
+        try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } shouldUpgrade: { head in
+            let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
+            let request = HBRequest(head: httpRequest, body: .byteBuffer(ByteBuffer()))
+            XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
+            return [:]
+        } getClient: { port, logger in
+            try HBWebSocketClient(
+                url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
+                configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
+                logger: logger
+            ) { _, _, _ in
+            }
+        }
+    }
     /*
-         func testPingPong() throws {
-             let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+     func testPingPong() throws {
+         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
-             let app = try self.setupClientAndServer(
-                 onServer: { _ in
-                 },
-                 onClient: { ws in
-                     ws.onPong { _ in
-                         promise.succeed()
-                     }
-                     ws.sendPing(promise: nil)
+         let app = try self.setupClientAndServer(
+             onServer: { _ in
+             },
+             onClient: { ws in
+                 ws.onPong { _ in
+                     promise.succeed()
                  }
-             )
-             defer { app.stop() }
+                 ws.sendPing(promise: nil)
+             }
+         )
+         defer { app.stop() }
 
-             try promise.wait()
-         }
-
-         func testAutoPing() throws {
-             let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(30))
-             var count = 0
-
-             let app = try self.setupClientAndServer(
-                 onServer: { ws in
-                     ws.initiateAutoPing(interval: .seconds(2))
-                     ws.onPong { _ in
-                         count += 1
-                         // wait for second pong, meaning auto ping caught the first one
-                         if count == 2 {
-                             promise.succeed()
-                         }
-                     }
-                 },
-                 onClient: { _ in
-                 }
-             )
-             defer { app.stop() }
-
-             try promise.wait()
-         }
-
-         func testUnsolicitedPong() throws {
-             let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-             let app = try self.setupClientAndServer(
-                 onServer: { ws in
-                     ws.onPong { _ in
-                         promise.succeed()
-                     }
-                 },
-                 onClient: { ws in
-                     ws.sendPong(.init(), promise: nil)
-                 }
-             )
-             defer { app.stop() }
-
-             try promise.wait()
-         }
-
-         func testQuery() throws {
-             let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
-             // add HTTP to WebSocket upgrade
-             app.ws.addUpgrade()
-             // on websocket connect.
-             app.ws.on(
-                 "/test",
-                 shouldUpgrade: { request in
-                     guard request.uri.queryParameters["connect"] != nil else { return request.failure(HBHTTPError(.badRequest)) }
-                     return request.success(nil)
-                 },
-                 onUpgrade: { _, _ in }
-             )
-             try app.start()
-             defer { app.stop() }
-
-             let eventLoop = app.eventLoopGroup.next()
-             let wsFuture = HBWebSocketClient.connect(
-                 url: HBURL("ws://localhost:\(app.server.port!)/test?connect"),
-                 configuration: .init(),
-                 on: eventLoop
-             )
-             _ = try wsFuture.wait()
-         }
-
-         func testAdditionalHeaders() throws {
-             let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
-             // add HTTP to WebSocket upgrade
-             app.ws.addUpgrade()
-             // on websocket connect.
-             app.ws.on(
-                 "/test",
-                 shouldUpgrade: { request in
-                     guard request.headers["Sec-WebSocket-Extensions"].first == "foo" else { return request.failure(HBHTTPError(.badRequest)) }
-                     return request.success(nil)
-                 },
-                 onUpgrade: { _, _ in }
-             )
-             try app.start()
-             defer { app.stop() }
-
-             let eventLoop = app.eventLoopGroup.next()
-             let wsFuture = HBWebSocketClient.connect(
-                 url: HBURL("ws://localhost:\(app.server.port!)/test"),
-                 headers: ["Sec-WebSocket-Extensions": "foo"],
-                 configuration: .init(),
-                 on: eventLoop
-             )
-             _ = try wsFuture.wait()
-         }
+         try promise.wait()
      }
 
-     @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-     extension HummingbirdWebSocketTests {
-         func testServerAsyncReadWrite() async throws {
-             let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+     func testAutoPing() throws {
+         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(30))
+         var count = 0
 
-             let app = try await self.setupClientAndServer(
-                 onServer: { ws in
-                     let stream = ws.readStream()
-                     Task {
-                         for try await data in stream {
-                             XCTAssertEqual(data, .text("Hello"))
-                         }
-                         ws.onClose { _ in
-                             promise.succeed()
-                         }
+         let app = try self.setupClientAndServer(
+             onServer: { ws in
+                 ws.initiateAutoPing(interval: .seconds(2))
+                 ws.onPong { _ in
+                     count += 1
+                     // wait for second pong, meaning auto ping caught the first one
+                     if count == 2 {
+                         promise.succeed()
                      }
-                 },
-                 onClient: { ws in
-                     try await ws.write(.text("Hello"))
-                     try await ws.close()
                  }
-             )
-             defer { app.stop() }
+             },
+             onClient: { _ in
+             }
+         )
+         defer { app.stop() }
 
-             try promise.wait()
-         }*/
+         try promise.wait()
+     }
+
+     func testUnsolicitedPong() throws {
+         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
+
+         let app = try self.setupClientAndServer(
+             onServer: { ws in
+                 ws.onPong { _ in
+                     promise.succeed()
+                 }
+             },
+             onClient: { ws in
+                 ws.sendPong(.init(), promise: nil)
+             }
+         )
+         defer { app.stop() }
+
+         try promise.wait()
+     }
+
+     */
 }

@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import HTTPTypes
 import HummingbirdCore
 import Logging
 import NIOCore
@@ -26,12 +27,16 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
 
     public typealias Value = EventLoopFuture<UpgradeResult>
 
+    let url: String
     let handler: Handler
     let maxFrameSize: Int
+    let additionalHeaders: HTTPFields
 
-    init(handler: Handler, maxFrameSize: Int = 1 << 14) {
+    init(handler: Handler, url: String, maxFrameSize: Int = 1 << 14, additionalHeaders: HTTPFields = .init()) {
+        self.url = url
         self.handler = handler
         self.maxFrameSize = maxFrameSize
+        self.additionalHeaders = additionalHeaders
     }
 
     public func setup(channel: any Channel, logger: Logger) -> NIOCore.EventLoopFuture<Value> {
@@ -49,11 +54,13 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
             var headers = HTTPHeaders()
             headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
             headers.add(name: "Content-Length", value: "0")
+            let additionalHeaders = HTTPHeaders(self.additionalHeaders)
+            headers.add(contentsOf: additionalHeaders)
 
             let requestHead = HTTPRequestHead(
                 version: .http1_1,
                 method: .GET,
-                uri: "/",
+                uri: self.url,
                 headers: headers
             )
 
