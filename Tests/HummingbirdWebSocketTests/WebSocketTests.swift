@@ -299,6 +299,50 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
         }
     }
+
+    // test HBWebSocketClient.connect
+    func testClientConnect() async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            let promise = Promise<Int>()
+            let logger = {
+                var logger = Logger(label: "WebSocketTest")
+                logger.logLevel = .debug
+                return logger
+            }()
+            let router = HBRouter()
+            let serviceGroup: ServiceGroup
+            let app = HBApplication(
+                router: router,
+                server: .webSocketUpgrade { _, _ in
+                    return .upgrade([:]) { _, outbound, _ in
+                        try await outbound.write(.text("Hello"))
+                    }
+                },
+                onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
+                logger: logger
+            )
+            serviceGroup = ServiceGroup(
+                configuration: .init(
+                    services: [app],
+                    gracefulShutdownSignals: [.sigterm, .sigint],
+                    logger: app.logger
+                )
+            )
+            group.addTask {
+                try await serviceGroup.run()
+            }
+            group.addTask {
+                try await HBWebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
+                    var inboundIterator = inbound.makeAsyncIterator()
+                    let msg = await inboundIterator.next()
+                    XCTAssertEqual(msg, .text("Hello"))
+                }
+            }
+            try await group.next()
+            await serviceGroup.triggerGracefulShutdown()
+        }
+    }
+
     /*
      func testPingPong() throws {
          let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
