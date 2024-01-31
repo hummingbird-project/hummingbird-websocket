@@ -86,7 +86,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
     ///   - configuration: Server configuration
     ///   - logger: Logger used by upgrade
     /// - Returns: Negotiated result future
-    public func setup(channel: Channel, configuration: HBServerConfiguration, logger: Logger) -> EventLoopFuture<Value> {
+    public func setup(channel: Channel, logger: Logger) -> EventLoopFuture<Value> {
         return channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
                 maxFrameSize: self.maxFrameSize,
