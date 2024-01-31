@@ -19,12 +19,12 @@ import NIOCore
 import NIOPosix
 
 /// WebSocket client
-/// 
+///
 /// Connect to HTTP server with WebSocket upgrade available.
-/// 
+///
 /// Supports TLS via both NIOSSL and Network framework.
-/// 
-/// Initialize the HBWebSocketClient with your handler and then call ``HBWebSocketClient/run`` 
+///
+/// Initialize the HBWebSocketClient with your handler and then call ``HBWebSocketClient/run``
 /// to connect. The handler is provider with an `inbound` stream of WebSocket packets coming
 /// from the server and an `outbound` writer that can be used to write packets to the server.
 /// ```swift
@@ -41,6 +41,7 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         private enum _Internal: Equatable {
             case invalidURL
         }
+
         private let value: _Internal
         private init(_ value: _Internal) {
             self.value = value
@@ -55,6 +56,7 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
         case ts(TSTLSOptions)
         #endif
     }
+
     /// WebSocket URL
     let url: HBURL
     /// WebSocket data handler
@@ -69,7 +71,7 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     let tlsConfiguration: MultiPlatformTLSConfiguration?
 
     /// Initialize websocket client
-    /// 
+    ///
     /// - Parametes:
     ///   - url: URL of websocket
     ///   - tlsConfiguration: TLS configuration
@@ -94,7 +96,7 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     }
 
     /// Initialize websocket client with callback
-    /// 
+    ///
     /// - Parametes:
     ///   - url: URL of websocket
     ///   - tlsConfiguration: TLS configuration
@@ -112,17 +114,18 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     ) throws where Handler == HBWebSocketDataCallbackHandler {
         let handler = HBWebSocketDataCallbackHandler(handlerCallback)
         try self.init(
-            url: url, 
+            url: url,
             tlsConfiguration: tlsConfiguration,
-            handler: handler, 
-            maxFrameSize: maxFrameSize, 
-            eventLoopGroup: eventLoopGroup, 
+            handler: handler,
+            maxFrameSize: maxFrameSize,
+            eventLoopGroup: eventLoopGroup,
             logger: logger
         )
     }
-#if canImport(Network)
+
+    #if canImport(Network)
     /// Initialize websocket client
-    /// 
+    ///
     /// - Parametes:
     ///   - url: URL of websocket
     ///   - transportServicesTLSOptions: TLS options for NIOTransportServices
@@ -147,7 +150,7 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     }
 
     /// Initialize websocket client with callback
-    /// 
+    ///
     /// - Parametes:
     ///   - url: URL of websocket
     ///   - transportServicesTLSOptions: TLS options for NIOTransportServices
@@ -165,27 +168,27 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
     ) throws where Handler == HBWebSocketDataCallbackHandler {
         let handler = HBWebSocketDataCallbackHandler(handlerCallback)
         try self.init(
-            url: url, 
+            url: url,
             transportServicesTLSOptions: transportServicesTLSOptions,
-            handler: handler, 
-            maxFrameSize: maxFrameSize, 
-            eventLoopGroup: eventLoopGroup, 
+            handler: handler,
+            maxFrameSize: maxFrameSize,
+            eventLoopGroup: eventLoopGroup,
             logger: logger
         )
     }
-#endif
+    #endif
 
     ///  Connect and run handler
     public func run() async throws {
         guard let host = url.host else { throw Error.invalidURL }
-        let requiresTLS = url.scheme == .wss || url.scheme == .https
-        let port = url.port ?? (requiresTLS ? 443 : 80)
+        let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
+        let port = self.url.port ?? (requiresTLS ? 443 : 80)
         if requiresTLS {
             switch self.tlsConfiguration {
             case .niossl(let tlsConfiguration):
-                let client = HBClient(
-                    try TLSClientChannel(
-                        WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize), 
+                let client = try HBClient(
+                    TLSClientChannel(
+                        WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize),
                         tlsConfiguration: tlsConfiguration
                     ),
                     address: .hostname(host, port: port),
@@ -207,14 +210,14 @@ public struct HBWebSocketClient<Handler: HBWebSocketDataHandler> {
 
             #endif
             case .none:
-                let client = HBClient(
-                    try TLSClientChannel(
-                        WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize), 
+                let client = try HBClient(
+                    TLSClientChannel(
+                        WebSocketClientChannel(handler: handler, maxFrameSize: maxFrameSize),
                         tlsConfiguration: TLSConfiguration.makeClientConfiguration()
                     ),
                     address: .hostname(host, port: port),
-                    eventLoopGroup: eventLoopGroup,
-                    logger: logger
+                    eventLoopGroup: self.eventLoopGroup,
+                    logger: self.logger
                 )
                 try await client.run()
             }
