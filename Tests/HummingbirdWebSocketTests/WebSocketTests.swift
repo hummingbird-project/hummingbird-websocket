@@ -129,14 +129,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
             group.addTask {
                 let client = try await getClient(promise.wait(), logger)
-                do {
-                    try await client.run()
-                } catch {
-                    throw error
-                }
+                try await client.run()
             }
-            try await group.next()
-            await serviceGroup.triggerGracefulShutdown()
+            do {
+                try await group.next()
+                await serviceGroup.triggerGracefulShutdown()
+            } catch {
+                await serviceGroup.triggerGracefulShutdown()
+                throw error
+            }
         }
     }
 
@@ -211,12 +212,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testNotWebSocket() async throws {
         // currently disabled as NIO websocket code doesnt shutdown correctly here
         try XCTSkipIf(true)
-        try await self.testClientAndServer { inbound, _, _ in
-            for try await _ in inbound {}
-        } shouldUpgrade: { _ in
-            return nil
-        } client: { inbound, _, _ in
-            for try await _ in inbound {}
+        do {
+            try await self.testClientAndServer { inbound, _, _ in
+                for try await _ in inbound {}
+            } shouldUpgrade: { _ in
+                return nil
+            } client: { inbound, _, _ in
+                for try await _ in inbound {}
+            }
+        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {
         }
     }
 
@@ -270,7 +274,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } shouldUpgrade: { head in
             let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
-            let request = HBRequest(head: httpRequest, body: .byteBuffer(ByteBuffer()))
+            let request = HBRequest(head: httpRequest, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.uri.query, "query=parameters&test=true")
             return [:]
         } getClient: { port, logger in
@@ -287,7 +291,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } shouldUpgrade: { head in
             let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
-            let request = HBRequest(head: httpRequest, body: .byteBuffer(ByteBuffer()))
+            let request = HBRequest(head: httpRequest, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
             return [:]
         } getClient: { port, logger in

@@ -89,8 +89,9 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
             let context = self.handler.alreadySetupContext ?? .init(logger: logger, allocator: websocketChannel.channel.allocator)
             await webSocket.handle(handler: self.handler, context: context)
         case .notUpgraded:
-            // The upgrade to websocket did not succeed. We are just exiting in this case.
+            // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")
+            throw HBWebSocketClientError.webSocketUpgradeFailed
         }
     }
 }

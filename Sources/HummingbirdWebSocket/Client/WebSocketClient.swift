@@ -39,19 +39,6 @@ import ServiceLifecycle
 /// }
 /// ```
 public struct HBWebSocketClient {
-    public struct Error: Swift.Error, Equatable {
-        private enum _Internal: Equatable {
-            case invalidURL
-        }
-
-        private let value: _Internal
-        private init(_ value: _Internal) {
-            self.value = value
-        }
-
-        public static var invalidURL: Self { .init(.invalidURL) }
-    }
-
     public struct Configuration: Sendable {
         /// Max websocket frame size that can be sent/received
         public var maxFrameSize: Int
@@ -144,7 +131,7 @@ public struct HBWebSocketClient {
 
     ///  Connect and run handler
     public func run() async throws {
-        guard let host = url.host else { throw Error.invalidURL }
+        guard let host = url.host else { throw HBWebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
         let port = self.url.port ?? (requiresTLS ? 443 : 80)
         // url path must include query values as well
