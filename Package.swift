@@ -11,7 +11,7 @@ let package = Package(
         // .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "2.x.x"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
