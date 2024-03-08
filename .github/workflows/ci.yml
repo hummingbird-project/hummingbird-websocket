@@ -4,7 +4,6 @@ on:
   push:
     branches:
     - main
-    - 7.x.x
     paths:
     - '**.swift'
     - '**.yml'
@@ -12,37 +11,18 @@ on:
   workflow_dispatch:
 
 jobs:
-#  macOS:
-#    runs-on: macOS-latest
-#    steps:
-#    - name: Checkout
-#      uses: actions/checkout@v3
-#    - name: SPM tests
-#      run: swift test --enable-code-coverage
-#    - name: Convert coverage files
-#      run: |
-#        xcrun llvm-cov export -format "lcov" \
-#          .build/debug/hummingbird-websocketPackageTests.xctest/Contents/MacOs/hummingbird-websocketPackageTests \
-#          -ignore-filename-regex="\/Tests\/" \
-#          -instr-profile=.build/debug/codecov/default.profdata > info.lcov
-#          -ignore-filename-regex="\/Benchmarks\/" \
-#    - name: Upload to codecov.io
-#      uses: codecov/codecov-action@v3
-#      with:
-#        file: info.lcov
   linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
-        image:
-          - 'swift:5.10'
-          - 'swiftlang/swift:nightly-jammy'
+        image: ["swift:5.9", "swift:5.10", "swiftlang/swift:nightly-jammy"]
     
     container:
       image: ${{ matrix.image }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Test
       run: |
         swift test --enable-code-coverage
@@ -54,6 +34,6 @@ jobs:
           -ignore-filename-regex="\/Benchmarks\/" \
           -instr-profile .build/debug/codecov/default.profdata > info.lcov
     - name: Upload to codecov.io
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: info.lcov
