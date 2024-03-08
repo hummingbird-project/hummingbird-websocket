@@ -18,6 +18,7 @@ import HummingbirdTLS
 import Logging
 import NIOCore
 import NIOPosix
+import NIOTransportServices
 import ServiceLifecycle
 
 /// WebSocket client
@@ -123,6 +124,7 @@ public struct HBWebSocketClient {
     ) throws {
         self.url = url
         self.handler = .init(process)
+        self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
         self.logger = logger
         self.tlsConfiguration = .ts(transportServicesTLSOptions)
@@ -152,8 +154,8 @@ public struct HBWebSocketClient {
 
             #if canImport(Network)
             case .ts(let tlsOptions):
-                let client = HBClient(
-                    WebSocketClientChannel(handler: handler, url: urlPath, maxFrameSize: maxFrameSize),
+                let client = try HBClient(
+                    WebSocketClientChannel(handler: handler, url: urlPath, maxFrameSize: self.configuration.maxFrameSize),
                     address: .hostname(host, port: port),
                     transportServicesTLSOptions: tlsOptions,
                     eventLoopGroup: self.eventLoopGroup,
@@ -242,7 +244,7 @@ extension HBWebSocketClient {
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         process: @escaping HBWebSocketDataCallbackHandler.Callback
-    ) throws {
+    ) async throws {
         let ws = try self.init(
             url: url,
             configuration: configuration,
