@@ -1,4 +1,4 @@
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Hummingbird server framework project
 //
@@ -28,4 +28,3 @@ public struct HBWebSocketClientError: Swift.Error, Equatable {
     /// WebSocket upgrade failed.
     public static var webSocketUpgradeFailed: Self { .init(.invalidURL) }
 }
-

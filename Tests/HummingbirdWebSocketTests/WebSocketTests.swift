@@ -220,8 +220,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             } client: { inbound, _, _ in
                 for try await _ in inbound {}
             }
-        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {
-        }
+        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {}
     }
 
     func testNoConnection() async throws {
