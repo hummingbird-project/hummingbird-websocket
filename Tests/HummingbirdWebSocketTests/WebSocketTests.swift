@@ -240,7 +240,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text("Hello"))
         } getClient: { port, logger in
             var clientTLSConfiguration = try getClientTLSConfiguration()
-            clientTLSConfiguration.certificateVerification = .noHostnameVerification
+            clientTLSConfiguration.certificateVerification = .none
             return try HBWebSocketClient(
                 url: .init("wss://localhost:\(port)"),
                 tlsConfiguration: clientTLSConfiguration,
