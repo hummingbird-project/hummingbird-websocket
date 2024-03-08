@@ -118,13 +118,14 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
         let requestClientNoContextTakeover = request.parameters["client_no_context_takeover"] != nil
 
         let receiveMaxWindow: Int?
-        // calculate client max window. If parameter doesn't exist then server cannot set it, if it does
-        // exist then the value should be set to minimum of both values, or the value of the other if
-        // one is nil
-        if let requestClientMaxWindow = requestClientMaxWindow {
-            receiveMaxWindow = optionalMin(requestClientMaxWindow.integer, self.clientMaxWindow)
+            // calculate client max window. If parameter doesn't exist then server cannot set it, if it does
+            // exist then the value should be set to minimum of both values, or the value of the other if
+            // one is nil
+            = if let requestClientMaxWindow
+        {
+            optionalMin(requestClientMaxWindow.integer, self.clientMaxWindow)
         } else {
-            receiveMaxWindow = nil
+            nil
         }
 
         return PerMessageDeflateExtension.Configuration(

@@ -220,8 +220,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             } client: { inbound, _, _ in
                 for try await _ in inbound {}
             }
-        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {
-        }
+        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {}
     }
 
     func testNoConnection() async throws {
@@ -241,7 +240,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text("Hello"))
         } getClient: { port, logger in
             var clientTLSConfiguration = try getClientTLSConfiguration()
-            clientTLSConfiguration.certificateVerification = .noHostnameVerification
+            clientTLSConfiguration.certificateVerification = .none
             return try HBWebSocketClient(
                 url: .init("wss://localhost:\(port)"),
                 tlsConfiguration: clientTLSConfiguration,
