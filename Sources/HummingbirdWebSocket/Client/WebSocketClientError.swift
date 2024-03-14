@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct HBWebSocketClientError: Swift.Error, Equatable {
+public struct WebSocketClientError: Swift.Error, Equatable {
     private enum _Internal: Equatable {
         case invalidURL
         case webSocketUpgradeFailed

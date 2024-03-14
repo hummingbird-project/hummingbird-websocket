@@ -75,9 +75,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping HBWebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
         shouldUpgrade: @escaping @Sendable (HTTPRequestHead) throws -> HTTPHeaders? = { _ in return [:] },
-        getClient: @escaping @Sendable (Int, Logger) throws -> HBWebSocketClient
+        getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -86,17 +86,17 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 logger.logLevel = .debug
                 return logger
             }()
-            let router = HBRouter()
+            let router = Router()
             let serviceGroup: ServiceGroup
-            let webSocketUpgrade: HBHTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { _, head in
+            let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { _, head in
                 if let headers = try shouldUpgrade(head) {
-                    return .upgrade(headers, HBWebSocketDataCallbackHandler(serverHandler))
+                    return .upgrade(headers, WebSocketDataCallbackHandler(serverHandler))
                 } else {
                     return .dontUpgrade
                 }
             }
             if let serverTLSConfiguration {
-                let app = try HBApplication(
+                let app = try Application(
                     router: router,
                     server: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
                     onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
@@ -110,7 +110,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     )
                 )
             } else {
-                let app = HBApplication(
+                let app = Application(
                     router: router,
                     server: webSocketUpgrade,
                     onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
@@ -143,16 +143,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping HBWebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
         shouldUpgrade: @escaping @Sendable (HTTPRequestHead) throws -> HTTPHeaders? = { _ in return [:] },
-        client clientHandler: @escaping HBWebSocketDataCallbackHandler.Callback
+        client clientHandler: @escaping WebSocketDataCallbackHandler.Callback
     ) async throws {
         try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
             server: serverHandler,
             shouldUpgrade: shouldUpgrade,
             getClient: { port, logger in
-                try HBWebSocketClient(
+                try WebSocketClient(
                     url: .init("ws://localhost:\(port)"),
                     logger: logger,
                     process: clientHandler
@@ -220,11 +220,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
             } client: { inbound, _, _ in
                 for try await _ in inbound {}
             }
-        } catch let error as HBWebSocketClientError where error == .webSocketUpgradeFailed {}
+        } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
 
     func testNoConnection() async throws {
-        let client = try HBWebSocketClient(
+        let client = try WebSocketClient(
             url: .init("ws://localhost:10245"),
             logger: Logger(label: "TestNoConnection")
         ) { _, _, _ in
@@ -241,7 +241,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         } getClient: { port, logger in
             var clientTLSConfiguration = try getClientTLSConfiguration()
             clientTLSConfiguration.certificateVerification = .none
-            return try HBWebSocketClient(
+            return try WebSocketClient(
                 url: .init("wss://localhost:\(port)"),
                 tlsConfiguration: clientTLSConfiguration,
                 logger: logger
@@ -260,7 +260,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(head.uri, "/ws")
             return [:]
         } getClient: { port, logger in
-            try HBWebSocketClient(
+            try WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws"),
                 logger: logger
             ) { _, _, _ in
@@ -273,11 +273,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } shouldUpgrade: { head in
             let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
-            let request = HBRequest(head: httpRequest, body: .init(buffer: ByteBuffer()))
+            let request = Request(head: httpRequest, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.uri.query, "query=parameters&test=true")
             return [:]
         } getClient: { port, logger in
-            try HBWebSocketClient(
+            try WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 logger: logger
             ) { _, _, _ in
@@ -290,11 +290,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } shouldUpgrade: { head in
             let httpRequest = try HTTPRequest(head, secure: false, splitCookie: false)
-            let request = HBRequest(head: httpRequest, body: .init(buffer: ByteBuffer()))
+            let request = Request(head: httpRequest, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
             return [:]
         } getClient: { port, logger in
-            try HBWebSocketClient(
+            try WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
                 logger: logger
@@ -303,7 +303,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    // test HBWebSocketClient.connect
+    // test WebSocketClient.connect
     func testClientConnect() async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -312,9 +312,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 logger.logLevel = .debug
                 return logger
             }()
-            let router = HBRouter()
+            let router = Router()
             let serviceGroup: ServiceGroup
-            let app = HBApplication(
+            let app = Application(
                 router: router,
                 server: .webSocketUpgrade { _, _ in
                     return .upgrade([:]) { _, outbound, _ in
@@ -335,7 +335,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             group.addTask {
-                try await HBWebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
+                try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
                     var inboundIterator = inbound.makeAsyncIterator()
                     let msg = await inboundIterator.next()
                     XCTAssertEqual(msg, .text("Hello"))

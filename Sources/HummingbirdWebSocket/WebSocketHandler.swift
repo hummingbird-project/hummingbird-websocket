@@ -20,8 +20,8 @@ import NIOWebSocket
 /// Handler processing raw WebSocket packets.
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
-/// and passes them onto the ``HBWebSocketDataHandler`` data handler setup by the user.
-actor HBWebSocketHandler: Sendable {
+/// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
+actor WebSocketHandler: Sendable {
     enum SocketType: Sendable {
         case client
         case server
@@ -34,26 +34,26 @@ actor HBWebSocketHandler: Sendable {
     var closed = false
     var pingData: ByteBuffer
 
-    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: HBWebSocketHandler.SocketType) {
+    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketHandler.SocketType) {
         self.asyncChannel = asyncChannel
         self.type = type
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
     }
 
     /// Handle WebSocket AsynChannel
-    func handle<Handler: HBWebSocketDataHandler>(
+    func handle<Handler: WebSocketDataHandler>(
         handler: Handler,
         context: Handler.Context
     ) async {
         try? await self.asyncChannel.executeThenClose { inbound, outbound in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
-                    let webSocketHandlerInbound = HBWebSocketHandlerInbound()
+                    let webSocketHandlerInbound = WebSocketHandlerInbound()
                     defer {
                         asyncChannel.channel.close(promise: nil)
                         webSocketHandlerInbound.finish()
                     }
-                    let webSocketHandlerOutbound = HBWebSocketHandlerOutboundWriter(webSocket: self, outbound: outbound)
+                    let webSocketHandlerOutbound = WebSocketHandlerOutboundWriter(webSocket: self, outbound: outbound)
                     group.addTask {
                         // parse messages coming from inbound
                         var frameSequence: WebSocketFrameSequence?
@@ -109,7 +109,7 @@ actor HBWebSocketHandler: Sendable {
     func onPing(
         _ frame: WebSocketFrame,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
-        context: some HBWebSocketContextProtocol
+        context: some WebSocketContextProtocol
     ) async throws {
         if frame.fin {
             try await self.pong(data: frame.unmaskedData, outbound: outbound)
@@ -122,7 +122,7 @@ actor HBWebSocketHandler: Sendable {
     func onPong(
         _ frame: WebSocketFrame,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
-        context: some HBWebSocketContextProtocol
+        context: some WebSocketContextProtocol
     ) async throws {
         let frameData = frame.unmaskedData
         guard self.pingData.readableBytes == 0 || frameData == self.pingData else {
@@ -153,7 +153,7 @@ actor HBWebSocketHandler: Sendable {
     func close(
         code: WebSocketErrorCode = .normalClosure,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
-        context: some HBWebSocketContextProtocol
+        context: some WebSocketContextProtocol
     ) async throws {
         guard !self.closed else { return }
         self.closed = true

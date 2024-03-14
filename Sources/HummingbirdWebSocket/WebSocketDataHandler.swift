@@ -22,13 +22,13 @@ import NIOWebSocket
 /// This is the users interface into HummingbirdWebSocket. They provide an implementation of this protocol when
 /// contructing their WebSocket upgrade handler. The user needs to return a type conforming to this protocol in
 /// the `shouldUpgrade` closure in HTTP1AndWebSocketChannel.init
-public protocol HBWebSocketDataHandler: Sendable {
+public protocol WebSocketDataHandler: Sendable {
     /// Context type supplied to the handle function.
     ///
-    /// The `HBWebSocketDataHandler` can chose to setup a context or accept the default one from
-    /// ``HBWebSocketHandler``.
-    associatedtype Context: HBWebSocketContextProtocol = HBWebSocketContext
-    /// If a `HBWebSocketDataHandler` requires a context with custom data it should
+    /// The `WebSocketDataHandler` can chose to setup a context or accept the default one from
+    /// ``WebSocketHandler``.
+    associatedtype Context: WebSocketContextProtocol = WebSocketContext
+    /// If a `WebSocketDataHandler` requires a context with custom data it should
     /// setup this variable on initialization
     var alreadySetupContext: Context? { get }
     ///  Handler WebSocket data packets
@@ -36,18 +36,18 @@ public protocol HBWebSocketDataHandler: Sendable {
     ///   - inbound: An AsyncSequence of text or binary WebSocket frames.
     ///   - outbound: An outbound Writer to write websocket frames to
     ///   - context: Associated context to this websocket channel
-    func handle(_ inbound: HBWebSocketHandlerInbound, _ outbound: HBWebSocketHandlerOutboundWriter, context: Context) async throws
+    func handle(_ inbound: WebSocketHandlerInbound, _ outbound: WebSocketHandlerOutboundWriter, context: Context) async throws
 }
 
-extension HBWebSocketDataHandler {
+extension WebSocketDataHandler {
     /// Default implementaion of ``alreadySetupContext`` returns nil, so the Context will be
-    /// created by the ``HBWebSocketChannelHandler``
+    /// created by the ``WebSocketChannelHandler``
     public var alreadySetupContext: Context? { nil }
 }
 
-/// HBWebSocketDataHandler that is is initialized via a callback
-public struct HBWebSocketDataCallbackHandler: HBWebSocketDataHandler {
-    public typealias Callback = @Sendable (HBWebSocketHandlerInbound, HBWebSocketHandlerOutboundWriter, HBWebSocketContext) async throws -> Void
+/// WebSocketDataHandler that is is initialized via a callback
+public struct WebSocketDataCallbackHandler: WebSocketDataHandler {
+    public typealias Callback = @Sendable (WebSocketHandlerInbound, WebSocketHandlerOutboundWriter, WebSocketContext) async throws -> Void
 
     let callback: Callback
 
@@ -56,14 +56,14 @@ public struct HBWebSocketDataCallbackHandler: HBWebSocketDataHandler {
     }
 
     ///  Handler WebSocket data packets by passing directly to the callback
-    public func handle(_ inbound: HBWebSocketHandlerInbound, _ outbound: HBWebSocketHandlerOutboundWriter, context: HBWebSocketContext) async throws {
+    public func handle(_ inbound: WebSocketHandlerInbound, _ outbound: WebSocketHandlerOutboundWriter, context: WebSocketContext) async throws {
         try await self.callback(inbound, outbound, context)
     }
 }
 
-extension ShouldUpgradeResult where Value == HBWebSocketDataCallbackHandler {
+extension ShouldUpgradeResult where Value == WebSocketDataCallbackHandler {
     /// Extension to ShouldUpgradeResult that takes just a callback
-    public static func upgrade(_ headers: HTTPHeaders, _ callback: @escaping HBWebSocketDataCallbackHandler.Callback) -> Self {
-        .upgrade(headers, HBWebSocketDataCallbackHandler(callback))
+    public static func upgrade(_ headers: HTTPHeaders, _ callback: @escaping WebSocketDataCallbackHandler.Callback) -> Self {
+        .upgrade(headers, WebSocketDataCallbackHandler(callback))
     }
 }

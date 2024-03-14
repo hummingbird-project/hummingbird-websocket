@@ -18,7 +18,7 @@ import NIOCore
 import NIOWebSocket
 
 /// PerMessageDeflate Websocket extension builder
-struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
+struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
     static var name = "permessage-deflate"
 
     let clientMaxWindow: Int?
@@ -87,7 +87,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     /// - Parameters:
     ///   - request: Client request
     ///   - eventLoop: EventLoop it is bound to
-    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
         let configuration = self.responseConfiguration(to: request)
         return try PerMessageDeflateExtension(configuration: configuration, eventLoop: eventLoop)
     }
@@ -96,7 +96,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
     /// - Parameters:
     ///   - response: Server response
     ///   - eventLoop: EventLoop it is bound to
-    func clientExtension(from response: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> HBWebSocketExtension? {
+    func clientExtension(from response: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> WebSocketExtension? {
         let clientMaxWindowParam = response.parameters["client_max_window_bits"]?.integer
         let clientNoContextTakeoverParam = response.parameters["client_no_context_takeover"] != nil
         let serverMaxWindowParam = response.parameters["server_max_window_bits"]?.integer
@@ -143,7 +143,7 @@ struct PerMessageDeflateExtensionBuilder: HBWebSocketExtensionBuilder {
 ///
 /// Uses deflate to compress messages sent across a WebSocket
 /// See RFC 7692 for more details https://www.rfc-editor.org/rfc/rfc7692
-struct PerMessageDeflateExtension: HBWebSocketExtension {
+struct PerMessageDeflateExtension: WebSocketExtension {
     enum SendState: Sendable {
         case idle
         case sendingMessage
@@ -201,7 +201,7 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
         self.internalState.value.shutdown()
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, ws: WebSocket) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
             let state = self.internalState.value
@@ -217,7 +217,7 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
         return frame
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, ws: WebSocket) throws -> WebSocketFrame {
         let state = self.internalState.value
         // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
         // compress the data
@@ -245,12 +245,12 @@ struct PerMessageDeflateExtension: HBWebSocketExtension {
     }
 }
 
-extension HBWebSocketExtensionFactory {
+extension WebSocketExtensionFactory {
     ///  permessage-deflate websocket extension
     /// - Parameters:
     ///   - maxWindow: Max window to be used for decompression and compression
     ///   - noContextTakeover: Should we reset window on every message
-    public static func perMessageDeflate(maxWindow: Int? = nil, noContextTakeover: Bool = false) -> HBWebSocketExtensionFactory {
+    public static func perMessageDeflate(maxWindow: Int? = nil, noContextTakeover: Bool = false) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
                 clientMaxWindow: maxWindow,
@@ -280,7 +280,7 @@ extension HBWebSocketExtensionFactory {
         serverNoContextTakeover: Bool = false,
         compressionLevel: Int? = nil,
         memoryLevel: Int? = nil
-    ) -> HBWebSocketExtensionFactory {
+    ) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
                 clientMaxWindow: clientMaxWindow,

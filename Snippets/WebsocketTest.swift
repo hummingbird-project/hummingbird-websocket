@@ -2,14 +2,14 @@ import Hummingbird
 import HummingbirdWebSocket
 import NIOHTTP1
 
-let router = HBRouter()
+let router = Router()
 router.get { _, _ in
     "Hello"
 }
 
-router.middlewares.add(HBFileMiddleware("Snippets/public"))
-let app = HBApplication(
-    responder: router.buildResponder(),
+router.middlewares.add(FileMiddleware("Snippets/public"))
+let app = Application(
+    router: router,
     server: .webSocketUpgrade { _, head in
         if head.uri == "/ws" {
             return .upgrade(HTTPHeaders()) { inbound, outbound, _ in

@@ -23,7 +23,7 @@ import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
 /// Child channel supporting a web socket upgrade from HTTP1
-public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChildChannel, HTTPChannelHandler {
+public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChildChannel, HTTPChannelHandler {
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Handler)
@@ -41,7 +41,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
     /// - Returns: Upgrade result future
     public init(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        responder: @escaping @Sendable (HBRequest, Channel) async throws -> HBResponse = { _, _ in throw HBHTTPError(.notImplemented) },
+        responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
         maxFrameSize: Int = (1 << 14),
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
     ) {
@@ -64,7 +64,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
     /// - Returns: Upgrade result future
     public init(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        responder: @escaping @Sendable (HBRequest, Channel) async throws -> HBResponse = { _, _ in throw HBHTTPError(.notImplemented) },
+        responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
         maxFrameSize: Int = (1 << 14),
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
     ) {
@@ -107,7 +107,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
                     let childChannelHandlers: [any ChannelHandler] =
                         [HTTP1ToHTTPServerCodec(secure: false)] +
                         self.additionalChannelHandlers() +
-                        [HBHTTPUserEventHandler(logger: logger)]
+                        [HTTPUserEventHandler(logger: logger)]
                     return channel.eventLoop.makeCompletedFuture {
                         try channel.pipeline.syncOperations.addHandlers(childChannelHandlers)
                         let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(wrappingChannelSynchronously: channel)
@@ -135,7 +135,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
             case .notUpgraded(let http1):
                 await handleHTTP(asyncChannel: http1, logger: logger)
             case .websocket(let asyncChannel, let handler):
-                let webSocket = HBWebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                 let context = handler.alreadySetupContext ?? .init(logger: logger, allocator: asyncChannel.channel.allocator)
                 await webSocket.handle(handler: handler, context: context)
             }
@@ -144,7 +144,7 @@ public struct HTTP1AndWebSocketChannel<Handler: HBWebSocketDataHandler>: HBChild
         }
     }
 
-    public var responder: @Sendable (HBRequest, Channel) async throws -> HBResponse
+    public var responder: @Sendable (Request, Channel) async throws -> Response
     let shouldUpgrade: @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     let maxFrameSize: Int
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]

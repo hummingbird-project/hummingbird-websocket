@@ -16,14 +16,14 @@ import HummingbirdCore
 import NIOCore
 import NIOHTTP1
 
-extension HBHTTPChannelBuilder {
+extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///  - parameters
-    public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
+    public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
-    ) -> HBHTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
                 additionalChannelHandlers: additionalChannelHandlers,
@@ -35,11 +35,11 @@ extension HBHTTPChannelBuilder {
     }
 
     /// HTTP1 channel builder supporting a websocket upgrade
-    public static func webSocketUpgrade<Handler: HBWebSocketDataHandler>(
+    public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
-    ) -> HBHTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel<Handler>(
                 additionalChannelHandlers: additionalChannelHandlers,
