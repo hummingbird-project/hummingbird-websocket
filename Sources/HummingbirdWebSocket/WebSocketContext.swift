@@ -15,15 +15,15 @@
 import Logging
 import NIOCore
 
-/// Protocol for Context passsed to ``HBWebSocketDataHandler``
-public protocol HBWebSocketContextProtocol: Sendable {
+/// Protocol for Context passsed to ``WebSocketDataHandler``
+public protocol WebSocketContextProtocol: Sendable {
     var logger: Logger { get }
     var allocator: ByteBufferAllocator { get }
     init(logger: Logger, allocator: ByteBufferAllocator)
 }
 
-/// Default implementation of ``HBWebSocketContextProtocol``
-public struct HBWebSocketContext: HBWebSocketContextProtocol {
+/// Default implementation of ``WebSocketContextProtocol``
+public struct WebSocketContext: WebSocketContextProtocol {
     public let logger: Logger
     public let allocator: ByteBufferAllocator
 

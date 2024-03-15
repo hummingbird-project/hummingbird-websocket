@@ -52,10 +52,10 @@
      }
 
      func setupClientAndServer(
-         serverExtensions: [HBWebSocketExtensionFactory] = [],
-         clientExtensions: [HBWebSocketExtensionFactory] = [],
-         onServer: @escaping (HBWebSocket) async throws -> Void,
-         onClient: @escaping (HBWebSocket) async throws -> Void
+         serverExtensions: [WebSocketExtensionFactory] = [],
+         clientExtensions: [WebSocketExtensionFactory] = [],
+         onServer: @escaping (WebSocket) async throws -> Void,
+         onClient: @escaping (WebSocket) async throws -> Void
      ) async throws -> HBApplication {
          let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
          app.logger.logLevel = .trace
@@ -69,7 +69,7 @@
          try app.start()
 
          let eventLoop = app.eventLoopGroup.next()
-         let ws = try await HBWebSocketClient.connect(
+         let ws = try await WebSocketClient.connect(
              url: HBURL("ws://localhost:\(app.server.port!)/test"),
              configuration: .init(extensions: clientExtensions),
              on: eventLoop
@@ -257,10 +257,10 @@
      }
  }
 
- struct XorWebSocketExtension: HBWebSocketExtension {
+ struct XorWebSocketExtension: WebSocketExtension {
      func shutdown() {}
 
-     func xorFrame(_ frame: WebSocketFrame, ws: HBWebSocket) -> WebSocketFrame {
+     func xorFrame(_ frame: WebSocketFrame, ws: WebSocket) -> WebSocketFrame {
          var newBuffer = ws.channel.allocator.buffer(capacity: frame.data.readableBytes)
          for byte in frame.data.readableBytesView {
              newBuffer.writeInteger(byte ^ self.value)
@@ -270,18 +270,18 @@
          return frame
      }
 
-     func processReceivedFrame(_ frame: WebSocketFrame, ws: HBWebSocket) -> WebSocketFrame {
+     func processReceivedFrame(_ frame: WebSocketFrame, ws: WebSocket) -> WebSocketFrame {
          return self.xorFrame(frame, ws: ws)
      }
 
-     func processFrameToSend(_ frame: WebSocketFrame, ws: HBWebSocket) throws -> WebSocketFrame {
+     func processFrameToSend(_ frame: WebSocketFrame, ws: WebSocket) throws -> WebSocketFrame {
          return self.xorFrame(frame, ws: ws)
      }
 
      let value: UInt8
  }
 
- struct XorWebSocketExtensionBuilder: HBWebSocketExtensionBuilder {
+ struct XorWebSocketExtensionBuilder: WebSocketExtensionBuilder {
      static var name = "permessage-xor"
      let value: UInt8?
 
@@ -305,17 +305,17 @@
          return header
      }
 
-     func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
+     func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
          XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
      }
 
-     func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (HBWebSocketExtension)? {
+     func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
          XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
      }
  }
 
- extension HBWebSocketExtensionFactory {
-     static func xor(value: UInt8? = nil) -> HBWebSocketExtensionFactory {
+ extension WebSocketExtensionFactory {
+     static func xor(value: UInt8? = nil) -> WebSocketExtensionFactory {
          .init { XorWebSocketExtensionBuilder(value: value) }
      }
  }

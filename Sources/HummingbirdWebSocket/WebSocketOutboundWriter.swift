@@ -16,7 +16,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Outbound websocket writer
-public struct HBWebSocketHandlerOutboundWriter {
+public struct WebSocketHandlerOutboundWriter {
     /// WebSocket frame that can be written
     public enum OutboundFrame: Sendable {
         /// Text frame
@@ -31,7 +31,7 @@ public struct HBWebSocketHandlerOutboundWriter {
         case custom(WebSocketFrame)
     }
 
-    let webSocket: HBWebSocketHandler
+    let webSocket: WebSocketHandler
     let outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
 
     /// Write WebSocket frame

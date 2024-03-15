@@ -19,7 +19,7 @@ import NIOCore
 import NIOHTTP1
 import NIOWebSocket
 
-public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientChannel {
+public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConnectionChannel {
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>)
         case notUpgraded
@@ -85,13 +85,13 @@ public struct WebSocketClientChannel<Handler: HBWebSocketDataHandler>: HBClientC
     public func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
         case .websocket(let websocketChannel):
-            let webSocket = HBWebSocketHandler(asyncChannel: websocketChannel, type: .client)
+            let webSocket = WebSocketHandler(asyncChannel: websocketChannel, type: .client)
             let context = self.handler.alreadySetupContext ?? .init(logger: logger, allocator: websocketChannel.channel.allocator)
             await webSocket.handle(handler: self.handler, context: context)
         case .notUpgraded:
             // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")
-            throw HBWebSocketClientError.webSocketUpgradeFailed
+            throw WebSocketClientError.webSocketUpgradeFailed
         }
     }
 }

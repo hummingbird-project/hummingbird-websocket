@@ -17,7 +17,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Inbound websocket data AsyncSequence
-public typealias HBWebSocketHandlerInbound = AsyncChannel<WebSocketDataFrame>
+public typealias WebSocketHandlerInbound = AsyncChannel<WebSocketDataFrame>
 /// Enumeration holding WebSocket data
 public enum WebSocketDataFrame: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     case text(String)
