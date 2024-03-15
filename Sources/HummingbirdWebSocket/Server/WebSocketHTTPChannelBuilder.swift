@@ -12,9 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+import HTTPTypes
 import HummingbirdCore
+import Logging
 import NIOCore
-import NIOHTTP1
 
 extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
@@ -22,7 +23,7 @@ extension HTTPChannelBuilder {
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) async throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
@@ -38,7 +39,7 @@ extension HTTPChannelBuilder {
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel<Handler>(

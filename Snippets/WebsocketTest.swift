@@ -1,6 +1,6 @@
+import HTTPTypes
 import Hummingbird
 import HummingbirdWebSocket
-import NIOHTTP1
 
 let router = Router()
 router.get { _, _ in
@@ -10,9 +10,9 @@ router.get { _, _ in
 router.middlewares.add(FileMiddleware("Snippets/public"))
 let app = Application(
     router: router,
-    server: .webSocketUpgrade { _, head in
-        if head.uri == "/ws" {
-            return .upgrade(HTTPHeaders()) { inbound, outbound, _ in
+    server: .webSocketUpgrade { _, head, _ in
+        if head.path == "/ws" {
+            return .upgrade(.init()) { inbound, outbound, _ in
                 for try await packet in inbound {
                     if case .text("disconnect") = packet {
                         break

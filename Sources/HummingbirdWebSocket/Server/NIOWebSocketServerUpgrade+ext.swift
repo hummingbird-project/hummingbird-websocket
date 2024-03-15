@@ -12,14 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+import HTTPTypes
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
+import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
+/// Should HTTP channel upgrade to WebSocket
 public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
     case dontUpgrade
-    case upgrade(HTTPHeaders, Value)
+    case upgrade(HTTPFields, Value)
 }
 
 extension NIOTypedWebSocketServerUpgrader {
@@ -47,21 +50,27 @@ extension NIOTypedWebSocketServerUpgrader {
     public convenience init<Value>(
         maxFrameSize: Int = 1 << 14,
         enableAutomaticErrorHandling: Bool = true,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Value>>,
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest) -> EventLoopFuture<ShouldUpgradeResult<Value>>,
         upgradePipelineHandler: @escaping @Sendable (Channel, Value) -> EventLoopFuture<UpgradeResult>
     ) {
         let shouldUpgradeResult = NIOLockedValueBox<Value?>(nil)
         self.init(
             maxFrameSize: maxFrameSize,
             enableAutomaticErrorHandling: enableAutomaticErrorHandling,
-            shouldUpgrade: { channel, head in
-                shouldUpgrade(channel, head).map { result in
+            shouldUpgrade: { (channel, head: HTTPRequestHead) in
+                let request: HTTPRequest
+                do {
+                    request = try HTTPRequest(head, secure: false, splitCookie: false)
+                } catch {
+                    return channel.eventLoop.makeFailedFuture(error)
+                }
+                return shouldUpgrade(channel, request).map { result in
                     switch result {
                     case .dontUpgrade:
                         return nil
                     case .upgrade(let headers, let value):
                         shouldUpgradeResult.withLockedValue { $0 = value }
-                        return headers
+                        return .init(headers)
                     }
                 }
             },

@@ -32,29 +32,6 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
 
     public typealias Value = EventLoopFuture<UpgradeResult>
 
-    ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
-    /// - Parameters:
-    ///   - additionalChannelHandlers: Additional channel handlers to add
-    ///   - responder: HTTP responder
-    ///   - maxFrameSize: Max frame size WebSocket will allow
-    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
-    /// - Returns: Upgrade result future
-    public init(
-        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
-        maxFrameSize: Int = (1 << 14),
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) throws -> ShouldUpgradeResult<Handler>
-    ) {
-        self.additionalChannelHandlers = additionalChannelHandlers
-        self.maxFrameSize = maxFrameSize
-        self.shouldUpgrade = { channel, head in
-            channel.eventLoop.makeCompletedFuture {
-                try shouldUpgrade(channel, head)
-            }
-        }
-        self.responder = responder
-    }
-
     ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
     /// - Parameters:
     ///   - additionalChannelHandlers: Additional channel handlers to add
@@ -66,14 +43,37 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
         maxFrameSize: Int = (1 << 14),
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequestHead) async throws -> ShouldUpgradeResult<Handler>
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) throws -> ShouldUpgradeResult<Handler>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.maxFrameSize = maxFrameSize
-        self.shouldUpgrade = { channel, head in
+        self.shouldUpgrade = { channel, head, logger in
+            channel.eventLoop.makeCompletedFuture {
+                try shouldUpgrade(channel, head, logger)
+            }
+        }
+        self.responder = responder
+    }
+
+    ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
+    /// - Parameters:
+    ///   - additionalChannelHandlers: Additional channel handlers to add
+    ///   - responder: HTTP responder
+    ///   - maxFrameSize: Max frame size WebSocket will allow
+    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    /// - Returns: Upgrade result future
+    public init(
+        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
+        responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
+        maxFrameSize: Int = (1 << 14),
+        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) async throws -> ShouldUpgradeResult<Handler>
+    ) {
+        self.additionalChannelHandlers = additionalChannelHandlers
+        self.maxFrameSize = maxFrameSize
+        self.shouldUpgrade = { channel, head, logger in
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<Handler>.self)
             promise.completeWithTask {
-                try await shouldUpgrade(channel, head)
+                try await shouldUpgrade(channel, head, logger)
             }
             return promise.futureResult
         }
@@ -91,7 +91,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
                 maxFrameSize: self.maxFrameSize,
                 shouldUpgrade: { channel, head in
-                    self.shouldUpgrade(channel, head)
+                    self.shouldUpgrade(channel, head, logger)
                 },
                 upgradePipelineHandler: { channel, handler in
                     channel.eventLoop.makeCompletedFuture {
@@ -136,7 +136,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
                 await handleHTTP(asyncChannel: http1, logger: logger)
             case .websocket(let asyncChannel, let handler):
                 let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
-                let context = handler.alreadySetupContext ?? .init(logger: logger, allocator: asyncChannel.channel.allocator)
+                let context = handler.alreadySetupContext ?? .init(channel: asyncChannel.channel, logger: logger)
                 await webSocket.handle(handler: handler, context: context)
             }
         } catch {
@@ -145,7 +145,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     }
 
     public var responder: @Sendable (Request, Channel) async throws -> Response
-    let shouldUpgrade: @Sendable (Channel, HTTPRequestHead) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
+    let shouldUpgrade: @Sendable (Channel, HTTPRequest, Logger) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     let maxFrameSize: Int
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
 }

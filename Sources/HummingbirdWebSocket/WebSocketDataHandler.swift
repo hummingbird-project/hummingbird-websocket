@@ -13,8 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 import AsyncAlgorithms
+import HTTPTypes
 import NIOCore
-import NIOHTTP1
 import NIOWebSocket
 
 /// Protocol for web socket data handling
@@ -63,7 +63,7 @@ public struct WebSocketDataCallbackHandler: WebSocketDataHandler {
 
 extension ShouldUpgradeResult where Value == WebSocketDataCallbackHandler {
     /// Extension to ShouldUpgradeResult that takes just a callback
-    public static func upgrade(_ headers: HTTPHeaders, _ callback: @escaping WebSocketDataCallbackHandler.Callback) -> Self {
+    public static func upgrade(_ headers: HTTPFields, _ callback: @escaping WebSocketDataCallbackHandler.Callback) -> Self {
         .upgrade(headers, WebSocketDataCallbackHandler(callback))
     }
 }
