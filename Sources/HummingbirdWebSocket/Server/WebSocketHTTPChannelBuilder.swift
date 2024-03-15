@@ -23,7 +23,7 @@ extension HTTPChannelBuilder {
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) async throws -> ShouldUpgradeResult<Handler>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
@@ -39,7 +39,7 @@ extension HTTPChannelBuilder {
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         maxFrameSize: Int = 1 << 14,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest, Logger) throws -> ShouldUpgradeResult<Handler>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel<Handler>(

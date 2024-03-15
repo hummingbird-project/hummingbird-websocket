@@ -51,7 +51,7 @@ extension RouterMethods {
     /// GET path for async closure returning type conforming to ResponseGenerator
     @discardableResult public func ws(
         _ path: String = "",
-        shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade,
+        shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
         handle: @escaping WebSocketDataCallbackHandler.Callback
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
@@ -73,7 +73,7 @@ extension HTTP1AndWebSocketChannel {
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - responder: HTTP responder
     ///   - maxFrameSize: Max frame size WebSocket will allow
-    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    ///   - webSocketRouter: WebSocket router
     /// - Returns: Upgrade result future
     public init<Context: WebSocketRequestContext, ResponderBuilder: HTTPResponderBuilder>(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
@@ -82,27 +82,20 @@ extension HTTP1AndWebSocketChannel {
         webSocketRouter: ResponderBuilder
     ) where Handler == WebSocketDataCallbackHandler, ResponderBuilder.Responder.Context == Context {
         let webSocketRouterResponder = webSocketRouter.buildResponder()
-        self.additionalChannelHandlers = additionalChannelHandlers
-        self.maxFrameSize = maxFrameSize
-        self.shouldUpgrade = { channel, head, logger in
-            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<Handler>.self)
-            promise.completeWithTask {
-                let request = Request(head: head, body: .init(buffer: .init()))
-                let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
-                do {
-                    let response = try await webSocketRouterResponder.respond(to: request, context: context)
-                    if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        return .upgrade(response.headers, webSocketHandler)
-                    } else {
-                        return .dontUpgrade
-                    }
-                } catch {
+        self.init(additionalChannelHandlers: additionalChannelHandlers, responder: responder, maxFrameSize: maxFrameSize) { head, channel, logger in
+            let request = Request(head: head, body: .init(buffer: .init()))
+            let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
+            do {
+                let response = try await webSocketRouterResponder.respond(to: request, context: context)
+                if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
+                    return .upgrade(response.headers, webSocketHandler)
+                } else {
                     return .dontUpgrade
                 }
+            } catch {
+                return .dontUpgrade
             }
-            return promise.futureResult
         }
-        self.responder = responder
     }
 }
 
