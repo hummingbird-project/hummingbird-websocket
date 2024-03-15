@@ -17,6 +17,7 @@ import HummingbirdCore
 import Logging
 import NIOCore
 import NIOHTTP1
+import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
 public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConnectionChannel {

@@ -16,6 +16,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
+        .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.21.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
         .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
@@ -27,6 +28,8 @@ let package = Package(
             .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "NIOCore", package: "swift-nio"),
+            .product(name: "NIOHTTPTypes", package: "swift-nio-extras"),
+            .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
         /*    .target(name: "HummingbirdWSCompression", dependencies: [
