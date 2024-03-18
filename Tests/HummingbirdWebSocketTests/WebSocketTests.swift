@@ -256,8 +256,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testNotWebSocket() async throws {
-        // currently disabled as NIO websocket code doesnt shutdown correctly here
-        // try XCTSkipIf(true)
         do {
             try await self.testClientAndServer { inbound, _, _ in
                 for try await _ in inbound {}
@@ -267,7 +265,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 for try await _ in inbound {}
             }
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {
-        } catch let error as ChannelError where error == .inappropriateOperationForState {}
+        } catch let error as ChannelError where error == .inappropriateOperationForState {
+            // This should not throw a ChannelError.inappropriateOperationForState but NIO
+            // websocket code doesn't shutdown correctly at the moment
+        }
     }
 
     func testNoConnection() async throws {
