@@ -58,7 +58,7 @@ extension RouterMethods {
             let result = try await shouldUpgrade(request, context)
             switch result {
             case .dontUpgrade:
-                return .init(status: .notAcceptable)
+                return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
                 context.webSocket.handler.withLockedValue { $0 = WebSocketDataCallbackHandler(handle) }
                 return .init(status: .ok, headers: headers)

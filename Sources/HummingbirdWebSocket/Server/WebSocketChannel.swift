@@ -119,6 +119,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPServerPipeline(
                 configuration: .init(upgradeConfiguration: serverUpgradeConfiguration)
             )
+            try channel.pipeline.syncOperations.addHandler(WebSocketUpgradeFailChannelHandler())
 
             return negotiationResultFuture
         }
@@ -133,7 +134,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
             let result = try await upgradeResult.get()
             switch result {
             case .notUpgraded(let http1):
-                await handleHTTP(asyncChannel: http1, logger: logger)
+                await self.handleHTTP(asyncChannel: http1, logger: logger)
             case .websocket(let asyncChannel, let handler):
                 let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                 let context = handler.alreadySetupContext ?? .init(channel: asyncChannel.channel, logger: logger)
@@ -144,8 +145,61 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
         }
     }
 
+    /// Upgrade failed we should write a 405
+    private func write405(asyncChannel: NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, logger: Logger) async {
+        do {
+            try await asyncChannel.executeThenClose { _, outbound in
+                let headers: HTTPFields = [
+                    .connection: "close",
+                    .contentLength: "0",
+                ]
+                let head = HTTPResponse(
+                    status: .methodNotAllowed,
+                    headerFields: headers
+                )
+
+                try await outbound.write(
+                    contentsOf: [
+                        .head(head),
+                        .end(nil),
+                    ]
+                )
+            }
+        } catch {
+            // we got here because we failed to either read or write to the channel
+            logger.trace("Failed to write to Channel. Error: \(error)")
+        }
+    }
+
     public var responder: @Sendable (Request, Channel) async throws -> Response
     let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     let maxFrameSize: Int
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
+}
+
+/// React to unsupportedWebSocketTarget error by writing methodNotAllowed response
+final class WebSocketUpgradeFailChannelHandler: ChannelDuplexHandler {
+    typealias OutboundIn = HTTPServerResponsePart
+    typealias OutboundOut = HTTPServerResponsePart
+    typealias InboundIn = HTTPServerRequestPart
+
+    init() {}
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        if error as? NIOWebSocketUpgradeError == .unsupportedWebSocketTarget {
+            let headers: HTTPHeaders = [
+                "connection": "close",
+                "contentLength": "0",
+            ]
+            let head = HTTPResponseHead(
+                version: .http1_1,
+                status: .methodNotAllowed,
+                headers: headers
+            )
+            context.write(self.wrapOutboundOut(.head(head)), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(.end(nil)), promise: nil)
+            context.close(promise: nil)
+        }
+        context.fireErrorCaught(error)
+    }
 }

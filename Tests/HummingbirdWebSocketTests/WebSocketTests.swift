@@ -15,6 +15,7 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
+import HummingbirdTesting
 import HummingbirdTLS
 import HummingbirdWebSocket
 import Logging
@@ -264,11 +265,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             } client: { inbound, _, _ in
                 for try await _ in inbound {}
             }
-        } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {
-        } catch let error as ChannelError where error == .inappropriateOperationForState {
-            // This should not throw a ChannelError.inappropriateOperationForState but NIO
-            // websocket code doesn't shutdown correctly at the moment
-        }
+        } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
 
     func testNoConnection() async throws {
@@ -421,15 +418,38 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testRouteSelectionFail() async throws {
-        try XCTSkipIf(true)
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
         } handle: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
-        try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
+        do {
+            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+                try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
+            }
+        } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+    }
+
+    func testHTTPRequest() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        router.ws("/ws") { _, _ in
+            return .upgrade([:])
+        } handle: { _, outbound, _ in
+            try await outbound.write(.text("Hello"))
+        }
+        router.get("/http") { _, _ in
+            return "Hello"
+        }
+        let application = Application(
+            router: router,
+            server: .webSocketUpgrade(webSocketRouter: router)
+        )
+        try await application.test(.live) { client in
+            try await client.execute(uri: "/http", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "Hello")
+            }
         }
     }
     /*
