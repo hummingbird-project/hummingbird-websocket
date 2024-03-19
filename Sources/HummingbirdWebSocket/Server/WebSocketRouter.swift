@@ -20,6 +20,9 @@ import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 
+/// WebSocket Router context type.
+///
+/// Includes reference to optional websocket handler
 public struct WebSocketRouterContext: Sendable {
     public init() {
         self.handler = .init(nil)
@@ -28,10 +31,12 @@ public struct WebSocketRouterContext: Sendable {
     let handler: NIOLockedValueBox<WebSocketDataCallbackHandler?>
 }
 
+/// Request context protocol requirement for routers that support websockets
 public protocol WebSocketRequestContext: RequestContext, WebSocketContextProtocol {
     var webSocket: WebSocketRouterContext { get }
 }
 
+/// Default implementation of a request context that supports WebSockets
 public struct BasicWebSocketRequestContext: WebSocketRequestContext {
     public var coreContext: CoreRequestContext
     public let webSocket: WebSocketRouterContext
@@ -42,13 +47,19 @@ public struct BasicWebSocketRequestContext: WebSocketRequestContext {
     }
 }
 
+/// Enum indicating whether a router `shouldUpgrade` function expects a
+/// WebSocket upgrade or not
 public enum RouterShouldUpgrade: Sendable {
     case dontUpgrade
     case upgrade(HTTPFields)
 }
 
 extension RouterMethods {
-    /// GET path for async closure returning type conforming to ResponseGenerator
+    /// Add path to router that support WebSocket upgrade
+    /// - Parameters:
+    ///   - path: Path to match
+    ///   - shouldUpgrade: Should request be upgraded
+    ///   - handle: WebSocket channel handler
     @discardableResult public func ws(
         _ path: String = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
@@ -67,6 +78,39 @@ extension RouterMethods {
     }
 }
 
+/// An alternative way to add a WebSocket upgrade to a router via Middleware
+///
+/// This is primarily designed to be used with ``HummingbirdRouter/RouterBuilder`` but can be used
+/// with ``Hummingbird/Router`` if you add a route immediately after it.
+public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: RouterMiddleware {
+    let shouldUpgrade: @Sendable (Request, Context) async throws -> RouterShouldUpgrade
+    let handle: WebSocketDataCallbackHandler.Callback
+
+    /// Initialize WebSocketUpgradeMiddleare
+    /// - Parameters:
+    ///   - shouldUpgrade: Return whether the WebSocket upgrade should occur
+    ///   - handle: WebSocket handler
+    public init(
+        shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
+        handle: @escaping WebSocketDataCallbackHandler.Callback
+    ) {
+        self.shouldUpgrade = shouldUpgrade
+        self.handle = handle
+    }
+
+    /// WebSocketUpgradeMiddleware handler
+    public func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        let result = try await shouldUpgrade(request, context)
+        switch result {
+        case .dontUpgrade:
+            return .init(status: .methodNotAllowed)
+        case .upgrade(let headers):
+            context.webSocket.handler.withLockedValue { $0 = WebSocketDataCallbackHandler(self.handle) }
+            return .init(status: .ok, headers: headers)
+        }
+    }
+}
+
 extension HTTP1AndWebSocketChannel {
     ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
     /// - Parameters:
@@ -75,18 +119,17 @@ extension HTTP1AndWebSocketChannel {
     ///   - maxFrameSize: Max frame size WebSocket will allow
     ///   - webSocketRouter: WebSocket router
     /// - Returns: Upgrade result future
-    public init<Context: WebSocketRequestContext, ResponderBuilder: HTTPResponderBuilder>(
-        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
+    public init<Context: WebSocketRequestContext, WSResponder: HTTPResponder>(
+        responder: @escaping @Sendable (Request, Channel) async throws -> Response,
+        webSocketResponder: WSResponder,
         configuration: WebSocketServerConfiguration,
-        webSocketRouter: ResponderBuilder
-    ) where Handler == WebSocketDataCallbackHandler, ResponderBuilder.Responder.Context == Context {
-        let webSocketRouterResponder = webSocketRouter.buildResponder()
-        self.init(additionalChannelHandlers: additionalChannelHandlers, responder: responder, configuration: configuration) { head, channel, logger in
+        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] }
+    ) where Handler == WebSocketDataCallbackHandler, WSResponder.Context == Context {
+        self.init(responder: responder, configuration: configuration, additionalChannelHandlers: additionalChannelHandlers) { head, channel, logger in
             let request = Request(head: head, body: .init(buffer: .init()))
             let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
             do {
-                let response = try await webSocketRouterResponder.respond(to: request, context: context)
+                let response = try await webSocketResponder.respond(to: request, context: context)
                 if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
                     return .upgrade(response.headers, webSocketHandler)
                 } else {
@@ -101,18 +144,28 @@ extension HTTP1AndWebSocketChannel {
 
 extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
-    ///  - parameters
-    public static func webSocketUpgrade<ResponderBuilder: HTTPResponderBuilder>(
-        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
+    ///
+    /// With this function you provide a separate router from the one you have supplied
+    /// to ``Hummingbird/Application``. You can provide the same router as is used for
+    /// standard HTTP routing, but it is preferable that you supply a separate one to
+    /// avoid attempting to match against paths which will never produce a WebSocket upgrade.
+    /// - Parameters:
+    ///   - webSocketRouter: Router used for testing whether a WebSocket upgrade should occur
+    ///   - configuration: WebSocket server configuration
+    ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
+    /// - Returns:
+    public static func webSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder>(
+        webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
-        webSocketRouter: ResponderBuilder
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketDataCallbackHandler>> where ResponderBuilder.Responder.Context: WebSocketRequestContext {
+        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketDataCallbackHandler>> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+        let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
             return HTTP1AndWebSocketChannel(
-                additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
+                webSocketResponder: webSocketReponder,
                 configuration: configuration,
-                webSocketRouter: webSocketRouter
+                additionalChannelHandlers: additionalChannelHandlers
             )
         }
     }
@@ -131,7 +184,7 @@ extension Logger {
     }
 }
 
-/// Generate Unique ID for each request
+/// Generate Unique ID for each request. This is a duplicate of the RequestID in Hummingbird
 package struct RequestID: CustomStringConvertible {
     let low: UInt64
 

@@ -21,15 +21,15 @@ extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///  - parameters
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
-        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         configuration: WebSocketServerConfiguration = .init(),
+        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
-                additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
                 configuration: configuration,
+                additionalChannelHandlers: additionalChannelHandlers,
                 shouldUpgrade: shouldUpgrade
             )
         }
@@ -37,15 +37,15 @@ extension HTTPChannelBuilder {
 
     /// HTTP1 channel builder supporting a websocket upgrade
     public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
-        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         configuration: WebSocketServerConfiguration = .init(),
+        additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<Handler>
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel<Handler>(
-                additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
                 configuration: configuration,
+                additionalChannelHandlers: additionalChannelHandlers,
                 shouldUpgrade: shouldUpgrade
             )
         }

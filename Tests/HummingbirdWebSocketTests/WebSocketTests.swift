@@ -417,6 +417,22 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    func testWebSocketMiddleware() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        router.group("/ws")
+            .add(middleware: WebSocketUpgradeMiddleware { _, _ in
+                return .upgrade([:])
+            } handle: { _, outbound, _ in
+                try await outbound.write(.text("One"))
+            })
+            .get { _, _ -> Response in return .init(status: .ok) }
+        do {
+            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _, _ in }
+            }
+        }
+    }
+
     func testRouteSelectionFail() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
