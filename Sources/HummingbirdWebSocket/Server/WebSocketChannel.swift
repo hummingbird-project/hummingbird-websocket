@@ -27,7 +27,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Handler)
-        case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>)
+        case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, failed: Bool)
     }
 
     public typealias Value = EventLoopFuture<UpgradeResult>
@@ -88,10 +88,12 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     /// - Returns: Negotiated result future
     public func setup(channel: Channel, logger: Logger) -> EventLoopFuture<Value> {
         return channel.eventLoop.makeCompletedFuture {
+            let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
                 maxFrameSize: self.maxFrameSize,
                 shouldUpgrade: { channel, head in
-                    self.shouldUpgrade(head, channel, logger)
+                    upgradeAttempted.value = true
+                    return self.shouldUpgrade(head, channel, logger)
                 },
                 upgradePipelineHandler: { channel, handler in
                     channel.eventLoop.makeCompletedFuture {
@@ -111,7 +113,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
                     return channel.eventLoop.makeCompletedFuture {
                         try channel.pipeline.syncOperations.addHandlers(childChannelHandlers)
                         let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(wrappingChannelSynchronously: channel)
-                        return UpgradeResult.notUpgraded(asyncChannel)
+                        return UpgradeResult.notUpgraded(asyncChannel, failed: upgradeAttempted.value)
                     }
                 }
             )
@@ -119,7 +121,6 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPServerPipeline(
                 configuration: .init(upgradeConfiguration: serverUpgradeConfiguration)
             )
-            try channel.pipeline.syncOperations.addHandler(WebSocketUpgradeFailChannelHandler())
 
             return negotiationResultFuture
         }
@@ -133,8 +134,12 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
         do {
             let result = try await upgradeResult.get()
             switch result {
-            case .notUpgraded(let http1):
-                await self.handleHTTP(asyncChannel: http1, logger: logger)
+            case .notUpgraded(let http1, let failed):
+                if failed {
+                    await self.write405(asyncChannel: http1, logger: logger)
+                } else {
+                    await self.handleHTTP(asyncChannel: http1, logger: logger)
+                }
             case .websocket(let asyncChannel, let handler):
                 let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                 let context = handler.alreadySetupContext ?? .init(channel: asyncChannel.channel, logger: logger)
@@ -175,31 +180,4 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
     let maxFrameSize: Int
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
-}
-
-/// React to unsupportedWebSocketTarget error by writing methodNotAllowed response
-final class WebSocketUpgradeFailChannelHandler: ChannelDuplexHandler {
-    typealias OutboundIn = HTTPServerResponsePart
-    typealias OutboundOut = HTTPServerResponsePart
-    typealias InboundIn = HTTPServerRequestPart
-
-    init() {}
-
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        if error as? NIOWebSocketUpgradeError == .unsupportedWebSocketTarget {
-            let headers: HTTPHeaders = [
-                "connection": "close",
-                "contentLength": "0",
-            ]
-            let head = HTTPResponseHead(
-                version: .http1_1,
-                status: .methodNotAllowed,
-                headers: headers
-            )
-            context.write(self.wrapOutboundOut(.head(head)), promise: nil)
-            context.writeAndFlush(self.wrapOutboundOut(.end(nil)), promise: nil)
-            context.close(promise: nil)
-        }
-        context.fireErrorCaught(error)
-    }
 }
