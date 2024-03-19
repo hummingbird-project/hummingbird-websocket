@@ -42,11 +42,11 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     public init(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
-        maxFrameSize: Int = (1 << 14),
+        configuration: WebSocketServerConfiguration,
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<Handler>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
-        self.maxFrameSize = maxFrameSize
+        self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
             channel.eventLoop.makeCompletedFuture {
                 try shouldUpgrade(head, channel, logger)
@@ -65,11 +65,11 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
     public init(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
-        maxFrameSize: Int = (1 << 14),
+        configuration: WebSocketServerConfiguration,
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<Handler>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
-        self.maxFrameSize = maxFrameSize
+        self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<Handler>.self)
             promise.completeWithTask {
@@ -90,7 +90,7 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
         return channel.eventLoop.makeCompletedFuture {
             let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
-                maxFrameSize: self.maxFrameSize,
+                maxFrameSize: self.configuration.maxFrameSize,
                 shouldUpgrade: { channel, head in
                     upgradeAttempted.value = true
                     return self.shouldUpgrade(head, channel, logger)
@@ -178,6 +178,6 @@ public struct HTTP1AndWebSocketChannel<Handler: WebSocketDataHandler>: ServerChi
 
     public var responder: @Sendable (Request, Channel) async throws -> Response
     let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<Handler>>
-    let maxFrameSize: Int
+    let configuration: WebSocketServerConfiguration
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
 }

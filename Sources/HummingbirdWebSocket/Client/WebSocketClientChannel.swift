@@ -30,20 +30,18 @@ public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConne
 
     let url: String
     let handler: Handler
-    let maxFrameSize: Int
-    let additionalHeaders: HTTPFields
+    let configuration: WebSocketClientConfiguration
 
-    init(handler: Handler, url: String, maxFrameSize: Int = 1 << 14, additionalHeaders: HTTPFields = .init()) {
+    init(handler: Handler, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
-        self.maxFrameSize = maxFrameSize
-        self.additionalHeaders = additionalHeaders
+        self.configuration = configuration
     }
 
     public func setup(channel: any Channel, logger: Logger) -> NIOCore.EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketClientUpgrader<UpgradeResult>(
-                maxFrameSize: maxFrameSize,
+                maxFrameSize: self.configuration.maxFrameSize,
                 upgradePipelineHandler: { channel, _ in
                     channel.eventLoop.makeCompletedFuture {
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
@@ -55,7 +53,7 @@ public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConne
             var headers = HTTPHeaders()
             headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
             headers.add(name: "Content-Length", value: "0")
-            let additionalHeaders = HTTPHeaders(self.additionalHeaders)
+            let additionalHeaders = HTTPHeaders(self.configuration.additionalHeaders)
             headers.add(contentsOf: additionalHeaders)
 
             let requestHead = HTTPRequestHead(

@@ -40,25 +40,6 @@ import ServiceLifecycle
 /// }
 /// ```
 public struct WebSocketClient {
-    public struct Configuration: Sendable {
-        /// Max websocket frame size that can be sent/received
-        public var maxFrameSize: Int
-        /// Additional headers to be sent with the initial HTTP request
-        public var additionalHeaders: HTTPFields
-
-        /// Initialize WebSocketClient configuration
-        ///   - Paramters
-        ///     - maxFrameSize: Max websocket frame size that can be sent/received
-        ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
-        public init(
-            maxFrameSize: Int = (1 << 14),
-            additionalHeaders: HTTPFields = .init()
-        ) {
-            self.maxFrameSize = maxFrameSize
-            self.additionalHeaders = additionalHeaders
-        }
-    }
-
     enum MultiPlatformTLSConfiguration: Sendable {
         case niossl(TLSConfiguration)
         #if canImport(Network)
@@ -71,7 +52,7 @@ public struct WebSocketClient {
     /// WebSocket data handler
     let handler: WebSocketDataCallbackHandler
     /// configuration
-    let configuration: Configuration
+    let configuration: WebSocketClientConfiguration
     /// EventLoopGroup to use
     let eventLoopGroup: EventLoopGroup
     /// Logger
@@ -90,7 +71,7 @@ public struct WebSocketClient {
     ///   - logger: Logger
     public init(
         url: URI,
-        configuration: Configuration = .init(),
+        configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
@@ -116,7 +97,7 @@ public struct WebSocketClient {
     ///   - logger: Logger
     public init(
         url: URI,
-        configuration: Configuration = .init(),
+        configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
@@ -143,7 +124,7 @@ public struct WebSocketClient {
             case .niossl(let tlsConfiguration):
                 let client = try ClientConnection(
                     TLSClientChannel(
-                        WebSocketClientChannel(handler: handler, url: urlPath, maxFrameSize: self.configuration.maxFrameSize),
+                        WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
                         tlsConfiguration: tlsConfiguration
                     ),
                     address: .hostname(host, port: port),
@@ -155,7 +136,7 @@ public struct WebSocketClient {
             #if canImport(Network)
             case .ts(let tlsOptions):
                 let client = try ClientConnection(
-                    WebSocketClientChannel(handler: handler, url: urlPath, maxFrameSize: self.configuration.maxFrameSize),
+                    WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
                     address: .hostname(host, port: port),
                     transportServicesTLSOptions: tlsOptions,
                     eventLoopGroup: self.eventLoopGroup,
@@ -170,8 +151,7 @@ public struct WebSocketClient {
                         WebSocketClientChannel(
                             handler: handler,
                             url: urlPath,
-                            maxFrameSize: self.configuration.maxFrameSize,
-                            additionalHeaders: self.configuration.additionalHeaders
+                            configuration: self.configuration
                         ),
                         tlsConfiguration: TLSConfiguration.makeClientConfiguration()
                     ),
@@ -186,8 +166,7 @@ public struct WebSocketClient {
                 WebSocketClientChannel(
                     handler: handler,
                     url: urlPath,
-                    maxFrameSize: self.configuration.maxFrameSize,
-                    additionalHeaders: self.configuration.additionalHeaders
+                    configuration: self.configuration
                 ),
                 address: .hostname(host, port: port),
                 eventLoopGroup: self.eventLoopGroup,
@@ -210,7 +189,7 @@ extension WebSocketClient {
     ///   - process: Closure handling webSocket
     public static func connect(
         url: URI,
-        configuration: Configuration = .init(),
+        configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
@@ -239,7 +218,7 @@ extension WebSocketClient {
     ///   - process: WebSocket data handler
     public static func connect(
         url: URI,
-        configuration: Configuration = .init(),
+        configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,

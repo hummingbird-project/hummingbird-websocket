@@ -78,11 +78,11 @@ extension HTTP1AndWebSocketChannel {
     public init<Context: WebSocketRequestContext, ResponderBuilder: HTTPResponderBuilder>(
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         responder: @escaping @Sendable (Request, Channel) async throws -> Response = { _, _ in throw HTTPError(.notImplemented) },
-        maxFrameSize: Int = (1 << 14),
+        configuration: WebSocketServerConfiguration,
         webSocketRouter: ResponderBuilder
     ) where Handler == WebSocketDataCallbackHandler, ResponderBuilder.Responder.Context == Context {
         let webSocketRouterResponder = webSocketRouter.buildResponder()
-        self.init(additionalChannelHandlers: additionalChannelHandlers, responder: responder, maxFrameSize: maxFrameSize) { head, channel, logger in
+        self.init(additionalChannelHandlers: additionalChannelHandlers, responder: responder, configuration: configuration) { head, channel, logger in
             let request = Request(head: head, body: .init(buffer: .init()))
             let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
             do {
@@ -104,14 +104,14 @@ extension HTTPChannelBuilder {
     ///  - parameters
     public static func webSocketUpgrade<ResponderBuilder: HTTPResponderBuilder>(
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
-        maxFrameSize: Int = 1 << 14,
+        configuration: WebSocketServerConfiguration = .init(),
         webSocketRouter: ResponderBuilder
     ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketDataCallbackHandler>> where ResponderBuilder.Responder.Context: WebSocketRequestContext {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
                 additionalChannelHandlers: additionalChannelHandlers,
                 responder: responder,
-                maxFrameSize: maxFrameSize,
+                configuration: configuration,
                 webSocketRouter: webSocketRouter
             )
         }
