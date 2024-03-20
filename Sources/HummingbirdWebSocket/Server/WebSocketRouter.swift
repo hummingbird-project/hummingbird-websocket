@@ -28,7 +28,7 @@ public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable
         self.handler = .init(nil)
     }
 
-    let handler: NIOLockedValueBox<WebSocketDataHandler<Context>?>
+    let handler: NIOLockedValueBox<WebSocketDataHandlerAndContext<Context>?>
 }
 
 /// Request context protocol requirement for routers that support websockets
@@ -63,7 +63,7 @@ extension RouterMethods {
     @discardableResult public func ws(
         _ path: String = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handle: @escaping WebSocketDataHandler<Context>.Handler
+        handle: @escaping WebSocketDataHandler<Context>
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
@@ -71,7 +71,7 @@ extension RouterMethods {
             case .dontUpgrade:
                 return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
-                context.webSocket.handler.withLockedValue { $0 = WebSocketDataHandler(context: context, handler: handle) }
+                context.webSocket.handler.withLockedValue { $0 = WebSocketDataHandlerAndContext(context: context, handler: handle) }
                 return .init(status: .ok, headers: headers)
             }
         }
@@ -84,7 +84,7 @@ extension RouterMethods {
 /// with ``Hummingbird/Router`` if you add a route immediately after it.
 public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: RouterMiddleware {
     let shouldUpgrade: @Sendable (Request, Context) async throws -> RouterShouldUpgrade
-    let handler: WebSocketDataHandler<Context>.Handler
+    let handler: WebSocketDataHandler<Context>
 
     /// Initialize WebSocketUpgradeMiddleare
     /// - Parameters:
@@ -92,7 +92,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     ///   - handle: WebSocket handler
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handler: @escaping WebSocketDataHandler<Context>.Handler
+        handler: @escaping WebSocketDataHandler<Context>
     ) {
         self.shouldUpgrade = shouldUpgrade
         self.handler = handler
@@ -128,7 +128,7 @@ extension HTTP1AndWebSocketChannel where Context: WebSocketRequestContext {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
-            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketDataHandler<Context>>.self)
+            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketDataHandlerAndContext<Context>>.self)
             promise.completeWithTask {
                 let request = Request(head: head, body: .init(buffer: .init()))
                 let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))

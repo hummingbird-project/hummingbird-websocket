@@ -41,8 +41,7 @@ actor WebSocketHandler: Sendable {
     }
 
     /// Handle WebSocket AsynChannel
-    func handle(handler: WebSocketDataHandler<some WebSocketContextProtocol>) async {
-        let context = handler.context
+    func handle<Context: WebSocketContextProtocol>(handler: @escaping WebSocketDataHandler<Context>, context: Context) async {
         try? await self.asyncChannel.executeThenClose { inbound, outbound in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
@@ -88,7 +87,7 @@ actor WebSocketHandler: Sendable {
                     }
                     group.addTask {
                         // handle websocket data and text
-                        try await handler.handler(webSocketHandlerInbound, webSocketHandlerOutbound, context)
+                        try await handler(webSocketHandlerInbound, webSocketHandlerOutbound, context)
                         try await self.close(code: .normalClosure, outbound: outbound, context: context)
                     }
                     try await group.next()

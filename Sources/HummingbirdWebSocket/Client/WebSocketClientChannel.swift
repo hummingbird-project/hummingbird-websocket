@@ -29,10 +29,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
     typealias Value = EventLoopFuture<UpgradeResult>
 
     let url: String
-    let handler: WebSocketDataHandler<WebSocketContext>.Handler
+    let handler: WebSocketDataHandler<WebSocketContext>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<WebSocketContext>.Handler, url: String, configuration: WebSocketClientConfiguration) {
+    init(handler: @escaping WebSocketDataHandler<WebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -85,8 +85,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
         switch try await value.get() {
         case .websocket(let webSocketChannel):
             let webSocket = WebSocketHandler(asyncChannel: webSocketChannel, type: .client)
-            let dataHandler = WebSocketDataHandler(context: .init(channel: webSocketChannel.channel, logger: logger), handler: self.handler)
-            await webSocket.handle(handler: dataHandler)
+            await webSocket.handle(handler: self.handler, context: WebSocketContext(channel: webSocketChannel.channel, logger: logger))
         case .notUpgraded:
             // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")

@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
+import Hummingbird
 import HummingbirdCore
 import Logging
 import NIOConcurrencyHelpers
@@ -26,12 +27,12 @@ import NIOWebSocket
 public struct HTTP1AndWebSocketChannel<Context: WebSocketContextProtocol>: ServerChildChannel, HTTPChannelHandler {
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
-        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, WebSocketDataHandler<Context>)
+        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, WebSocketDataHandlerAndContext<Context>)
         case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, failed: Bool)
     }
 
     public typealias Value = EventLoopFuture<UpgradeResult>
-    public typealias Handler = WebSocketDataHandler<Context>.Handler
+    public typealias Handler = WebSocketDataHandler<Context>
 
     ///  Setup channel to accept HTTP1 with a WebSocket upgrade
     /// - Parameters:
@@ -95,7 +96,7 @@ public struct HTTP1AndWebSocketChannel<Context: WebSocketContextProtocol>: Serve
                 }
             case .websocket(let asyncChannel, let handler):
                 let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
-                await webSocket.handle(handler: handler)
+                await webSocket.handle(handler: handler.handler, context: handler.context)
             }
         } catch {
             logger.error("Error handling upgrade result: \(error)")
@@ -129,7 +130,7 @@ public struct HTTP1AndWebSocketChannel<Context: WebSocketContextProtocol>: Serve
     }
 
     public var responder: @Sendable (Request, Channel) async throws -> Response
-    let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketDataHandler<Context>>>
+    let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketDataHandlerAndContext<Context>>>
     let configuration: WebSocketServerConfiguration
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
 }
@@ -151,11 +152,12 @@ extension HTTP1AndWebSocketChannel where Context == WebSocketContext {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
-            channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketDataHandler<Context>> in
+            channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketDataHandlerAndContext<Context>> in
                 try shouldUpgrade(head, channel, logger)
                     .map {
+                        let logger = logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID()))
                         let context = WebSocketContext(channel: channel, logger: logger)
-                        return WebSocketDataHandler<Context>(context: context, handler: $0)
+                        return WebSocketDataHandlerAndContext<Context>(context: context, handler: $0)
                     }
             }
         }
@@ -178,12 +180,13 @@ extension HTTP1AndWebSocketChannel where Context == WebSocketContext {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
-            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketDataHandler<Context>>.self)
+            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketDataHandlerAndContext<Context>>.self)
             promise.completeWithTask {
                 try await shouldUpgrade(head, channel, logger)
                     .map {
+                        let logger = logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID()))
                         let context = WebSocketContext(channel: channel, logger: logger)
-                        return WebSocketDataHandler<Context>(context: context, handler: $0)
+                        return WebSocketDataHandlerAndContext<Context>(context: context, handler: $0)
                     }
             }
             return promise.futureResult

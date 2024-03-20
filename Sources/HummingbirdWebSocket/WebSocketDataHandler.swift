@@ -18,20 +18,17 @@ import Logging
 import NIOCore
 import NIOWebSocket
 
-/// Protocol for web socket data handling
-///
-/// This is the users interface into HummingbirdWebSocket. They provide an implementation of this protocol when
-/// contructing their WebSocket upgrade handler. The user needs to return a type conforming to this protocol in
-/// the `shouldUpgrade` closure in HTTP1AndWebSocketChannel.init
-public struct WebSocketDataHandler<Context: WebSocketContextProtocol>: Sendable {
-    /// Handler closure type
-    public typealias Handler = @Sendable (WebSocketHandlerInbound, WebSocketHandlerOutboundWriter, Context) async throws -> Void
+/// Handle websocket data and text blocks
+public typealias WebSocketDataHandler<Context: WebSocketContextProtocol> = @Sendable (WebSocketHandlerInbound, WebSocketHandlerOutboundWriter, Context) async throws -> Void
+
+/// Struct holding for web socket data handler and context.
+public struct WebSocketDataHandlerAndContext<Context: WebSocketContextProtocol>: Sendable {
     /// Context sent to handler
     let context: Context
     /// handler function
-    let handler: Handler
+    let handler: WebSocketDataHandler<Context>
 
-    public init(context: Context, handler: @escaping Handler) {
+    public init(context: Context, handler: @escaping WebSocketDataHandler<Context>) {
         self.context = context
         self.handler = handler
     }
