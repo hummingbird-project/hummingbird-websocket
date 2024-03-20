@@ -141,7 +141,7 @@ extension HTTP1AndWebSocketChannel {
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        return .upgrade(response.headers) { asyncChannel in
+                        return .upgrade(response.headers) { asyncChannel, _ in
                             let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                             await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
                         }

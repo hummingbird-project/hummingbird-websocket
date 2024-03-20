@@ -25,7 +25,7 @@ import NIOWebSocket
 
 /// Child channel supporting a web socket upgrade from HTTP1
 public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
-    public typealias WebSocketChannelHandler = @Sendable (NIOAsyncChannel<WebSocketFrame, WebSocketFrame>) async -> Void
+    public typealias WebSocketChannelHandler = @Sendable (NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Logger) async -> Void
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, WebSocketChannelHandler, Logger)
@@ -103,7 +103,7 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
 
             case .websocket(let asyncChannel, let handler, let logger):
                 logger.debug("Websocket upgrade")
-                await handler(asyncChannel)
+                await handler(asyncChannel, logger)
             }
         } catch {
             logger.error("Error handling upgrade result: \(error)")
@@ -162,7 +162,7 @@ extension HTTP1AndWebSocketChannel {
             channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketChannelHandler> in
                 try shouldUpgrade(head, channel, logger)
                     .map { handler in
-                        return { asyncChannel in
+                        return { asyncChannel, logger in
                             let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                             let context = WebSocketContext(channel: channel, logger: logger)
                             await webSocket.handle(handler: handler, context: context)
@@ -193,7 +193,7 @@ extension HTTP1AndWebSocketChannel {
             promise.completeWithTask {
                 try await shouldUpgrade(head, channel, logger)
                     .map { handler in
-                        return { asyncChannel in
+                        return { asyncChannel, logger in
                             let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
                             let context = WebSocketContext(channel: channel, logger: logger)
                             await webSocket.handle(handler: handler, context: context)
