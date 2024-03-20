@@ -18,22 +18,5 @@ import Logging
 import NIOCore
 import NIOWebSocket
 
-/// Handle websocket data and text blocks
+/// Function that handles websocket data and text blocks
 public typealias WebSocketDataHandler<Context: WebSocketContextProtocol> = @Sendable (WebSocketHandlerInbound, WebSocketHandlerOutboundWriter, Context) async throws -> Void
-
-/// Struct holding for web socket data handler and context.
-public struct WebSocketDataHandlerAndContext<Context: WebSocketContextProtocol>: Sendable {
-    /// Context sent to handler
-    let context: Context
-    /// handler function
-    let handler: WebSocketDataHandler<Context>
-
-    public init(context: Context, handler: @escaping WebSocketDataHandler<Context>) {
-        self.context = context
-        self.handler = handler
-    }
-
-    func withContext(channel: Channel, logger: Logger) -> Self {
-        .init(context: .init(channel: channel, logger: logger), handler: self.handler)
-    }
-}

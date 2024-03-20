@@ -24,11 +24,17 @@ import NIOCore
 ///
 /// Includes reference to optional websocket handler
 public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable {
+    /// Holds WebSocket context and handler to call
+    struct Value: Sendable {
+        let context: Context
+        let handler: WebSocketDataHandler<Context>
+    }
+
     public init() {
         self.handler = .init(nil)
     }
 
-    let handler: NIOLockedValueBox<WebSocketDataHandlerAndContext<Context>?>
+    let handler: NIOLockedValueBox<Value?>
 }
 
 /// Request context protocol requirement for routers that support websockets
@@ -71,7 +77,7 @@ extension RouterMethods {
             case .dontUpgrade:
                 return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
-                context.webSocket.handler.withLockedValue { $0 = WebSocketDataHandlerAndContext(context: context, handler: handle) }
+                context.webSocket.handler.withLockedValue { $0 = WebSocketRouterContext.Value(context: context, handler: handle) }
                 return .init(status: .ok, headers: headers)
             }
         }
@@ -111,7 +117,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     }
 }
 
-extension HTTP1AndWebSocketChannel where Context: WebSocketRequestContext {
+extension HTTP1AndWebSocketChannel {
     ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
     /// - Parameters:
     ///   - additionalChannelHandlers: Additional channel handlers to add
@@ -124,18 +130,21 @@ extension HTTP1AndWebSocketChannel where Context: WebSocketRequestContext {
         webSocketResponder: WSResponder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] }
-    ) where WSResponder.Context == Context {
+    ) where WSResponder.Context: WebSocketRequestContext {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
-            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketDataHandlerAndContext<Context>>.self)
+            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
             promise.completeWithTask {
                 let request = Request(head: head, body: .init(buffer: .init()))
-                let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
+                let context = WSResponder.Context(channel: channel, logger: logger)
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        return .upgrade(response.headers, webSocketHandler)
+                        return .upgrade(response.headers) { asyncChannel in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                            await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
+                        }
                     } else {
                         return .dontUpgrade
                     }
@@ -165,7 +174,7 @@ extension HTTPChannelBuilder {
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WSResponderBuilder.Responder.Context>> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
             return HTTP1AndWebSocketChannel(
