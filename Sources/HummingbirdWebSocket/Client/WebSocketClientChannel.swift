@@ -20,25 +20,25 @@ import NIOHTTP1
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
-public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConnectionChannel {
-    public enum UpgradeResult {
+struct WebSocketClientChannel: ClientConnectionChannel {
+    enum UpgradeResult {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>)
         case notUpgraded
     }
 
-    public typealias Value = EventLoopFuture<UpgradeResult>
+    typealias Value = EventLoopFuture<UpgradeResult>
 
     let url: String
-    let handler: Handler
+    let handler: WebSocketDataHandler<WebSocketContext>.Handler
     let configuration: WebSocketClientConfiguration
 
-    init(handler: Handler, url: String, configuration: WebSocketClientConfiguration) {
+    init(handler: @escaping WebSocketDataHandler<WebSocketContext>.Handler, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
     }
 
-    public func setup(channel: any Channel, logger: Logger) -> NIOCore.EventLoopFuture<Value> {
+    func setup(channel: any Channel, logger: Logger) -> NIOCore.EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketClientUpgrader<UpgradeResult>(
                 maxFrameSize: self.configuration.maxFrameSize,
@@ -81,12 +81,12 @@ public struct WebSocketClientChannel<Handler: WebSocketDataHandler>: ClientConne
         }
     }
 
-    public func handle(value: Value, logger: Logger) async throws {
+    func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
         case .websocket(let webSocketChannel):
             let webSocket = WebSocketHandler(asyncChannel: webSocketChannel, type: .client)
-            let context = self.handler.alreadySetupContext ?? .init(channel: webSocketChannel.channel, logger: logger)
-            await webSocket.handle(handler: self.handler, context: context)
+            let dataHandler = WebSocketDataHandler(context: .init(channel: webSocketChannel.channel, logger: logger), handler: self.handler)
+            await webSocket.handle(handler: dataHandler)
         case .notUpgraded:
             // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")

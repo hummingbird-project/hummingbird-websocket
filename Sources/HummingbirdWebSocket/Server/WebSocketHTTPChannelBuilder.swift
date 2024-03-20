@@ -20,11 +20,11 @@ import NIOCore
 extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///  - parameters
-    public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
+    public static func webSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<Handler>
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<WebSocketContext>.Handler>
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketContext>> {
         return .init { responder in
             return HTTP1AndWebSocketChannel(
                 responder: responder,
@@ -36,13 +36,13 @@ extension HTTPChannelBuilder {
     }
 
     /// HTTP1 channel builder supporting a websocket upgrade
-    public static func webSocketUpgrade<Handler: WebSocketDataHandler>(
+    public static func webSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<Handler>
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<Handler>> {
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<WebSocketContext>.Handler>
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketContext>> {
         return .init { responder in
-            return HTTP1AndWebSocketChannel<Handler>(
+            return HTTP1AndWebSocketChannel(
                 responder: responder,
                 configuration: configuration,
                 additionalChannelHandlers: additionalChannelHandlers,

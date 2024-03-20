@@ -76,7 +76,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>.Handler,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
@@ -91,7 +91,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let serviceGroup: ServiceGroup
             let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { head, _, _ in
                 if let headers = try shouldUpgrade(head) {
-                    return .upgrade(headers, WebSocketDataCallbackHandler(serverHandler))
+                    return .upgrade(headers, serverHandler)
                 } else {
                     return .dontUpgrade
                 }
@@ -144,9 +144,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>.Handler,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        client clientHandler: @escaping WebSocketDataCallbackHandler.Callback
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>.Handler
     ) async throws {
         try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
@@ -156,7 +156,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try WebSocketClient(
                     url: .init("ws://localhost:\(port)"),
                     logger: logger,
-                    process: clientHandler
+                    handler: clientHandler
                 )
             }
         )
@@ -422,7 +422,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.group("/ws")
             .add(middleware: WebSocketUpgradeMiddleware { _, _ in
                 return .upgrade([:])
-            } handle: { _, outbound, _ in
+            } handler: { _, outbound, _ in
                 try await outbound.write(.text("One"))
             })
             .get { _, _ -> Response in return .init(status: .ok) }

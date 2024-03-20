@@ -23,6 +23,16 @@ import NIOWebSocket
 public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
     case dontUpgrade
     case upgrade(HTTPFields, Value)
+
+    /// Map upgrade result to difference type
+    func map<Result>(_ map: (Value) throws -> Result) rethrows -> ShouldUpgradeResult<Result> {
+        switch self {
+        case .dontUpgrade:
+            return .dontUpgrade
+        case .upgrade(let headers, let value):
+            return try .upgrade(headers, map(value))
+        }
+    }
 }
 
 extension NIOTypedWebSocketServerUpgrader {
@@ -47,7 +57,7 @@ extension NIOTypedWebSocketServerUpgrader {
     ///         websocket protocol. This only needs to add the user handlers: the
     ///         `WebSocketFrameEncoder` and `WebSocketFrameDecoder` will have been added to the
     ///         pipeline automatically.
-    public convenience init<Value>(
+    convenience init<Value>(
         maxFrameSize: Int = 1 << 14,
         enableAutomaticErrorHandling: Bool = true,
         shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest) -> EventLoopFuture<ShouldUpgradeResult<Value>>,
