@@ -19,7 +19,7 @@ import NIOCore
 public protocol WebSocketContextProtocol: Sendable {
     var logger: Logger { get }
     var allocator: ByteBufferAllocator { get }
-    init(logger: Logger, allocator: ByteBufferAllocator)
+    init(channel: Channel, logger: Logger)
 }
 
 /// Default implementation of ``WebSocketContextProtocol``
@@ -27,8 +27,8 @@ public struct WebSocketContext: WebSocketContextProtocol {
     public let logger: Logger
     public let allocator: ByteBufferAllocator
 
-    public init(logger: Logger, allocator: ByteBufferAllocator) {
+    public init(channel: Channel, logger: Logger) {
         self.logger = logger
-        self.allocator = allocator
+        self.allocator = channel.allocator
     }
 }
