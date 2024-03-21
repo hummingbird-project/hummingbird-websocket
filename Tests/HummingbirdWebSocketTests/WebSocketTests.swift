@@ -209,37 +209,37 @@ final class HummingbirdWebSocketTests: XCTestCase {
     // MARK: Tests
 
     func testServerToClientMessage() async throws {
-        try await self.testClientAndServer { _, outbound, _ in
-            try await outbound.write(.text("Hello"))
-        } client: { inbound, _, _ in
-            var inboundIterator = inbound.makeAsyncIterator()
+        try await self.testClientAndServer { ws, _ in
+            try await ws.outbound.write(.text("Hello"))
+        } client: { ws, _ in
+            var inboundIterator = ws.inbound.makeAsyncIterator()
             let msg = await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         }
     }
 
     func testClientToServerMessage() async throws {
-        try await self.testClientAndServer { inbound, _, _ in
-            var inboundIterator = inbound.makeAsyncIterator()
+        try await self.testClientAndServer { ws, _ in
+            var inboundIterator = ws.inbound.makeAsyncIterator()
             let msg = await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
-        } client: { _, outbound, _ in
-            try await outbound.write(.text("Hello"))
+        } client: { ws, _ in
+            try await ws.outbound.write(.text("Hello"))
         }
     }
 
     func testClientToServerSplitPacket() async throws {
-        try await self.testClientAndServer { inbound, outbound, _ in
-            for try await packet in inbound {
-                try await outbound.write(.custom(packet.webSocketFrame))
+        try await self.testClientAndServer { ws, _ in
+            for try await packet in ws.inbound {
+                try await ws.outbound.write(.custom(packet.webSocketFrame))
             }
-        } client: { inbound, outbound, _ in
+        } client: { ws, _ in
             let buffer = ByteBuffer(string: "Hello ")
-            try await outbound.write(.custom(.init(fin: false, opcode: .text, data: buffer)))
+            try await ws.outbound.write(.custom(.init(fin: false, opcode: .text, data: buffer)))
             let buffer2 = ByteBuffer(string: "World!")
-            try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer2)))
+            try await ws.outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer2)))
 
-            var inboundIterator = inbound.makeAsyncIterator()
+            var inboundIterator = ws.inbound.makeAsyncIterator()
             let msg = await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello World!"))
         }
@@ -247,23 +247,23 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     // test connection is closed when buffer is too large
     func testTooLargeBuffer() async throws {
-        try await self.testClientAndServer { inbound, outbound, _ in
+        try await self.testClientAndServer { ws, _ in
             let buffer = ByteBuffer(repeating: 1, count: (1 << 14) + 1)
-            try await outbound.write(.binary(buffer))
-            for try await _ in inbound {}
-        } client: { inbound, _, _ in
-            for try await _ in inbound {}
+            try await ws.outbound.write(.binary(buffer))
+            for try await _ in ws.inbound {}
+        } client: { ws, _ in
+            for try await _ in ws.inbound {}
         }
     }
 
     func testNotWebSocket() async throws {
         do {
-            try await self.testClientAndServer { inbound, _, _ in
-                for try await _ in inbound {}
+            try await self.testClientAndServer { ws, _ in
+                for try await _ in ws.inbound {}
             } shouldUpgrade: { _ in
                 return nil
-            } client: { inbound, _, _ in
-                for try await _ in inbound {}
+            } client: { ws, _ in
+                for try await _ in ws.inbound {}
             }
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
@@ -272,7 +272,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let client = try WebSocketClient(
             url: .init("ws://localhost:10245"),
             logger: Logger(label: "TestNoConnection")
-        ) { _, _, _ in
+        ) { _, _ in
         }
         do {
             try await client.run()
@@ -281,8 +281,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testTLS() async throws {
-        try await self.testClientAndServer(serverTLSConfiguration: getServerTLSConfiguration()) { _, outbound, _ in
-            try await outbound.write(.text("Hello"))
+        try await self.testClientAndServer(serverTLSConfiguration: getServerTLSConfiguration()) { ws, _ in
+            try await ws.outbound.write(.text("Hello"))
         } getClient: { port, logger in
             var clientTLSConfiguration = try getClientTLSConfiguration()
             clientTLSConfiguration.certificateVerification = .none
@@ -290,8 +290,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 url: .init("wss://localhost:\(port)"),
                 tlsConfiguration: clientTLSConfiguration,
                 logger: logger
-            ) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+            ) { ws, _ in
+                var inboundIterator = ws.inbound.makeAsyncIterator()
                 let msg = await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Hello"))
             }
@@ -299,8 +299,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testURLPath() async throws {
-        try await self.testClientAndServer { inbound, _, _ in
-            for try await _ in inbound {}
+        try await self.testClientAndServer { ws, _ in
+            for try await _ in ws.inbound {}
         } shouldUpgrade: { head in
             XCTAssertEqual(head.path, "/ws")
             return [:]
@@ -308,14 +308,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws"),
                 logger: logger
-            ) { _, _, _ in
+            ) { _, _ in
             }
         }
     }
 
     func testQueryParameters() async throws {
-        try await self.testClientAndServer { inbound, _, _ in
-            for try await _ in inbound {}
+        try await self.testClientAndServer { ws, _ in
+            for try await _ in ws.inbound {}
         } shouldUpgrade: { head in
             let request = Request(head: head, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.uri.query, "query=parameters&test=true")
@@ -324,14 +324,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 logger: logger
-            ) { _, _, _ in
+            ) { _, _ in
             }
         }
     }
 
     func testAdditionalHeaders() async throws {
-        try await self.testClientAndServer { inbound, _, _ in
-            for try await _ in inbound {}
+        try await self.testClientAndServer { ws, _ in
+            for try await _ in ws.inbound {}
         } shouldUpgrade: { head in
             let request = Request(head: head, body: .init(buffer: ByteBuffer()))
             XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
@@ -341,7 +341,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
                 logger: logger
-            ) { _, _, _ in
+            ) { _, _ in
             }
         }
     }
@@ -360,8 +360,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: .webSocketUpgrade { _, _, _ in
-                    return .upgrade([:]) { _, outbound, _ in
-                        try await outbound.write(.text("Hello"))
+                    return .upgrade([:]) { ws, _ in
+                        try await ws.outbound.write(.text("Hello"))
                     }
                 },
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
@@ -378,8 +378,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             group.addTask {
-                try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
-                    var inboundIterator = inbound.makeAsyncIterator()
+                try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { ws, _ in
+                    var inboundIterator = ws.inbound.makeAsyncIterator()
                     let msg = await inboundIterator.next()
                     XCTAssertEqual(msg, .text("Hello"))
                 }
@@ -393,24 +393,24 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
             return .upgrade([:])
-        } onUpgrade: { _, outbound, _ in
-            try await outbound.write(.text("One"))
+        } handle: { ws, _ in
+            try await ws.outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
             return .upgrade([:])
-        } onUpgrade: { _, outbound, _ in
-            try await outbound.write(.text("Two"))
+        } onUpgrade: { ws, _ in
+            try await ws.outbound.write(.text("Two"))
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+            try WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { ws, _ in
+                var inboundIterator = ws.inbound.makeAsyncIterator()
                 let msg = await inboundIterator.next()
                 XCTAssertEqual(msg, .text("One"))
             }
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+            try WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { ws, _ in
+                var inboundIterator = ws.inbound.makeAsyncIterator()
                 let msg = await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Two"))
             }
@@ -422,13 +422,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.group("/ws")
             .add(middleware: WebSocketUpgradeMiddleware { _, _ in
                 return .upgrade([:])
-            } onUpgrade: { _, outbound, _ in
-                try await outbound.write(.text("One"))
+            } onUpgrade: { ws, _ in
+                try await ws.outbound.write(.text("One"))
             })
             .get { _, _ -> Response in return .init(status: .ok) }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _, _ in }
+                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _ in }
             }
         }
     }
@@ -437,12 +437,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } onUpgrade: { _, outbound, _ in
-            try await outbound.write(.text("One"))
+        } onUpgrade: { ws, _ in
+            try await ws.outbound.write(.text("One"))
         }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
+                try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _ in }
             }
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
@@ -471,13 +471,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.middlewares.add(MyMiddleware())
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } onUpgrade: { _, outbound, context in
-            try await outbound.write(.text(context.name))
+        } onUpgrade: { ws, context in
+            try await ws.outbound.write(.text(context.name))
         }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
-                    let text = await inbound.first { _ in true }
+                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { ws, _ in
+                    let text = await ws.inbound.first { _ in true }
                     XCTAssertEqual(text, .text("Roger Moore"))
                 }
             }
@@ -488,8 +488,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } onUpgrade: { _, outbound, _ in
-            try await outbound.write(.text("Hello"))
+        } onUpgrade: { ws, _ in
+            try await ws.outbound.write(.text("Hello"))
         }
         router.get("/http") { _, _ in
             return "Hello"

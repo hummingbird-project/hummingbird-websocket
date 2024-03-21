@@ -16,25 +16,21 @@ import Hummingbird
 import Logging
 import NIOCore
 import NIOWebSocket
+import ServiceLifecycle
 
 /// Handler processing raw WebSocket packets.
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
 actor WebSocketHandler: Sendable {
-    enum SocketType: Sendable {
-        case client
-        case server
-    }
-
     static let pingDataSize = 16
 
     let asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
-    let type: SocketType
+    let type: WebSocket.SocketType
     var closed = false
     var pingData: ByteBuffer
 
-    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketHandler.SocketType) {
+    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocket.SocketType) {
         self.asyncChannel = asyncChannel
         self.type = type
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
@@ -43,61 +39,69 @@ actor WebSocketHandler: Sendable {
     /// Handle WebSocket AsynChannel
     func handle<Context: WebSocketContextProtocol>(handler: @escaping WebSocketDataHandler<Context>, context: Context) async {
         try? await self.asyncChannel.executeThenClose { inbound, outbound in
-            do {
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    let webSocketHandlerInbound = WebSocketHandlerInbound()
-                    defer {
-                        asyncChannel.channel.close(promise: nil)
-                        webSocketHandlerInbound.finish()
-                    }
-                    let webSocketHandlerOutbound = WebSocketHandlerOutboundWriter(webSocket: self, outbound: outbound)
-                    group.addTask {
-                        // parse messages coming from inbound
-                        var frameSequence: WebSocketFrameSequence?
-                        for try await frame in inbound {
-                            switch frame.opcode {
-                            case .connectionClose:
-                                return
-                            case .ping:
-                                try await self.onPing(frame, outbound: outbound, context: context)
-                            case .pong:
-                                try await self.onPong(frame, outbound: outbound, context: context)
-                            case .text, .binary:
-                                if var frameSeq = frameSequence {
-                                    frameSeq.append(frame)
-                                    frameSequence = frameSeq
-                                } else {
-                                    frameSequence = WebSocketFrameSequence(frame: frame)
+            let webSocket = WebSocket(type: self.type, outbound: outbound, allocator: self.asyncChannel.channel.allocator)
+            defer {
+                asyncChannel.channel.close(promise: nil)
+                webSocket.inbound.finish()
+            }
+            try await withTaskCancellationOrGracefulShutdownHandler {
+                do {
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            // parse messages coming from inbound
+                            var frameSequence: WebSocketFrameSequence?
+                            for try await frame in inbound {
+                                switch frame.opcode {
+                                case .connectionClose:
+                                    print("\(self.type): Received close")
+                                    return
+                                case .ping:
+                                    try await self.onPing(frame, outbound: webSocket.outbound, context: context)
+                                case .pong:
+                                    try await self.onPong(frame, outbound: webSocket.outbound, context: context)
+                                case .text, .binary:
+                                    if var frameSeq = frameSequence {
+                                        frameSeq.append(frame)
+                                        frameSequence = frameSeq
+                                    } else {
+                                        frameSequence = WebSocketFrameSequence(frame: frame)
+                                    }
+                                case .continuation:
+                                    if var frameSeq = frameSequence {
+                                        frameSeq.append(frame)
+                                        frameSequence = frameSeq
+                                    } else {
+                                        try await self.close(code: .protocolError, outbound: webSocket.outbound, context: context)
+                                    }
+                                default:
+                                    break
                                 }
-                            case .continuation:
-                                if var frameSeq = frameSequence {
-                                    frameSeq.append(frame)
-                                    frameSequence = frameSeq
-                                } else {
-                                    try await self.close(code: .protocolError, outbound: outbound, context: context)
+                                if let frameSeq = frameSequence, frame.fin {
+                                    await webSocket.inbound.send(frameSeq.data)
+                                    frameSequence = nil
                                 }
-                            default:
-                                break
-                            }
-                            if let frameSeq = frameSequence, frame.fin {
-                                await webSocketHandlerInbound.send(frameSeq.data)
-                                frameSequence = nil
                             }
                         }
+                        group.addTask {
+                            // handle websocket data and text
+                            try await handler(webSocket, context)
+                            try await self.close(code: .normalClosure, outbound: webSocket.outbound, context: context)
+                        }
+                        try await group.next()
+                        print("\(self.type): Closed")
                     }
-                    group.addTask {
-                        // handle websocket data and text
-                        try await handler(webSocketHandlerInbound, webSocketHandlerOutbound, context)
-                        try await self.close(code: .normalClosure, outbound: outbound, context: context)
-                    }
-                    try await group.next()
+                } catch let error as NIOWebSocketError {
+                    let errorCode = WebSocketErrorCode(error)
+                    try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
+                } catch {
+                    let errorCode = WebSocketErrorCode.unexpectedServerError
+                    try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
                 }
-            } catch let error as NIOWebSocketError {
-                let errorCode = WebSocketErrorCode(error)
-                try await self.close(code: errorCode, outbound: outbound, context: context)
-            } catch {
-                let errorCode = WebSocketErrorCode.unexpectedServerError
-                try await self.close(code: errorCode, outbound: outbound, context: context)
+            } onCancelOrGracefulShutdown: {
+                Task {
+                    try? await self.close(code: .normalClosure, outbound: webSocket.outbound, context: context)
+                    webSocket.inbound.finish()
+                }
             }
         }
     }
@@ -105,7 +109,7 @@ actor WebSocketHandler: Sendable {
     /// Respond to ping
     func onPing(
         _ frame: WebSocketFrame,
-        outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
+        outbound: WebSocketOutboundWriter,
         context: some WebSocketContextProtocol
     ) async throws {
         if frame.fin {
@@ -118,7 +122,7 @@ actor WebSocketHandler: Sendable {
     /// Respond to pong
     func onPong(
         _ frame: WebSocketFrame,
-        outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
+        outbound: WebSocketOutboundWriter,
         context: some WebSocketContextProtocol
     ) async throws {
         let frameData = frame.unmaskedData
@@ -130,26 +134,26 @@ actor WebSocketHandler: Sendable {
     }
 
     /// Send ping
-    func ping(outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) async throws {
+    func ping(outbound: WebSocketOutboundWriter) async throws {
         guard !self.closed else { return }
         if self.pingData.readableBytes == 0 {
             // creating random payload
             let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
             self.pingData.writeBytes(random)
         }
-        try await self.send(frame: .init(fin: true, opcode: .ping, data: self.pingData), outbound: outbound)
+        try await outbound.write(frame: .init(fin: true, opcode: .ping, data: self.pingData))
     }
 
     /// Send pong
-    func pong(data: ByteBuffer?, outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) async throws {
+    func pong(data: ByteBuffer?, outbound: WebSocketOutboundWriter) async throws {
         guard !self.closed else { return }
-        try await self.send(frame: .init(fin: true, opcode: .pong, data: data ?? .init()), outbound: outbound)
+        try await outbound.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
 
     /// Send close
     func close(
         code: WebSocketErrorCode = .normalClosure,
-        outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
+        outbound: WebSocketOutboundWriter,
         context: some WebSocketContextProtocol
     ) async throws {
         guard !self.closed else { return }
@@ -157,24 +161,7 @@ actor WebSocketHandler: Sendable {
 
         var buffer = context.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
-        try await self.send(frame: .init(fin: true, opcode: .connectionClose, data: buffer), outbound: outbound)
-    }
-
-    /// Send WebSocket frame
-    func send(
-        frame: WebSocketFrame,
-        outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
-    ) async throws {
-        var frame = frame
-        frame.maskKey = self.makeMaskKey()
-        try await outbound.write(frame)
-    }
-
-    /// Make mask key to be used in WebSocket frame
-    private func makeMaskKey() -> WebSocketMaskingKey? {
-        guard self.type == .client else { return nil }
-        let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: .min ... .max) }
-        return WebSocketMaskingKey(bytes)
+        try await outbound.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
     }
 }
 

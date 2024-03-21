@@ -16,7 +16,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Outbound websocket writer
-public struct WebSocketHandlerOutboundWriter {
+public struct WebSocketOutboundWriter: Sendable {
     /// WebSocket frame that can be written
     public enum OutboundFrame: Sendable {
         /// Text frame
@@ -25,13 +25,12 @@ public struct WebSocketHandlerOutboundWriter {
         case binary(ByteBuffer)
         /// Unsolicited pong frame
         case pong
-        /// A ping frame. The returning pong will be dealt with by the underlying code
-        case ping
         /// A custom frame not supported by the above
         case custom(WebSocketFrame)
     }
 
-    let webSocket: WebSocketHandler
+    let type: WebSocket.SocketType
+    let allocator: ByteBufferAllocator
     let outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
 
     /// Write WebSocket frame
@@ -40,20 +39,33 @@ public struct WebSocketHandlerOutboundWriter {
         switch frame {
         case .binary(let buffer):
             // send binary data
-            try await self.webSocket.send(frame: .init(fin: true, opcode: .binary, data: buffer), outbound: self.outbound)
+            try await self.write(frame: .init(fin: true, opcode: .binary, data: buffer))
         case .text(let string):
             // send text based data
-            let buffer = self.webSocket.asyncChannel.channel.allocator.buffer(string: string)
-            try await self.webSocket.send(frame: .init(fin: true, opcode: .text, data: buffer), outbound: self.outbound)
-        case .ping:
-            // send ping
-            try await self.webSocket.ping(outbound: self.outbound)
+            let buffer = self.allocator.buffer(string: string)
+            try await self.write(frame: .init(fin: true, opcode: .text, data: buffer))
         case .pong:
             // send unexplained pong as a heartbeat
-            try await self.webSocket.pong(data: nil, outbound: self.outbound)
+            try await self.write(frame: .init(fin: true, opcode: .pong, data: .init()))
         case .custom(let frame):
             // send custom WebSocketFrame
-            try await self.webSocket.send(frame: frame, outbound: self.outbound)
+            try await self.write(frame: frame)
         }
+    }
+
+    /// Send WebSocket frame
+    func write(
+        frame: WebSocketFrame
+    ) async throws {
+        var frame = frame
+        frame.maskKey = self.makeMaskKey()
+        try await self.outbound.write(frame)
+    }
+
+    /// Make mask key to be used in WebSocket frame
+    private func makeMaskKey() -> WebSocketMaskingKey? {
+        guard self.type == .client else { return nil }
+        let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: .min ... .max) }
+        return WebSocketMaskingKey(bytes)
     }
 }

@@ -19,4 +19,4 @@ import NIOCore
 import NIOWebSocket
 
 /// Function that handles websocket data and text blocks
-public typealias WebSocketDataHandler<Context: WebSocketContextProtocol> = @Sendable (WebSocketHandlerInbound, WebSocketHandlerOutboundWriter, Context) async throws -> Void
+public typealias WebSocketDataHandler<Context: WebSocketContextProtocol> = @Sendable (WebSocket, Context) async throws -> Void
