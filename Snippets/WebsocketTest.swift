@@ -11,12 +11,12 @@ router.get { _, _ in
     "Hello"
 }
 
-router.ws("/ws") { ws, _ in
-    for try await packet in ws.inbound {
+router.ws("/ws") { inbound, outbound, _ in
+    for try await packet in inbound {
         if case .text("disconnect") = packet {
             break
         }
-        try await ws.outbound.write(.custom(packet.webSocketFrame))
+        try await outbound.write(.custom(packet.webSocketFrame))
     }
 }
 

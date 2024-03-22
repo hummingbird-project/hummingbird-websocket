@@ -29,7 +29,7 @@ public struct WebSocketOutboundWriter: Sendable {
         case custom(WebSocketFrame)
     }
 
-    let type: WebSocket.SocketType
+    let type: WebSocketType
     let allocator: ByteBufferAllocator
     let outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
 

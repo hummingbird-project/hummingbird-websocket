@@ -18,6 +18,12 @@ import NIOCore
 import NIOWebSocket
 import ServiceLifecycle
 
+/// WebSocket type
+public enum WebSocketType: Sendable {
+    case client
+    case server
+}
+
 /// Handler processing raw WebSocket packets.
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
@@ -26,11 +32,11 @@ actor WebSocketHandler: Sendable {
     static let pingDataSize = 16
 
     let asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
-    let type: WebSocket.SocketType
+    let type: WebSocketType
     var closed: Bool
     var pingData: ByteBuffer
 
-    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocket.SocketType) {
+    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketType) {
         self.asyncChannel = asyncChannel
         self.type = type
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
@@ -41,13 +47,18 @@ actor WebSocketHandler: Sendable {
     func handle<Context: WebSocketContextProtocol>(handler: @escaping WebSocketDataHandler<Context>, context: Context) async {
         let asyncChannel = self.asyncChannel
         try? await asyncChannel.executeThenClose { inbound, outbound in
-            let webSocket = WebSocket(type: self.type, outbound: outbound, allocator: asyncChannel.channel.allocator)
+            let webSocketInbound = WebSocketInboundStream()
+            let webSocketOutbound = WebSocketOutboundWriter(
+                type: self.type,
+                allocator: asyncChannel.channel.allocator,
+                outbound: outbound
+            )
             try await withTaskCancellationHandler {
                 try await withGracefulShutdownHandler {
                     try await withThrowingTaskGroup(of: Void.self) { group in
                         group.addTask {
                             defer {
-                                webSocket.inbound.finish()
+                                webSocketInbound.finish()
                             }
                             // parse messages coming from inbound
                             var frameSequence: WebSocketFrameSequence?
@@ -58,13 +69,13 @@ actor WebSocketHandler: Sendable {
                                     case .connectionClose:
                                         // we received a connection close. Finish the inbound data stream,
                                         // send a close back if it hasn't already been send and exit
-                                        webSocket.inbound.finish()
-                                        _ = try await self.close(code: .normalClosure, outbound: webSocket.outbound, context: context)
+                                        webSocketInbound.finish()
+                                        _ = try await self.close(code: .normalClosure, outbound: webSocketOutbound, context: context)
                                         return
                                     case .ping:
-                                        try await self.onPing(frame, outbound: webSocket.outbound, context: context)
+                                        try await self.onPing(frame, outbound: webSocketOutbound, context: context)
                                     case .pong:
-                                        try await self.onPong(frame, outbound: webSocket.outbound, context: context)
+                                        try await self.onPong(frame, outbound: webSocketOutbound, context: context)
                                     case .text, .binary:
                                         if var frameSeq = frameSequence {
                                             frameSeq.append(frame)
@@ -77,48 +88,48 @@ actor WebSocketHandler: Sendable {
                                             frameSeq.append(frame)
                                             frameSequence = frameSeq
                                         } else {
-                                            try await self.close(code: .protocolError, outbound: webSocket.outbound, context: context)
+                                            try await self.close(code: .protocolError, outbound: webSocketOutbound, context: context)
                                         }
                                     default:
                                         break
                                     }
                                     if let frameSeq = frameSequence, frame.fin {
-                                        await webSocket.inbound.send(frameSeq.data)
+                                        await webSocketInbound.send(frameSeq.data)
                                         frameSequence = nil
                                     }
                                 } catch {
                                     // catch errors while processing websocket frames so responding close message
                                     // can be dealt with
                                     let errorCode = WebSocketErrorCode(error)
-                                    try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
+                                    try await self.close(code: errorCode, outbound: webSocketOutbound, context: context)
                                 }
                             }
                         }
                         group.addTask {
                             do {
                                 // handle websocket data and text
-                                try await handler(webSocket, context)
-                                try await self.close(code: .normalClosure, outbound: webSocket.outbound, context: context)
+                                try await handler(webSocketInbound, webSocketOutbound, context)
+                                try await self.close(code: .normalClosure, outbound: webSocketOutbound, context: context)
                             } catch {
                                 if self.type == .server {
                                     let errorCode = WebSocketErrorCode.unexpectedServerError
-                                    try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
+                                    try await self.close(code: errorCode, outbound: webSocketOutbound, context: context)
                                 } else {
                                     try await asyncChannel.channel.close(mode: .input)
                                 }
                             }
                         }
                         try await group.next()
-                        webSocket.inbound.finish()
+                        webSocketInbound.finish()
                     }
                 } onGracefulShutdown: {
                     Task {
-                        try? await self.close(code: .normalClosure, outbound: webSocket.outbound, context: context)
+                        try? await self.close(code: .normalClosure, outbound: webSocketOutbound, context: context)
                     }
                 }
             } onCancel: {
                 Task {
-                    webSocket.inbound.finish()
+                    webSocketInbound.finish()
                     try await asyncChannel.channel.close(mode: .input)
                 }
             }
