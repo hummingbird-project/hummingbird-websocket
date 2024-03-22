@@ -393,12 +393,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Two"))
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
@@ -422,7 +422,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.group("/ws")
             .add(middleware: WebSocketUpgradeMiddleware { _, _ in
                 return .upgrade([:])
-            } handler: { _, outbound, _ in
+            } onUpgrade: { _, outbound, _ in
                 try await outbound.write(.text("One"))
             })
             .get { _, _ -> Response in return .init(status: .ok) }
@@ -437,7 +437,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         do {
@@ -471,7 +471,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.middlewares.add(MyMiddleware())
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, context in
+        } onUpgrade: { _, outbound, context in
             try await outbound.write(.text(context.name))
         }
         do {
@@ -488,7 +488,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Hello"))
         }
         router.get("/http") { _, _ in

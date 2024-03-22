@@ -65,11 +65,11 @@ extension RouterMethods {
     /// - Parameters:
     ///   - path: Path to match
     ///   - shouldUpgrade: Should request be upgraded
-    ///   - handle: WebSocket channel handler
+    ///   - handler: WebSocket channel handler
     @discardableResult public func ws(
         _ path: String = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handle: @escaping WebSocketDataHandler<Context>
+        onUpgrade handler: @escaping WebSocketDataHandler<Context>
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
@@ -77,7 +77,7 @@ extension RouterMethods {
             case .dontUpgrade:
                 return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
-                context.webSocket.handler.withLockedValue { $0 = WebSocketRouterContext.Value(context: context, handler: handle) }
+                context.webSocket.handler.withLockedValue { $0 = WebSocketRouterContext.Value(context: context, handler: handler) }
                 return .init(status: .ok, headers: headers)
             }
         }
@@ -98,7 +98,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     ///   - handle: WebSocket handler
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handler: @escaping WebSocketDataHandler<Context>
+        onUpgrade handler: @escaping WebSocketDataHandler<Context>
     ) {
         self.shouldUpgrade = shouldUpgrade
         self.handler = handler
