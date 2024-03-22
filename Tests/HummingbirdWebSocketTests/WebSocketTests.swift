@@ -403,7 +403,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
             return .upgrade([:])
-        } handle: { ws, _ in
+        } onUpgrade: { ws, _ in
             try await ws.outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
