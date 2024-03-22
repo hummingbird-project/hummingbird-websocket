@@ -82,8 +82,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
-            let logger = {
-                var logger = Logger(label: "WebSocketTest")
+            let serverLogger = {
+                var logger = Logger(label: "WebSocketServer")
+                logger.logLevel = .debug
+                return logger
+            }()
+            let clientLogger = {
+                var logger = Logger(label: "WebSocketClient")
                 logger.logLevel = .debug
                 return logger
             }()
@@ -101,7 +106,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     router: router,
                     server: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
                     onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                    logger: logger
+                    logger: serverLogger
                 )
                 serviceGroup = ServiceGroup(
                     configuration: .init(
@@ -115,7 +120,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     router: router,
                     server: webSocketUpgrade,
                     onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                    logger: logger
+                    logger: serverLogger
                 )
                 serviceGroup = ServiceGroup(
                     configuration: .init(
@@ -129,7 +134,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             group.addTask {
-                let client = try await getClient(promise.wait(), logger)
+                let client = try await getClient(promise.wait(), clientLogger)
                 try await client.run()
             }
             do {
@@ -169,8 +174,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
-            let logger = {
-                var logger = Logger(label: "WebSocketTest")
+            let serverLogger = {
+                var logger = Logger(label: "WebSocketServer")
+                logger.logLevel = .debug
+                return logger
+            }()
+            let clientLogger = {
+                var logger = Logger(label: "WebSocketClient")
                 logger.logLevel = .debug
                 return logger
             }()
@@ -180,7 +190,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 router: router,
                 server: .webSocketUpgrade(webSocketRouter: webSocketRouter),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                logger: logger
+                logger: serverLogger
             )
             serviceGroup = ServiceGroup(
                 configuration: .init(
@@ -193,7 +203,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             group.addTask {
-                let client = try await getClient(promise.wait(), logger)
+                let client = try await getClient(promise.wait(), clientLogger)
                 try await client.run()
             }
             do {
@@ -566,4 +576,17 @@ final class HummingbirdWebSocketTests: XCTestCase {
      }
 
      */
+}
+
+extension Logger {
+    /// Create new Logger with additional metadata value
+    /// - Parameters:
+    ///   - metadataKey: Metadata key
+    ///   - value: Metadata value
+    /// - Returns: Logger
+    func with(metadataKey: String, value: MetadataValue) -> Logger {
+        var logger = self
+        logger[metadataKey: metadataKey] = value
+        return logger
+    }
 }
