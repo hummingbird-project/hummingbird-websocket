@@ -50,15 +50,23 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
-        self.shouldUpgrade = { head, channel, logger in
+        self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
             channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketChannelHandler> in
                 try shouldUpgrade(head, channel, logger)
-                    .map { handler in
-                        return { asyncChannel, logger in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                    .map { headers, handler -> (HTTPFields, WebSocketChannelHandler) in
+                        var headers = headers
+                        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headerFields)
+                        let responseHeaders = configuration.extensions.compactMap { $0.serverResponseHeader(to: clientHeaders) }
+                        headers.append(contentsOf: responseHeaders.map { .init(name: HTTPField.Name.secWebSocketExtensions, value: $0) })
+                        let extensions = try configuration.extensions.compactMap {
+                            try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
+                        }
+
+                        return (headers, { asyncChannel, logger in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
                             await webSocket.handle(handler: handler, context: context)
-                        }
+                        })
                     }
             }
         }
@@ -80,16 +88,23 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
-        self.shouldUpgrade = { head, channel, logger in
+        self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
             promise.completeWithTask {
                 try await shouldUpgrade(head, channel, logger)
-                    .map { handler in
-                        return { asyncChannel, logger in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                    .map { headers, handler in
+                        var headers = headers
+                        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headerFields)
+                        let responseHeaders = configuration.extensions.compactMap { $0.serverResponseHeader(to: clientHeaders) }
+                        headers.append(contentsOf: responseHeaders.map { .init(name: HTTPField.Name.secWebSocketExtensions, value: $0) })
+                        let extensions = try configuration.extensions.compactMap {
+                            try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
+                        }
+                        return (headers, { asyncChannel, logger in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
                             await webSocket.handle(handler: handler, context: context)
-                        }
+                        })
                     }
             }
             return promise.futureResult

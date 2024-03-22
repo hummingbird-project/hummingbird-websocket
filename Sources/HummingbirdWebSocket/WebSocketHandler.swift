@@ -35,12 +35,14 @@ actor WebSocketHandler: Sendable {
     let type: WebSocketType
     var closed: Bool
     var pingData: ByteBuffer
+    let extensions: [any WebSocketExtension]
 
-    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketType) {
+    init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketType, extensions: [any WebSocketExtension]) {
         self.asyncChannel = asyncChannel
         self.type = type
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
         self.closed = false
+        self.extensions = extensions
     }
 
     /// Handle WebSocket AsynChannel

@@ -27,6 +27,7 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
     let serverNoContextTakeover: Bool
     let compressionLevel: Int?
     let memoryLevel: Int?
+    let maxDecompressedFrameSize: Int
 
     init(
         clientMaxWindow: Int? = nil,
@@ -34,7 +35,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
         serverMaxWindow: Int? = nil,
         serverNoContextTakeover: Bool = false,
         compressionLevel: Int? = nil,
-        memoryLevel: Int? = nil
+        memoryLevel: Int? = nil,
+        maxDecompressedFrameSize: Int = (1 << 14)
     ) {
         self.clientMaxWindow = clientMaxWindow
         self.clientNoContextTakeover = clientNoContextTakeover
@@ -42,6 +44,7 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
         self.serverNoContextTakeover = serverNoContextTakeover
         self.compressionLevel = compressionLevel
         self.memoryLevel = memoryLevel
+        self.maxDecompressedFrameSize = maxDecompressedFrameSize
     }
 
     /// Return client request header
@@ -107,7 +110,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
             sendMaxWindow: clientMaxWindowParam,
             sendNoContextTakeover: clientNoContextTakeoverParam,
             compressionLevel: self.compressionLevel,
-            memoryLevel: self.memoryLevel
+            memoryLevel: self.memoryLevel,
+            maxDecompressedFrameSize: self.maxDecompressedFrameSize
         ), eventLoop: eventLoop)
     }
 
@@ -134,7 +138,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
             sendMaxWindow: optionalMin(requestServerMaxWindow?.integer, self.serverMaxWindow),
             sendNoContextTakeover: requestServerNoContextTakeover || self.serverNoContextTakeover,
             compressionLevel: self.compressionLevel,
-            memoryLevel: self.memoryLevel
+            memoryLevel: self.memoryLevel,
+            maxDecompressedFrameSize: self.maxDecompressedFrameSize
         )
     }
 }
@@ -144,11 +149,6 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
 /// Uses deflate to compress messages sent across a WebSocket
 /// See RFC 7692 for more details https://www.rfc-editor.org/rfc/rfc7692
 struct PerMessageDeflateExtension: WebSocketExtension {
-    enum SendState: Sendable {
-        case idle
-        case sendingMessage
-    }
-
     struct Configuration: Sendable {
         let receiveMaxWindow: Int?
         let receiveNoContextTakeover: Bool
@@ -156,90 +156,157 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         let sendNoContextTakeover: Bool
         let compressionLevel: Int?
         let memoryLevel: Int?
+        let maxDecompressedFrameSize: Int
+    }
+
+    actor Decompressor {
+        fileprivate let decompressor: any NIODecompressor
+
+        init(_ decompressor: any NIODecompressor) throws {
+            self.decompressor = decompressor
+            try self.decompressor.startStream()
+        }
+
+        func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
+            var frame = frame
+            precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
+            // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
+            // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
+            frame.data.writeBytes([0, 0, 255, 255])
+            frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: maxSize, allocator: context.allocator)
+            if resetStream {
+                try self.decompressor.resetStream()
+            }
+            return frame
+        }
+
+        func shutdown() throws {
+            try self.decompressor.finishStream()
+        }
+    }
+
+    actor Compressor {
+        enum SendState: Sendable {
+            case idle
+            case sendingMessage
+        }
+
+        fileprivate let compressor: any NIOCompressor
+        var sendState: SendState
+
+        init(_ compressor: any NIOCompressor) throws {
+            self.compressor = compressor
+            self.sendState = .idle
+            try self.compressor.startStream()
+        }
+
+        func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
+            // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
+            // compress the data
+            let shouldWeCompress = frame.data.readableBytes > 16 || !frame.fin || self.sendState != .idle
+            if shouldWeCompress {
+                var newFrame = frame
+                if self.sendState == .idle {
+                    newFrame.rsv1 = true
+                    self.sendState = .sendingMessage
+                }
+                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: context.allocator)
+                // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
+                // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
+                if newFrame.fin {
+                    newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
+                    self.sendState = .idle
+                    if resetStream {
+                        try self.compressor.resetStream()
+                    }
+                }
+                return newFrame
+            }
+            return frame
+        }
+
+        func shutdown() throws {
+            try self.compressor.finishStream()
+        }
     }
 
     /// Internal mutable state and referenced types, that cannot be set to Sendable
-    class InternalState {
-        fileprivate let decompressor: any NIODecompressor
-        fileprivate let compressor: any NIOCompressor
-        fileprivate var sendState: SendState
+    /* class InternalState {
+         fileprivate let decompressor: any NIODecompressor
+         fileprivate let compressor: any NIOCompressor
+         fileprivate var sendState: SendState
 
-        init(configuration: Configuration) throws {
-            self.decompressor = CompressionAlgorithm.deflate(
+         init(configuration: Configuration) throws {
+             self.decompressor = CompressionAlgorithm.deflate(
+                 configuration: .init(
+                     windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
+                 )
+             ).decompressor
+             // compression level -1 will setup the default compression level, 8 is the default memory level
+             self.compressor = CompressionAlgorithm.deflate(
+                 configuration: .init(
+                     windowSize: numericCast(configuration.sendMaxWindow ?? 15),
+                     compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
+                     memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
+                 )
+             ).compressor
+             self.sendState = .idle
+             try self.decompressor.startStream()
+             try self.compressor.startStream()
+         }
+
+         func shutdown() {
+             try? self.compressor.finishStream()
+             try? self.decompressor.finishStream()
+         }
+     } */
+
+    let configuration: Configuration
+    let decompressor: Decompressor
+    let compressor: Compressor
+    // let internalState: NIOLoopBound<InternalState>
+
+    init(configuration: Configuration, eventLoop: EventLoop) throws {
+        self.configuration = configuration
+        self.decompressor = try .init(
+            CompressionAlgorithm.deflate(
                 configuration: .init(
                     windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
                 )
             ).decompressor
-            // compression level -1 will setup the default compression level, 8 is the default memory level
-            self.compressor = CompressionAlgorithm.deflate(
+        )
+        self.compressor = try .init(
+            CompressionAlgorithm.deflate(
                 configuration: .init(
                     windowSize: numericCast(configuration.sendMaxWindow ?? 15),
                     compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
                     memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
                 )
             ).compressor
-            self.sendState = .idle
-            try self.decompressor.startStream()
-            try self.compressor.startStream()
-        }
-
-        func shutdown() {
-            try? self.compressor.finishStream()
-            try? self.decompressor.finishStream()
-        }
+        )
     }
 
-    let configuration: Configuration
-    let internalState: NIOLoopBound<InternalState>
-
-    init(configuration: Configuration, eventLoop: EventLoop) throws {
-        self.configuration = configuration
-        self.internalState = try .init(.init(configuration: configuration), eventLoop: eventLoop)
+    func shutdown() async {
+        try? await self.decompressor.shutdown()
+        try? await self.compressor.shutdown()
     }
 
-    func shutdown() {
-        self.internalState.value.shutdown()
-    }
-
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
-        var frame = frame
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame {
         if frame.rsv1 {
-            let state = self.internalState.value
-            precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
-            // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
-            // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
-            frame.data.writeBytes([0, 0, 255, 255])
-            frame.data = try frame.data.decompressStream(with: state.decompressor, maxSize: ws.maxFrameSize, allocator: context.allocator)
-            if self.configuration.receiveNoContextTakeover {
-                try state.decompressor.resetStream()
-            }
+            return try await self.decompressor.decompress(
+                frame,
+                maxSize: self.configuration.maxDecompressedFrameSize,
+                resetStream: self.configuration.receiveNoContextTakeover,
+                context: context
+            )
         }
         return frame
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
-        let state = self.internalState.value
-        // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
-        // compress the data
-        let shouldWeCompress = frame.data.readableBytes > 16 || !frame.fin || state.sendState != .idle
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame {
         let isCorrectType = frame.opcode == .text || frame.opcode == .binary
-        if shouldWeCompress, isCorrectType {
-            var newFrame = frame
-            if state.sendState == .idle {
-                newFrame.rsv1 = true
-                state.sendState = .sendingMessage
-            }
-            newFrame.data = try newFrame.data.compressStream(with: state.compressor, flush: .sync, allocator: context.allocator)
-            // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
-            // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
-            if newFrame.fin {
-                newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
-                state.sendState = .idle
-                if self.configuration.sendNoContextTakeover {
-                    try state.compressor.resetStream()
-                }
-            }
-            return newFrame
+        if isCorrectType {
+            return try await self.compressor.compress(frame, resetStream: self.configuration.sendNoContextTakeover, context: context)
         }
         return frame
     }
@@ -250,7 +317,11 @@ extension WebSocketExtensionFactory {
     /// - Parameters:
     ///   - maxWindow: Max window to be used for decompression and compression
     ///   - noContextTakeover: Should we reset window on every message
-    public static func perMessageDeflate(maxWindow: Int? = nil, noContextTakeover: Bool = false) -> WebSocketExtensionFactory {
+    public static func perMessageDeflate(
+        maxWindow: Int? = nil,
+        noContextTakeover: Bool = false,
+        maxDecompressedFrameSize: Int = 1 << 14
+    ) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
                 clientMaxWindow: maxWindow,
@@ -258,7 +329,8 @@ extension WebSocketExtensionFactory {
                 serverMaxWindow: maxWindow,
                 serverNoContextTakeover: noContextTakeover,
                 compressionLevel: nil,
-                memoryLevel: nil
+                memoryLevel: nil,
+                maxDecompressedFrameSize: maxDecompressedFrameSize
             )
         }
     }
@@ -279,7 +351,8 @@ extension WebSocketExtensionFactory {
         serverMaxWindow: Int? = nil,
         serverNoContextTakeover: Bool = false,
         compressionLevel: Int? = nil,
-        memoryLevel: Int? = nil
+        memoryLevel: Int? = nil,
+        maxDecompressedFrameSize: Int = 1 << 14
     ) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
@@ -288,7 +361,8 @@ extension WebSocketExtensionFactory {
                 serverMaxWindow: serverMaxWindow,
                 serverNoContextTakeover: serverNoContextTakeover,
                 compressionLevel: compressionLevel,
-                memoryLevel: memoryLevel
+                memoryLevel: memoryLevel,
+                maxDecompressedFrameSize: maxDecompressedFrameSize
             )
         }
     }

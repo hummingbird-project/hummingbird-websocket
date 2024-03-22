@@ -14,13 +14,13 @@
 
 import HTTPTypes
 
-public struct WebSocketClientConfiguration: WebSocketConfiguration {
+public struct WebSocketClientConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
     /// Additional headers to be sent with the initial HTTP request
     public var additionalHeaders: HTTPFields
-    /// WebSocket type
-    public var type: WebSocketType { .client }
+    /// WebSocket extensions
+    public var extensions: [any WebSocketExtensionBuilder]
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
@@ -28,9 +28,11 @@ public struct WebSocketClientConfiguration: WebSocketConfiguration {
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     public init(
         maxFrameSize: Int = (1 << 14),
-        additionalHeaders: HTTPFields = .init()
+        additionalHeaders: HTTPFields = .init(),
+        extensions: [WebSocketExtensionFactory] = []
     ) {
         self.maxFrameSize = maxFrameSize
         self.additionalHeaders = additionalHeaders
+        self.extensions = extensions.map { $0.build() }
     }
 }

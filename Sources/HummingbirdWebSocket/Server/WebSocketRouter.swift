@@ -141,8 +141,15 @@ extension HTTP1AndWebSocketChannel {
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        return .upgrade(response.headers) { asyncChannel, _ in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                        var headers = response.headers
+                        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headerFields)
+                        let responseHeaders = configuration.extensions.compactMap { $0.serverResponseHeader(to: clientHeaders) }
+                        headers.append(contentsOf: responseHeaders.map { .init(name: HTTPField.Name.secWebSocketExtensions, value: $0) })
+                        let extensions = try configuration.extensions.compactMap {
+                            try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
+                        }
+                        return .upgrade(headers) { asyncChannel, _ in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
                         }
                     } else {

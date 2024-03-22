@@ -19,15 +19,15 @@ import NIOWebSocket
 /// Protocol for WebSocket extension
 public protocol WebSocketExtension: Sendable {
     /// Process frame received from websocket
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame
     /// shutdown extension
-    func shutdown()
+    func shutdown() async
 }
 
 /// Protocol for WebSocket extension builder
-public protocol WebSocketExtensionBuilder {
+public protocol WebSocketExtensionBuilder: Sendable {
     /// name of WebSocket extension name
     static var name: String { get }
     /// construct client request header

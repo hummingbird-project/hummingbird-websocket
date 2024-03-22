@@ -13,20 +13,21 @@
 //===----------------------------------------------------------------------===//
 
 /// Configuration for a WebSocket server
-public struct WebSocketServerConfiguration: WebSocketConfiguration {
+public struct WebSocketServerConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
-    /// WebSocket type
-    public var type: WebSocketType { .server }
+    /// WebSocket extensions
+    public var extensions: [any WebSocketExtensionBuilder]
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
     ///     - maxFrameSize: Max websocket frame size that can be sent/received
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     public init(
-        maxFrameSize: Int = (1 << 14)
+        maxFrameSize: Int = (1 << 14),
+        extensions: [WebSocketExtensionFactory] = []
     ) {
         self.maxFrameSize = maxFrameSize
+        self.extensions = extensions.map { $0.build() }
     }
-
 }
