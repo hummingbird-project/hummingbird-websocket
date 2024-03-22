@@ -13,9 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 /// Configuration for a WebSocket server
-public struct WebSocketServerConfiguration: Sendable {
+public struct WebSocketServerConfiguration: WebSocketConfiguration {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
+    /// WebSocket type
+    public var type: WebSocketType { .server }
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
@@ -26,4 +28,5 @@ public struct WebSocketServerConfiguration: Sendable {
     ) {
         self.maxFrameSize = maxFrameSize
     }
+
 }

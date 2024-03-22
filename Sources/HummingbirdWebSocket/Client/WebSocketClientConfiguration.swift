@@ -14,11 +14,13 @@
 
 import HTTPTypes
 
-public struct WebSocketClientConfiguration: Sendable {
+public struct WebSocketClientConfiguration: WebSocketConfiguration {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
     /// Additional headers to be sent with the initial HTTP request
     public var additionalHeaders: HTTPFields
+    /// WebSocket type
+    public var type: WebSocketType { .client }
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
