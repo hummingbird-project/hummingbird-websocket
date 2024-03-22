@@ -32,13 +32,13 @@ let package = Package(
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
-        /*    .target(name: "HummingbirdWSCompression", dependencies: [
-                .byName(name: "HummingbirdWSCore"),
-                .product(name: "CompressNIO", package: "compress-nio"),
-            ]),*/
+        .target(name: "HummingbirdWSCompression", dependencies: [
+            .byName(name: "HummingbirdWebSocket"),
+            .product(name: "CompressNIO", package: "compress-nio"),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
-            // .byName(name: "HummingbirdWSCompression"),
+            .byName(name: "HummingbirdWSCompression"),
             .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),

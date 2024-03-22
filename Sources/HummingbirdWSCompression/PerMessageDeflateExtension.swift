@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import CompressNIO
-import HummingbirdWSCore
+import HummingbirdWebSocket
 import NIOCore
 import NIOWebSocket
 
@@ -201,7 +201,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         self.internalState.value.shutdown()
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, ws: WebSocket) throws -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
         var frame = frame
         if frame.rsv1 {
             let state = self.internalState.value
@@ -209,7 +209,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
             // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
             frame.data.writeBytes([0, 0, 255, 255])
-            frame.data = try frame.data.decompressStream(with: state.decompressor, maxSize: ws.maxFrameSize, allocator: ws.channel.allocator)
+            frame.data = try frame.data.decompressStream(with: state.decompressor, maxSize: ws.maxFrameSize, allocator: context.allocator)
             if self.configuration.receiveNoContextTakeover {
                 try state.decompressor.resetStream()
             }
@@ -217,7 +217,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         return frame
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, ws: WebSocket) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
         let state = self.internalState.value
         // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
         // compress the data
@@ -229,7 +229,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                 newFrame.rsv1 = true
                 state.sendState = .sendingMessage
             }
-            newFrame.data = try newFrame.data.compressStream(with: state.compressor, flush: .sync, allocator: ws.channel.allocator)
+            newFrame.data = try newFrame.data.compressStream(with: state.compressor, flush: .sync, allocator: context.allocator)
             // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
             // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
             if newFrame.fin {
