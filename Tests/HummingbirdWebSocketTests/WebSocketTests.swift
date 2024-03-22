@@ -76,7 +76,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
@@ -91,7 +91,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let serviceGroup: ServiceGroup
             let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { head, _, _ in
                 if let headers = try shouldUpgrade(head) {
-                    return .upgrade(headers, WebSocketDataCallbackHandler(serverHandler))
+                    return .upgrade(headers, serverHandler)
                 } else {
                     return .dontUpgrade
                 }
@@ -144,9 +144,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataCallbackHandler.Callback,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        client clientHandler: @escaping WebSocketDataCallbackHandler.Callback
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
     ) async throws {
         try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
@@ -156,7 +156,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try WebSocketClient(
                     url: .init("ws://localhost:\(port)"),
                     logger: logger,
-                    process: clientHandler
+                    handler: clientHandler
                 )
             }
         )
@@ -393,12 +393,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Two"))
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
@@ -422,7 +422,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.group("/ws")
             .add(middleware: WebSocketUpgradeMiddleware { _, _ in
                 return .upgrade([:])
-            } handle: { _, outbound, _ in
+            } onUpgrade: { _, outbound, _ in
                 try await outbound.write(.text("One"))
             })
             .get { _, _ -> Response in return .init(status: .ok) }
@@ -437,7 +437,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         do {
@@ -447,11 +447,48 @@ final class HummingbirdWebSocketTests: XCTestCase {
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
 
+    /// Test context from router is passed through to web socket
+    func testRouterContextUpdate() async throws {
+        struct MyRequestContext: WebSocketRequestContext {
+            var coreContext: CoreRequestContext
+            var webSocket: WebSocketRouterContext<MyRequestContext>
+            var name: String
+
+            init(channel: Channel, logger: Logger) {
+                self.coreContext = .init(allocator: channel.allocator, logger: logger)
+                self.webSocket = .init()
+                self.name = ""
+            }
+        }
+        struct MyMiddleware: RouterMiddleware {
+            func handle(_ request: Request, context: MyRequestContext, next: (Request, MyRequestContext) async throws -> Response) async throws -> Response {
+                var context = context
+                context.name = "Roger Moore"
+                return try await next(request, context)
+            }
+        }
+        let router = Router(context: MyRequestContext.self)
+        router.middlewares.add(MyMiddleware())
+        router.ws("/ws") { _, _ in
+            return .upgrade([:])
+        } onUpgrade: { _, outbound, context in
+            try await outbound.write(.text(context.name))
+        }
+        do {
+            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
+                    let text = await inbound.first { _ in true }
+                    XCTAssertEqual(text, .text("Roger Moore"))
+                }
+            }
+        } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+    }
+
     func testHTTPRequest() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             return .upgrade([:])
-        } handle: { _, outbound, _ in
+        } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Hello"))
         }
         router.get("/http") { _, _ in

@@ -23,23 +23,29 @@ import NIOCore
 /// WebSocket Router context type.
 ///
 /// Includes reference to optional websocket handler
-public struct WebSocketRouterContext: Sendable {
+public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable {
+    /// Holds WebSocket context and handler to call
+    struct Value: Sendable {
+        let context: Context
+        let handler: WebSocketDataHandler<Context>
+    }
+
     public init() {
         self.handler = .init(nil)
     }
 
-    let handler: NIOLockedValueBox<WebSocketDataCallbackHandler?>
+    let handler: NIOLockedValueBox<Value?>
 }
 
 /// Request context protocol requirement for routers that support websockets
 public protocol WebSocketRequestContext: RequestContext, WebSocketContextProtocol {
-    var webSocket: WebSocketRouterContext { get }
+    var webSocket: WebSocketRouterContext<Self> { get }
 }
 
 /// Default implementation of a request context that supports WebSockets
 public struct BasicWebSocketRequestContext: WebSocketRequestContext {
     public var coreContext: CoreRequestContext
-    public let webSocket: WebSocketRouterContext
+    public let webSocket: WebSocketRouterContext<Self>
 
     public init(channel: Channel, logger: Logger) {
         self.coreContext = .init(allocator: channel.allocator, logger: logger)
@@ -59,11 +65,11 @@ extension RouterMethods {
     /// - Parameters:
     ///   - path: Path to match
     ///   - shouldUpgrade: Should request be upgraded
-    ///   - handle: WebSocket channel handler
+    ///   - handler: WebSocket channel handler
     @discardableResult public func ws(
         _ path: String = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handle: @escaping WebSocketDataCallbackHandler.Callback
+        onUpgrade handler: @escaping WebSocketDataHandler<Context>
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
@@ -71,7 +77,7 @@ extension RouterMethods {
             case .dontUpgrade:
                 return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
-                context.webSocket.handler.withLockedValue { $0 = WebSocketDataCallbackHandler(handle) }
+                context.webSocket.handler.withLockedValue { $0 = WebSocketRouterContext.Value(context: context, handler: handler) }
                 return .init(status: .ok, headers: headers)
             }
         }
@@ -84,7 +90,7 @@ extension RouterMethods {
 /// with ``Hummingbird/Router`` if you add a route immediately after it.
 public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: RouterMiddleware {
     let shouldUpgrade: @Sendable (Request, Context) async throws -> RouterShouldUpgrade
-    let handle: WebSocketDataCallbackHandler.Callback
+    let handler: WebSocketDataHandler<Context>
 
     /// Initialize WebSocketUpgradeMiddleare
     /// - Parameters:
@@ -92,10 +98,10 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     ///   - handle: WebSocket handler
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        handle: @escaping WebSocketDataCallbackHandler.Callback
+        onUpgrade handler: @escaping WebSocketDataHandler<Context>
     ) {
         self.shouldUpgrade = shouldUpgrade
-        self.handle = handle
+        self.handler = handler
     }
 
     /// WebSocketUpgradeMiddleware handler
@@ -105,7 +111,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
         case .dontUpgrade:
             return .init(status: .methodNotAllowed)
         case .upgrade(let headers):
-            context.webSocket.handler.withLockedValue { $0 = WebSocketDataCallbackHandler(self.handle) }
+            context.webSocket.handler.withLockedValue { $0 = .init(context: context, handler: self.handler) }
             return .init(status: .ok, headers: headers)
         }
     }
@@ -119,26 +125,36 @@ extension HTTP1AndWebSocketChannel {
     ///   - maxFrameSize: Max frame size WebSocket will allow
     ///   - webSocketRouter: WebSocket router
     /// - Returns: Upgrade result future
-    public init<Context: WebSocketRequestContext, WSResponder: HTTPResponder>(
+    public init<WSResponder: HTTPResponder>(
         responder: @escaping @Sendable (Request, Channel) async throws -> Response,
         webSocketResponder: WSResponder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] }
-    ) where Handler == WebSocketDataCallbackHandler, WSResponder.Context == Context {
-        self.init(responder: responder, configuration: configuration, additionalChannelHandlers: additionalChannelHandlers) { head, channel, logger in
-            let request = Request(head: head, body: .init(buffer: .init()))
-            let context = Context(channel: channel, logger: logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID())))
-            do {
-                let response = try await webSocketResponder.respond(to: request, context: context)
-                if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                    return .upgrade(response.headers, webSocketHandler)
-                } else {
+    ) where WSResponder.Context: WebSocketRequestContext {
+        self.additionalChannelHandlers = additionalChannelHandlers
+        self.configuration = configuration
+        self.shouldUpgrade = { head, channel, logger in
+            let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
+            promise.completeWithTask {
+                let request = Request(head: head, body: .init(buffer: .init()))
+                let context = WSResponder.Context(channel: channel, logger: logger)
+                do {
+                    let response = try await webSocketResponder.respond(to: request, context: context)
+                    if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
+                        return .upgrade(response.headers) { asyncChannel, _ in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                            await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
+                        }
+                    } else {
+                        return .dontUpgrade
+                    }
+                } catch {
                     return .dontUpgrade
                 }
-            } catch {
-                return .dontUpgrade
             }
+            return promise.futureResult
         }
+        self.responder = responder
     }
 }
 
@@ -158,7 +174,7 @@ extension HTTPChannelBuilder {
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel<WebSocketDataCallbackHandler>> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
             return HTTP1AndWebSocketChannel(
@@ -182,29 +198,4 @@ extension Logger {
         logger[metadataKey: metadataKey] = value
         return logger
     }
-}
-
-/// Generate Unique ID for each request. This is a duplicate of the RequestID in Hummingbird
-package struct RequestID: CustomStringConvertible {
-    let low: UInt64
-
-    package init() {
-        self.low = Self.globalRequestID.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
-    }
-
-    package var description: String {
-        Self.high + self.formatAsHexWithLeadingZeros(self.low)
-    }
-
-    func formatAsHexWithLeadingZeros(_ value: UInt64) -> String {
-        let string = String(value, radix: 16)
-        if string.count < 16 {
-            return String(repeating: "0", count: 16 - string.count) + string
-        } else {
-            return string
-        }
-    }
-
-    private static let high = String(UInt64.random(in: .min ... .max), radix: 16)
-    private static let globalRequestID = ManagedAtomic<UInt64>(UInt64.random(in: .min ... .max))
 }

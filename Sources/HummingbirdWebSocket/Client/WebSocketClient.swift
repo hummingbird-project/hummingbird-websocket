@@ -27,7 +27,7 @@ import ServiceLifecycle
 ///
 /// Supports TLS via both NIOSSL and Network framework.
 ///
-/// Initialize the WebSocketClient with your handler and then call ``WebSocketClient/run``
+/// Initialize the WebSocketClient with your handler and then call ``WebSocketClient/run()``
 /// to connect. The handler is provider with an `inbound` stream of WebSocket packets coming
 /// from the server and an `outbound` writer that can be used to write packets to the server.
 /// ```swift
@@ -50,7 +50,7 @@ public struct WebSocketClient {
     /// WebSocket URL
     let url: URI
     /// WebSocket data handler
-    let handler: WebSocketDataCallbackHandler
+    let handler: WebSocketDataHandler<WebSocketContext>
     /// configuration
     let configuration: WebSocketClientConfiguration
     /// EventLoopGroup to use
@@ -75,10 +75,10 @@ public struct WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        process: @escaping WebSocketDataCallbackHandler.Callback
+        handler: @escaping WebSocketDataHandler<WebSocketContext>
     ) throws {
         self.url = url
-        self.handler = .init(process)
+        self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
         self.logger = logger
@@ -101,10 +101,10 @@ public struct WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        process: @escaping WebSocketDataCallbackHandler.Callback
+        handler: @escaping WebSocketDataHandler<WebSocketContext>
     ) throws {
         self.url = url
-        self.handler = .init(process)
+        self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
         self.logger = logger
@@ -193,7 +193,7 @@ extension WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        process: @escaping WebSocketDataCallbackHandler.Callback
+        handler: @escaping WebSocketDataHandler<WebSocketContext>
     ) async throws {
         let ws = try self.init(
             url: url,
@@ -201,7 +201,7 @@ extension WebSocketClient {
             tlsConfiguration: tlsConfiguration,
             eventLoopGroup: eventLoopGroup,
             logger: logger,
-            process: process
+            handler: handler
         )
         try await ws.run()
     }
@@ -222,7 +222,7 @@ extension WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        process: @escaping WebSocketDataCallbackHandler.Callback
+        handler: @escaping WebSocketDataHandler<WebSocketContext>
     ) async throws {
         let ws = try self.init(
             url: url,
@@ -230,7 +230,7 @@ extension WebSocketClient {
             transportServicesTLSOptions: transportServicesTLSOptions,
             eventLoopGroup: eventLoopGroup,
             logger: logger,
-            process: process
+            handler: handler
         )
         try await ws.run()
     }
