@@ -86,11 +86,10 @@ actor WebSocketHandler: Sendable {
                                         await webSocket.inbound.send(frameSeq.data)
                                         frameSequence = nil
                                     }
-                                } catch let error as NIOWebSocketError {
-                                    let errorCode = WebSocketErrorCode(error)
-                                    try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
                                 } catch {
-                                    let errorCode = WebSocketErrorCode.unexpectedServerError
+                                    // catch errors while processing websocket frames so responding close message
+                                    // can be dealt with
+                                    let errorCode = WebSocketErrorCode(error)
                                     try await self.close(code: errorCode, outbound: webSocket.outbound, context: context)
                                 }
                             }
@@ -189,13 +188,15 @@ actor WebSocketHandler: Sendable {
 }
 
 extension WebSocketErrorCode {
-    init(_ error: NIOWebSocketError) {
+    init(_ error: any Error) {
         switch error {
-        case .invalidFrameLength:
+        case NIOWebSocketError.invalidFrameLength:
             self = .messageTooLarge
-        case .fragmentedControlFrame,
-             .multiByteControlFrameLength:
+        case NIOWebSocketError.fragmentedControlFrame,
+             NIOWebSocketError.multiByteControlFrameLength:
             self = .protocolError
+        default:
+            self = .unexpectedServerError
         }
     }
 }
