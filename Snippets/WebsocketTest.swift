@@ -1,7 +1,10 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdWebSocket
+import Logging
 
+var logger = Logger(label: "Echo")
+logger.logLevel = .trace
 let router = Router(context: BasicWebSocketRequestContext.self)
 router.middlewares.add(FileMiddleware("Snippets/public"))
 router.get { _, _ in
@@ -19,6 +22,7 @@ router.ws("/ws") { ws, _ in
 
 let app = Application(
     router: router,
-    server: .webSocketUpgrade(webSocketRouter: router)
+    server: .webSocketUpgrade(webSocketRouter: router),
+    logger: logger
 )
 try await app.runService()

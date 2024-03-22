@@ -62,6 +62,10 @@ public struct WebSocketOutboundWriter: Sendable {
         try await self.outbound.write(frame)
     }
 
+    func finish() {
+        self.outbound.finish()
+    }
+
     /// Make mask key to be used in WebSocket frame
     private func makeMaskKey() -> WebSocketMaskingKey? {
         guard self.type == .client else { return nil }

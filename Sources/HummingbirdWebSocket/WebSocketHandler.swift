@@ -53,7 +53,7 @@ actor WebSocketHandler: Sendable {
                             var frameSequence: WebSocketFrameSequence?
                             for try await frame in inbound {
                                 do {
-                                    print("\(self.type): Received \(frame.opcode)")
+                                    context.logger.trace("Received \(frame.opcode)")
                                     switch frame.opcode {
                                     case .connectionClose:
                                         // we received a connection close. Finish the inbound data stream,
@@ -124,7 +124,7 @@ actor WebSocketHandler: Sendable {
                 }
             }
         }
-        print("\(self.type): Really Closed")
+        context.logger.debug("Closed WebSocket")
     }
 
     /// Respond to ping
@@ -184,6 +184,7 @@ actor WebSocketHandler: Sendable {
         var buffer = context.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
         try await outbound.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
+        outbound.finish()
     }
 }
 
