@@ -194,7 +194,12 @@ actor WebSocketHandler: Sendable {
         var buffer = context.allocator.buffer(capacity: 2)
         buffer.write(webSocketErrorCode: code)
         try await outbound.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
-        outbound.finish()
+        // Only server should initiate a connection close. Clients should wait for the
+        // server to close the connection when it receives the WebSocket close packet
+        // See https://www.rfc-editor.org/rfc/rfc6455#section-7.1.1
+        if self.type == .server {
+            outbound.finish()
+        }
     }
 }
 
