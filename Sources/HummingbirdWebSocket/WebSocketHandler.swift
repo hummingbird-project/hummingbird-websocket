@@ -29,12 +29,16 @@ public enum WebSocketType: Sendable {
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
 actor WebSocketHandler: Sendable {
+    enum InternalError: Error {
+        case close(WebSocketErrorCode)
+    }
+
     static let pingDataSize = 16
 
     let asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
     let type: WebSocketType
-    var closed: Bool
     var pingData: ByteBuffer
+    var closed = false
     let extensions: [any WebSocketExtension]
 
     init(asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, type: WebSocketType, extensions: [any WebSocketExtension]) {
@@ -53,7 +57,9 @@ actor WebSocketHandler: Sendable {
             let webSocketOutbound = WebSocketOutboundWriter(
                 type: self.type,
                 allocator: asyncChannel.channel.allocator,
-                outbound: outbound
+                outbound: outbound,
+                extensions: self.extensions,
+                context: context
             )
             try await withTaskCancellationHandler {
                 try await withGracefulShutdownHandler {
@@ -96,8 +102,14 @@ actor WebSocketHandler: Sendable {
                                         break
                                     }
                                     if let frameSeq = frameSequence, frame.fin {
-                                        await webSocketInbound.send(frameSeq.data)
-                                        frameSequence = nil
+                                        var collatedFrame = frameSeq.collapsed
+                                        for ext in self.extensions.reversed() {
+                                            collatedFrame = try await ext.processReceivedFrame(collatedFrame, context: context)
+                                        }
+                                        if let finalFrame = WebSocketDataFrame(frame: collatedFrame) {
+                                            await webSocketInbound.send(finalFrame)
+                                            frameSequence = nil
+                                        }
                                     }
                                 } catch {
                                     // catch errors while processing websocket frames so responding close message
@@ -112,6 +124,8 @@ actor WebSocketHandler: Sendable {
                                 // handle websocket data and text
                                 try await handler(webSocketInbound, webSocketOutbound, context)
                                 try await self.close(code: .normalClosure, outbound: webSocketOutbound, context: context)
+                            } catch InternalError.close(let code) {
+                                try await self.close(code: code, outbound: webSocketOutbound, context: context)
                             } catch {
                                 if self.type == .server {
                                     let errorCode = WebSocketErrorCode.unexpectedServerError
@@ -142,7 +156,7 @@ actor WebSocketHandler: Sendable {
     /// Respond to ping
     func onPing(
         _ frame: WebSocketFrame,
-        outbound: WebSocketOutboundWriter,
+        outbound: WebSocketOutboundWriter<some WebSocketContextProtocol>,
         context: some WebSocketContextProtocol
     ) async throws {
         if frame.fin {
@@ -155,7 +169,7 @@ actor WebSocketHandler: Sendable {
     /// Respond to pong
     func onPong(
         _ frame: WebSocketFrame,
-        outbound: WebSocketOutboundWriter,
+        outbound: WebSocketOutboundWriter<some WebSocketContextProtocol>,
         context: some WebSocketContextProtocol
     ) async throws {
         guard !self.closed else { return }
@@ -168,7 +182,7 @@ actor WebSocketHandler: Sendable {
     }
 
     /// Send ping
-    func ping(outbound: WebSocketOutboundWriter) async throws {
+    func ping(outbound: WebSocketOutboundWriter<some WebSocketContextProtocol>) async throws {
         guard !self.closed else { return }
         if self.pingData.readableBytes == 0 {
             // creating random payload
@@ -179,7 +193,7 @@ actor WebSocketHandler: Sendable {
     }
 
     /// Send pong
-    func pong(data: ByteBuffer?, outbound: WebSocketOutboundWriter) async throws {
+    func pong(data: ByteBuffer?, outbound: WebSocketOutboundWriter<some WebSocketContextProtocol>) async throws {
         guard !self.closed else { return }
         try await outbound.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
@@ -187,7 +201,7 @@ actor WebSocketHandler: Sendable {
     /// Send close
     func close(
         code: WebSocketErrorCode = .normalClosure,
-        outbound: WebSocketOutboundWriter,
+        outbound: WebSocketOutboundWriter<some WebSocketContextProtocol>,
         context: some WebSocketContextProtocol
     ) async throws {
         guard !self.closed else { return }

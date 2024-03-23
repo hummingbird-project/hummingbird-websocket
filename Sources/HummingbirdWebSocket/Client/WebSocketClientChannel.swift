@@ -45,11 +45,11 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
-                        // work out what extensions we should add
+                        // work out what extensions we should add based off the server response
                         let headerFields = HTTPFields(head.headers, splitCookie: false)
                         let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(headerFields)
                         let extensions = try configuration.extensions.compactMap {
-                            try $0.clientExtension(from: serverExtensions, eventLoop: channel.eventLoop)
+                            try $0.clientExtension(from: serverExtensions)
                         }
                         return UpgradeResult.websocket(asyncChannel, extensions)
                     }
@@ -61,6 +61,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             headers.add(name: "Content-Length", value: "0")
             let additionalHeaders = HTTPHeaders(self.configuration.additionalHeaders)
             headers.add(contentsOf: additionalHeaders)
+            // add websocket extensions to headers
             headers.add(contentsOf: self.configuration.extensions.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
 
             let requestHead = HTTPRequestHead(

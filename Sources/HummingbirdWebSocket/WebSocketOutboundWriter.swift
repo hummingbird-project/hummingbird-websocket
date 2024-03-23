@@ -16,7 +16,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Outbound websocket writer
-public struct WebSocketOutboundWriter: Sendable {
+public struct WebSocketOutboundWriter<Context: WebSocketContextProtocol>: Sendable {
     /// WebSocket frame that can be written
     public enum OutboundFrame: Sendable {
         /// Text frame
@@ -32,6 +32,8 @@ public struct WebSocketOutboundWriter: Sendable {
     let type: WebSocketType
     let allocator: ByteBufferAllocator
     let outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
+    let extensions: [any WebSocketExtension]
+    let context: Context
 
     /// Write WebSocket frame
     public func write(_ frame: OutboundFrame) async throws {
@@ -58,8 +60,18 @@ public struct WebSocketOutboundWriter: Sendable {
         frame: WebSocketFrame
     ) async throws {
         var frame = frame
+        do {
+            for ext in self.extensions {
+                frame = try await ext.processFrameToSend(frame, context: self.context)
+            }
+        } catch {
+            self.context.logger.debug("Closing as we failed to generate valid frame data")
+            throw WebSocketHandler.InternalError.close(.unexpectedServerError)
+        }
         frame.maskKey = self.makeMaskKey()
         try await self.outbound.write(frame)
+
+        self.context.logger.trace("Sent \(frame.opcode)")
     }
 
     func finish() {

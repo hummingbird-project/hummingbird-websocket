@@ -18,6 +18,8 @@ import NIOWebSocket
 
 /// Protocol for WebSocket extension
 public protocol WebSocketExtension: Sendable {
+    /// Extension name
+    var name: String { get }
     /// Process frame received from websocket
     func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
@@ -35,9 +37,9 @@ public protocol WebSocketExtensionBuilder: Sendable {
     /// construct server response header based of client request
     func serverReponseHeader(to: WebSocketExtensionHTTPParameters) -> String?
     /// construct server version of extension based of client request
-    func serverExtension(from: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (any WebSocketExtension)?
+    func serverExtension(from: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)?
     /// construct client version of extension based of server response
-    func clientExtension(from: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (any WebSocketExtension)?
+    func clientExtension(from: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)?
 }
 
 extension WebSocketExtensionBuilder {
@@ -53,10 +55,10 @@ extension WebSocketExtensionBuilder {
     }
 
     /// construct all server extensions based of all client requests
-    public func serverExtension(from requests: [WebSocketExtensionHTTPParameters], eventLoop: EventLoop) throws -> (any WebSocketExtension)? {
+    public func serverExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any WebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }
-            if let ext = try serverExtension(from: request, eventLoop: eventLoop) {
+            if let ext = try serverExtension(from: request) {
                 return ext
             }
         }
@@ -64,10 +66,10 @@ extension WebSocketExtensionBuilder {
     }
 
     /// construct all client extensions based of all server responses
-    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters], eventLoop: EventLoop) throws -> (any WebSocketExtension)? {
+    public func clientExtension(from requests: [WebSocketExtensionHTTPParameters]) throws -> (any WebSocketExtension)? {
         for request in requests {
             guard request.name == Self.name else { continue }
-            if let ext = try clientExtension(from: request, eventLoop: eventLoop) {
+            if let ext = try clientExtension(from: request) {
                 return ext
             }
         }

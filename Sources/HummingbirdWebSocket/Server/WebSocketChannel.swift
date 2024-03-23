@@ -24,7 +24,7 @@ import NIOHTTPTypesHTTP1
 import NIOWebSocket
 
 /// Child channel supporting a web socket upgrade from HTTP1
-public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
+public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandler {
     public typealias WebSocketChannelHandler = @Sendable (NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Logger) async -> Void
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
     public enum UpgradeResult {
@@ -54,14 +54,12 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
             channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketChannelHandler> in
                 try shouldUpgrade(head, channel, logger)
                     .map { headers, handler -> (HTTPFields, WebSocketChannelHandler) in
-                        var headers = headers
-                        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headerFields)
-                        let responseHeaders = configuration.extensions.compactMap { $0.serverResponseHeader(to: clientHeaders) }
-                        headers.append(contentsOf: responseHeaders.map { .init(name: HTTPField.Name.secWebSocketExtensions, value: $0) })
-                        let extensions = try configuration.extensions.compactMap {
-                            try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
-                        }
-
+                        let (headers, extensions) = try Self.webSocketExtensionNegociation(
+                            extensionBuilders: configuration.extensions,
+                            requestHeaders: head.headerFields,
+                            responseHeaders: headers,
+                            logger: logger
+                        )
                         return (headers, { asyncChannel, logger in
                             let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
@@ -93,13 +91,12 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
             promise.completeWithTask {
                 try await shouldUpgrade(head, channel, logger)
                     .map { headers, handler in
-                        var headers = headers
-                        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(head.headerFields)
-                        let responseHeaders = configuration.extensions.compactMap { $0.serverResponseHeader(to: clientHeaders) }
-                        headers.append(contentsOf: responseHeaders.map { .init(name: HTTPField.Name.secWebSocketExtensions, value: $0) })
-                        let extensions = try configuration.extensions.compactMap {
-                            try $0.serverExtension(from: clientHeaders, eventLoop: channel.eventLoop)
-                        }
+                        let (headers, extensions) = try Self.webSocketExtensionNegociation(
+                            extensionBuilders: configuration.extensions,
+                            requestHeaders: head.headerFields,
+                            responseHeaders: headers,
+                            logger: logger
+                        )
                         return (headers, { asyncChannel, logger in
                             let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
@@ -211,6 +208,40 @@ public struct HTTP1AndWebSocketChannel: ServerChildChannel, HTTPChannelHandler {
             // we got here because we failed to either read or write to the channel
             logger.trace("Failed to write to Channel. Error: \(error)")
         }
+    }
+
+    /// WebSocket extension negociation
+    /// - Parameters:
+    ///   - requestHeaders: Request headers
+    ///   - headers: Response headers
+    ///   - logger: Logger
+    /// - Returns: Response headers and extensions enabled
+    static func webSocketExtensionNegociation(
+        extensionBuilders: [any WebSocketExtensionBuilder],
+        requestHeaders: HTTPFields,
+        responseHeaders: HTTPFields,
+        logger: Logger
+    ) throws -> (responseHeaders: HTTPFields, extensions: [any WebSocketExtension]) {
+        var responseHeaders = responseHeaders
+        let clientHeaders = WebSocketExtensionHTTPParameters.parseHeaders(requestHeaders)
+        if clientHeaders.count > 0 {
+            logger.trace(
+                "Extensions requested",
+                metadata: ["hb_extensions": .string(clientHeaders.map(\.name).joined(separator: ","))]
+            )
+        }
+        let extensionResponseHeaders = extensionBuilders.compactMap { $0.serverResponseHeader(to: clientHeaders) }
+        responseHeaders.append(contentsOf: extensionResponseHeaders.map { .init(name: .secWebSocketExtensions, value: $0) })
+        let extensions = try extensionBuilders.compactMap {
+            try $0.serverExtension(from: clientHeaders)
+        }
+        if extensions.count > 0 {
+            logger.debug(
+                "Enabled extensions",
+                metadata: ["hb_extensions": .string(extensions.map(\.name).joined(separator: ","))]
+            )
+        }
+        return (responseHeaders, extensions)
     }
 
     public var responder: @Sendable (Request, Channel) async throws -> Response

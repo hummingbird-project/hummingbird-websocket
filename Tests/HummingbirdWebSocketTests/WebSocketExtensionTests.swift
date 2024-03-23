@@ -24,29 +24,27 @@ import XCTest
 
 final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
-        serverExtensions: [WebSocketExtensionFactory] = [],
+        serverChannel: HTTPChannelBuilder<HTTP1WebSocketUpgradeChannel>,
         clientExtensions: [WebSocketExtensionFactory] = [],
-        server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketRequestContext>,
         client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
             let serverLogger = {
                 var logger = Logger(label: "WebSocketServer")
-                logger.logLevel = .debug
+                logger.logLevel = .trace
                 return logger
             }()
             let clientLogger = {
                 var logger = Logger(label: "WebSocketClient")
-                logger.logLevel = .debug
+                logger.logLevel = .trace
                 return logger
             }()
-            let router = Router(context: BasicWebSocketRequestContext.self)
-            router.ws("/test", onUpgrade: serverHandler)
             let serviceGroup: ServiceGroup
+            let router = Router()
             let app = Application(
                 router: router,
-                server: .webSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: serverExtensions)),
+                server: serverChannel,
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: serverLogger
             )
@@ -83,6 +81,21 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 throw error
             }
         }
+    }
+
+    func testClientAndServer(
+        serverExtensions: [WebSocketExtensionFactory] = [],
+        clientExtensions: [WebSocketExtensionFactory] = [],
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
+    ) async throws {
+        try await self.testClientAndServer(
+            serverChannel: .webSocketUpgrade(configuration: .init(extensions: serverExtensions)) { _, _, _ in
+                .upgrade([:], serverHandler)
+            },
+            clientExtensions: clientExtensions,
+            client: clientHandler
+        )
     }
 
     /// Create random buffer
@@ -176,210 +189,77 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             try await outbound.write(.text("Hello"))
             for try await _ in inbound {}
         }
-        /*    onServer: { ws in
-                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
-                 let stream = ws.readStream()
-                 Task {
-                     var iterator = stream.makeAsyncIterator()
-                     let firstMessage = await iterator.next()
-                     XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
-                     let secondMessage = await iterator.next()
-                     XCTAssertEqual(secondMessage, .text("Hello"))
-                     for await _ in stream {}
-                     ws.onClose { _ in
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { ws in
-                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
-                 try await ws.write(.text("Hello, testing this is compressed"))
-                 try await ws.write(.text("Hello"))
-                 try await ws.close()
-             }
-         )*/
     }
 
-    /*     static var eventLoopGroup: EventLoopGroup!
+    func testPerMessageDeflateMaxWindow() async throws {
+        let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
+        try await self.testClientAndServer(
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate(maxWindow: 10)]
+        ) { inbound, outbound, _ in
+            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
+            for try await data in inbound {
+                XCTAssertEqual(data, .binary(buffer))
+            }
+        } client: { _, outbound, _ in
+            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
+            try await outbound.write(.binary(buffer))
+        }
+    }
 
-     override class func setUp() {
-         self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-     }
+    func testPerMessageDeflateNoContextTakeover() async throws {
+        let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
+        try await self.testClientAndServer(
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true)]
+        ) { inbound, outbound, _ in
+            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
+            for try await data in inbound {
+                XCTAssertEqual(data, .binary(buffer))
+            }
+        } client: { _, outbound, _ in
+            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
 
-     override class func tearDown() {
-         XCTAssertNoThrow(try self.eventLoopGroup.syncShutdownGracefully())
-     }
+            try await outbound.write(.binary(buffer))
+        }
+    }
 
-     /// Create random buffer
-     /// - Parameters:
-     ///   - size: size of buffer
-     ///   - randomness: how random you want the buffer to be (percentage)
-     func createRandomBuffer(size: Int, randomness: Int = 100) -> ByteBuffer {
-         var buffer = ByteBufferAllocator().buffer(capacity: size)
-         let randomness = (randomness * randomness) / 100
-         for i in 0..<size {
-             let random = Int.random(in: 0..<25600)
-             if random < randomness * 256 {
-                 buffer.writeInteger(UInt8(random & 0xFF))
-             } else {
-                 buffer.writeInteger(UInt8(i & 0xFF))
-             }
-         }
-         return buffer
-     }
+    func testPerMessageExtensionOrdering() async throws {
+        let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
+        try await self.testClientAndServer(
+            serverExtensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true)],
+            clientExtensions: [.xor(value: 34), .perMessageDeflate()]
+        ) { inbound, _, _ in
+            for try await data in inbound {
+                XCTAssertEqual(data, .binary(buffer))
+            }
+        } client: { _, outbound, _ in
+            try await outbound.write(.binary(buffer))
+        }
+    }
 
-     func setupClientAndServer(
-         serverExtensions: [WebSocketExtensionFactory] = [],
-         clientExtensions: [WebSocketExtensionFactory] = [],
-         onServer: @escaping (WebSocket) async throws -> Void,
-         onClient: @escaping (WebSocket) async throws -> Void
-     ) async throws -> HBApplication {
-         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
-         app.logger.logLevel = .trace
-         // add HTTP to WebSocket upgrade
-         app.ws.addUpgrade(maxFrameSize: 1 << 14, extensions: serverExtensions)
-         // on websocket connect.
-         app.ws.on("/test", onUpgrade: { _, ws in
-             try await onServer(ws)
-             return .ok
-         })
-         try app.start()
-
-         let eventLoop = app.eventLoopGroup.next()
-         let ws = try await WebSocketClient.connect(
-             url: HBURL("ws://localhost:\(app.server.port!)/test"),
-             configuration: .init(extensions: clientExtensions),
-             on: eventLoop
-         )
-         try await onClient(ws)
-         return app
-     }
-
-     func testPerMessageDeflate() async throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         let app = try await self.setupClientAndServer(
-             serverExtensions: [.perMessageDeflate()],
-             clientExtensions: [.perMessageDeflate()],
-             onServer: { ws in
-                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
-                 let stream = ws.readStream()
-                 Task {
-                     var iterator = stream.makeAsyncIterator()
-                     let firstMessage = await iterator.next()
-                     XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
-                     let secondMessage = await iterator.next()
-                     XCTAssertEqual(secondMessage, .text("Hello"))
-                     for await _ in stream {}
-                     ws.onClose { _ in
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { ws in
-                 XCTAssertNotNil(ws.extensions.first as? PerMessageDeflateExtension)
-                 try await ws.write(.text("Hello, testing this is compressed"))
-                 try await ws.write(.text("Hello"))
-                 try await ws.close()
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testPerMessageDeflateMaxWindow() async throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
-         let app = try await self.setupClientAndServer(
-             serverExtensions: [.perMessageDeflate()],
-             clientExtensions: [.perMessageDeflate(maxWindow: 10)],
-             onServer: { ws in
-                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
-                 let stream = ws.readStream()
-                 Task {
-                     for try await data in stream {
-                         XCTAssertEqual(data, .binary(buffer))
-                     }
-                     ws.onClose { _ in
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { ws in
-                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
-                 try await ws.write(.binary(buffer))
-                 try await ws.close()
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testPerMessageDeflateNoContextTakeover() async throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
-         let app = try await self.setupClientAndServer(
-             serverExtensions: [.perMessageDeflate()],
-             clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true)],
-             onServer: { ws in
-                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
-                 let stream = ws.readStream()
-                 Task {
-                     for try await data in stream {
-                         XCTAssertEqual(data, .binary(buffer))
-                     }
-                     ws.onClose { _ in
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { ws in
-                 XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
-                 try await ws.write(.binary(buffer))
-                 try await ws.close()
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testPerMessageExtensionOrdering() async throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
-         let app = try await self.setupClientAndServer(
-             serverExtensions: [.xor(), .perMessageDeflate()],
-             clientExtensions: [.xor(value: 34), .perMessageDeflate()],
-             onServer: { ws in
-                 // XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
-                 let stream = ws.readStream()
-                 Task {
-                     for try await data in stream {
-                         XCTAssertEqual(data, .binary(buffer))
-                     }
-                     ws.onClose { _ in
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { ws in
-                 // XCTAssertEqual((ws.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
-                 try await ws.write(.binary(buffer))
-                 try await ws.close()
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }*/
+    func testPerMessageDeflateWithRouter() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        router.ws("/test") { inbound, _, _ in
+            var iterator = inbound.makeAsyncIterator()
+            let firstMessage = await iterator.next()
+            XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+            let secondMessage = await iterator.next()
+            XCTAssertEqual(secondMessage, .text("Hello"))
+        }
+        try await self.testClientAndServer(
+            serverChannel: .webSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
+            clientExtensions: [.perMessageDeflate()]
+        ) { inbound, outbound, _ in
+            try await outbound.write(.text("Hello, testing this is compressed"))
+            try await outbound.write(.text("Hello"))
+            for try await _ in inbound {}
+        }
+    }
 }
 
 struct XorWebSocketExtension: WebSocketExtension {
+    let name = "xor"
     func shutdown() {}
 
     func xorFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) -> WebSocketFrame {
@@ -427,11 +307,11 @@ struct XorWebSocketExtensionBuilder: WebSocketExtensionBuilder {
         return header
     }
 
-    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 
-    func clientExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
+    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 }

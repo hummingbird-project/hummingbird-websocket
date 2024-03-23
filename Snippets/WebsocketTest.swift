@@ -1,6 +1,7 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdWebSocket
+import HummingbirdWSCompression
 import Logging
 
 var logger = Logger(label: "Echo")
@@ -22,7 +23,7 @@ router.ws("/ws") { inbound, outbound, _ in
 
 let app = Application(
     router: router,
-    server: .webSocketUpgrade(webSocketRouter: router),
+    server: .webSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
     logger: logger
 )
 try await app.runService()

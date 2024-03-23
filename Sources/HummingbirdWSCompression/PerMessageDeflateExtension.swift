@@ -89,17 +89,15 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
     /// Create server PerMessageDeflateExtension based off request headers
     /// - Parameters:
     ///   - request: Client request
-    ///   - eventLoop: EventLoop it is bound to
-    func serverExtension(from request: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> (WebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
         let configuration = self.responseConfiguration(to: request)
-        return try PerMessageDeflateExtension(configuration: configuration, eventLoop: eventLoop)
+        return try PerMessageDeflateExtension(configuration: configuration)
     }
 
     /// Create client PerMessageDeflateExtension based off response headers
     /// - Parameters:
     ///   - response: Server response
-    ///   - eventLoop: EventLoop it is bound to
-    func clientExtension(from response: WebSocketExtensionHTTPParameters, eventLoop: EventLoop) throws -> WebSocketExtension? {
+    func clientExtension(from response: WebSocketExtensionHTTPParameters) throws -> WebSocketExtension? {
         let clientMaxWindowParam = response.parameters["client_max_window_bits"]?.integer
         let clientNoContextTakeoverParam = response.parameters["client_no_context_takeover"] != nil
         let serverMaxWindowParam = response.parameters["server_max_window_bits"]?.integer
@@ -112,7 +110,7 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
             compressionLevel: self.compressionLevel,
             memoryLevel: self.memoryLevel,
             maxDecompressedFrameSize: self.maxDecompressedFrameSize
-        ), eventLoop: eventLoop)
+        ))
     }
 
     private func responseConfiguration(to request: WebSocketExtensionHTTPParameters) -> PerMessageDeflateExtension.Configuration {
@@ -230,43 +228,12 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         }
     }
 
-    /// Internal mutable state and referenced types, that cannot be set to Sendable
-    /* class InternalState {
-         fileprivate let decompressor: any NIODecompressor
-         fileprivate let compressor: any NIOCompressor
-         fileprivate var sendState: SendState
-
-         init(configuration: Configuration) throws {
-             self.decompressor = CompressionAlgorithm.deflate(
-                 configuration: .init(
-                     windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
-                 )
-             ).decompressor
-             // compression level -1 will setup the default compression level, 8 is the default memory level
-             self.compressor = CompressionAlgorithm.deflate(
-                 configuration: .init(
-                     windowSize: numericCast(configuration.sendMaxWindow ?? 15),
-                     compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
-                     memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
-                 )
-             ).compressor
-             self.sendState = .idle
-             try self.decompressor.startStream()
-             try self.compressor.startStream()
-         }
-
-         func shutdown() {
-             try? self.compressor.finishStream()
-             try? self.decompressor.finishStream()
-         }
-     } */
-
+    let name = "permessage-deflate"
     let configuration: Configuration
     let decompressor: Decompressor
     let compressor: Compressor
-    // let internalState: NIOLoopBound<InternalState>
 
-    init(configuration: Configuration, eventLoop: EventLoop) throws {
+    init(configuration: Configuration) throws {
         self.configuration = configuration
         self.decompressor = try .init(
             CompressionAlgorithm.deflate(
