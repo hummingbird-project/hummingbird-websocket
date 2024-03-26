@@ -180,9 +180,9 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             clientExtensions: [.perMessageDeflate()]
         ) { inbound, _, _ in
             var iterator = inbound.makeAsyncIterator()
-            let firstMessage = await iterator.next()
+            let firstMessage = try await iterator.next()
             XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
-            let secondMessage = await iterator.next()
+            let secondMessage = try await iterator.next()
             XCTAssertEqual(secondMessage, .text("Hello"))
         } client: { inbound, outbound, _ in
             try await outbound.write(.text("Hello, testing this is compressed"))
@@ -197,12 +197,14 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.perMessageDeflate()],
             clientExtensions: [.perMessageDeflate(maxWindow: 10)]
         ) { inbound, outbound, _ in
-            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
+            let extensions = await outbound.handler.extensions
+            XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
             for try await data in inbound {
                 XCTAssertEqual(data, .binary(buffer))
             }
         } client: { _, outbound, _ in
-            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
+            let extensions = await outbound.handler.extensions
+            XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
             try await outbound.write(.binary(buffer))
         }
     }
@@ -213,12 +215,14 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.perMessageDeflate()],
             clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true)]
         ) { inbound, outbound, _ in
-            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
+            let extensions = await outbound.handler.extensions
+            XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
             for try await data in inbound {
                 XCTAssertEqual(data, .binary(buffer))
             }
         } client: { _, outbound, _ in
-            XCTAssertEqual((outbound.extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
+            let extensions = await outbound.handler.extensions
+            XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
 
             try await outbound.write(.binary(buffer))
         }
@@ -242,9 +246,9 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/test") { inbound, _, _ in
             var iterator = inbound.makeAsyncIterator()
-            let firstMessage = await iterator.next()
+            let firstMessage = try await iterator.next()
             XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
-            let secondMessage = await iterator.next()
+            let secondMessage = try await iterator.next()
             XCTAssertEqual(secondMessage, .text("Hello"))
         }
         try await self.testClientAndServer(
