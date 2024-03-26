@@ -54,7 +54,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketChannelHandler> in
                 try shouldUpgrade(head, channel, logger)
                     .map { headers, handler -> (HTTPFields, WebSocketChannelHandler) in
-                        let (headers, extensions) = try Self.webSocketExtensionNegociation(
+                        let (headers, extensions) = try Self.webSocketExtensionNegotiation(
                             extensionBuilders: configuration.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: headers,
