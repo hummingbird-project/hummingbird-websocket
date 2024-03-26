@@ -86,7 +86,7 @@ actor WebSocketHandler {
         let webSocketOutbound = WebSocketOutboundWriter(handler: self)
         var inboundIterator = inbound.makeAsyncIterator()
         let webSocketInbound = WebSocketInboundStream(
-            inboundIterator: inboundIterator,
+            iterator: inboundIterator,
             handler: self
         )
         try? await withGracefulShutdownHandler {
