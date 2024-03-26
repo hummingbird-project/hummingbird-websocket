@@ -31,4 +31,9 @@ public struct WebSocketContext: WebSocketContextProtocol {
         self.logger = logger
         self.allocator = channel.allocator
     }
+
+    init(allocator: ByteBufferAllocator, logger: Logger) {
+        self.allocator = allocator
+        self.logger = logger
+    }
 }

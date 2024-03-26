@@ -223,7 +223,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text("Hello"))
         } client: { inbound, _, _ in
             var inboundIterator = inbound.makeAsyncIterator()
-            let msg = await inboundIterator.next()
+            let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         }
     }
@@ -231,7 +231,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testClientToServerMessage() async throws {
         try await self.testClientAndServer { inbound, _, _ in
             var inboundIterator = inbound.makeAsyncIterator()
-            let msg = await inboundIterator.next()
+            let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         } client: { _, outbound, _ in
             try await outbound.write(.text("Hello"))
@@ -250,7 +250,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer2)))
 
             var inboundIterator = inbound.makeAsyncIterator()
-            let msg = await inboundIterator.next()
+            let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello World!"))
         }
     }
@@ -302,7 +302,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 logger: logger
             ) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
-                let msg = await inboundIterator.next()
+                let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Hello"))
             }
         }
@@ -390,7 +390,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             group.addTask {
                 try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
                     var inboundIterator = inbound.makeAsyncIterator()
-                    let msg = await inboundIterator.next()
+                    let msg = try await inboundIterator.next()
                     XCTAssertEqual(msg, .text("Hello"))
                 }
             }
@@ -414,14 +414,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
             try WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
-                let msg = await inboundIterator.next()
+                let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("One"))
             }
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
             try WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
-                let msg = await inboundIterator.next()
+                let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Two"))
             }
         }
@@ -487,7 +487,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
                 try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
-                    let text = await inbound.first { _ in true }
+                    let text = try await inbound.first { _ in true }
                     XCTAssertEqual(text, .text("Roger Moore"))
                 }
             }
