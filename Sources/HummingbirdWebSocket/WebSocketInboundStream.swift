@@ -17,34 +17,39 @@ import NIOConcurrencyHelpers
 import NIOCore
 import NIOWebSocket
 
-private let webSocketPingDataSize = 16
-
 /// Inbound websocket data AsyncSequence
-// public typealias WebSocketInboundStream = AsyncChannel<WebSocketDataFrame>
-
 public final class WebSocketInboundStream: AsyncSequence, Sendable {
-    typealias InboundIterator = NIOAsyncChannelInboundStream<WebSocketFrame>.AsyncIterator
-    let inboundIterator: UnsafeTransfer<InboundIterator>
+    typealias UnderlyingIterator = NIOAsyncChannelInboundStream<WebSocketFrame>.AsyncIterator
+    /// Underlying NIOAsyncChannelInboundStream
+    let underlyingIterator: UnsafeTransfer<UnderlyingIterator>
+    /// Handler for websockets
     let handler: WebSocketHandler
+    internal let alreadyIterated: NIOLockedValueBox<Bool>
 
     init(
-        inboundIterator: InboundIterator,
+        iterator: UnderlyingIterator,
         handler: WebSocketHandler
     ) {
-        self.inboundIterator = .init(inboundIterator)
+        self.underlyingIterator = .init(iterator)
         self.handler = handler
+        self.alreadyIterated = .init(false)
     }
 
+    /// Inbound websocket data AsyncSequence iterator
     public struct AsyncIterator: AsyncIteratorProtocol {
         let handler: WebSocketHandler
-        var iterator: InboundIterator
+        var iterator: UnderlyingIterator
+        var closed: Bool
 
-        init(sequence: WebSocketInboundStream) {
+        init(sequence: WebSocketInboundStream, closed: Bool) {
             self.handler = sequence.handler
-            self.iterator = sequence.inboundIterator.wrappedValue
+            self.iterator = sequence.underlyingIterator.wrappedValue
+            self.closed = closed
         }
 
+        /// Return next WebSocket frame, while dealing with any other frames
         public mutating func next() async throws -> WebSocketDataFrame? {
+            guard !self.closed else { return nil }
             // parse messages coming from inbound
             var frameSequence: WebSocketFrameSequence?
             while let frame = try await self.iterator.next() {
@@ -55,6 +60,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         // we received a connection close.
                         // send a close back if it hasn't already been send and exit
                         _ = try await self.handler.close(code: .normalClosure)
+                        self.closed = true
                         return nil
                     case .ping:
                         try await self.handler.onPing(frame)
@@ -79,6 +85,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                     }
                     if let frameSeq = frameSequence, frame.fin {
                         var collatedFrame = frameSeq.collapsed
+                        // apply extensions
                         for ext in self.handler.extensions.reversed() {
                             collatedFrame = try await ext.processReceivedFrame(collatedFrame, context: self.handler.context)
                         }
@@ -101,7 +108,17 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
 
     public typealias Element = WebSocketDataFrame
 
+    /// Creates the Asynchronous Iterator
     public func makeAsyncIterator() -> AsyncIterator {
-        .init(sequence: self)
+        // verify if an iterator has already been created. If it has then create an
+        // iterator that returns nothing. This could be a precondition failure (currently
+        // an assert) as you should not be allowed to do this.
+        let done = self.alreadyIterated.withLockedValue {
+            assert($0 == false, "Can only create iterator from WebSocketInboundStream once")
+            let done = $0
+            $0 = true
+            return done
+        }
+        return .init(sequence: self, closed: done)
     }
 }
