@@ -210,7 +210,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         }
     }
 
-    /// WebSocket extension negociation
+    /// WebSocket extension negotiation
     /// - Parameters:
     ///   - requestHeaders: Request headers
     ///   - headers: Response headers
