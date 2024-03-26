@@ -141,7 +141,7 @@ extension HTTP1WebSocketUpgradeChannel {
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        let (headers, extensions) = try Self.webSocketExtensionNegociation(
+                        let (headers, extensions) = try Self.webSocketExtensionNegotiation(
                             extensionBuilders: configuration.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: response.headers,
