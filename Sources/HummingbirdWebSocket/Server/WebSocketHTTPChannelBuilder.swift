@@ -24,9 +24,9 @@ extension HTTPChannelBuilder {
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<WebSocketContext>>
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel> {
+    ) -> HTTPChannelBuilder<HTTP1WebSocketUpgradeChannel> {
         return .init { responder in
-            return HTTP1AndWebSocketChannel(
+            return HTTP1WebSocketUpgradeChannel(
                 responder: responder,
                 configuration: configuration,
                 additionalChannelHandlers: additionalChannelHandlers,
@@ -40,9 +40,9 @@ extension HTTPChannelBuilder {
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<WebSocketContext>>
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel> {
+    ) -> HTTPChannelBuilder<HTTP1WebSocketUpgradeChannel> {
         return .init { responder in
-            return HTTP1AndWebSocketChannel(
+            return HTTP1WebSocketUpgradeChannel(
                 responder: responder,
                 configuration: configuration,
                 additionalChannelHandlers: additionalChannelHandlers,

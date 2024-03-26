@@ -19,6 +19,8 @@ public struct WebSocketClientConfiguration: Sendable {
     public var maxFrameSize: Int
     /// Additional headers to be sent with the initial HTTP request
     public var additionalHeaders: HTTPFields
+    /// WebSocket extensions
+    public var extensions: [any WebSocketExtensionBuilder]
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
@@ -26,9 +28,11 @@ public struct WebSocketClientConfiguration: Sendable {
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     public init(
         maxFrameSize: Int = (1 << 14),
-        additionalHeaders: HTTPFields = .init()
+        additionalHeaders: HTTPFields = .init(),
+        extensions: [WebSocketExtensionFactory] = []
     ) {
         self.maxFrameSize = maxFrameSize
         self.additionalHeaders = additionalHeaders
+        self.extensions = extensions.map { $0.build() }
     }
 }

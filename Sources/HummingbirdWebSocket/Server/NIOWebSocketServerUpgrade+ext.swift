@@ -25,12 +25,13 @@ public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
     case upgrade(HTTPFields, Value)
 
     /// Map upgrade result to difference type
-    func map<Result>(_ map: (Value) throws -> Result) rethrows -> ShouldUpgradeResult<Result> {
+    func map<Result>(_ map: (HTTPFields, Value) throws -> (HTTPFields, Result)) rethrows -> ShouldUpgradeResult<Result> {
         switch self {
         case .dontUpgrade:
             return .dontUpgrade
         case .upgrade(let headers, let value):
-            return try .upgrade(headers, map(value))
+            let result = try map(headers, value)
+            return .upgrade(result.0, result.1)
         }
     }
 }
