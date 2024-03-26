@@ -91,7 +91,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             promise.completeWithTask {
                 try await shouldUpgrade(head, channel, logger)
                     .map { headers, handler in
-                        let (headers, extensions) = try Self.webSocketExtensionNegociation(
+                        let (headers, extensions) = try Self.webSocketExtensionNegotiation(
                             extensionBuilders: configuration.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: headers,
