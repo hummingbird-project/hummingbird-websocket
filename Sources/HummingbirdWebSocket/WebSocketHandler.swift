@@ -153,7 +153,6 @@ actor WebSocketHandler {
     func onPong(
         _ frame: WebSocketFrame
     ) async throws {
-        guard !self.closed else { return }
         let frameData = frame.unmaskedData
         guard self.pingData.readableBytes == 0 || frameData == self.pingData else {
             try await self.close(code: .goingAway)
@@ -202,112 +201,6 @@ actor WebSocketHandler {
         guard self.type == .client else { return nil }
         let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: .min ... .max) }
         return WebSocketMaskingKey(bytes)
-    }
-
-    actor WebSocketInternal {
-        static let pingDataSize = 16
-        var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
-        let type: WebSocketType
-        let extensions: [any WebSocketExtension]
-        let context: WebSocketContext
-        var pingData: ByteBuffer
-        var closed = false
-
-        init(
-            outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
-            type: WebSocketType,
-            extensions: [any WebSocketExtension],
-            context: some WebSocketContextProtocol
-        ) {
-            self.outbound = outbound
-            self.type = type
-            self.extensions = extensions
-            self.context = .init(allocator: context.allocator, logger: context.logger)
-            self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
-            self.closed = false
-        }
-
-        /// Send WebSocket frame
-        func write(frame: WebSocketFrame) async throws {
-            var frame = frame
-            do {
-                for ext in self.extensions {
-                    frame = try await ext.processFrameToSend(frame, context: self.context)
-                }
-            } catch {
-                self.context.logger.debug("Closing as we failed to generate valid frame data")
-                throw WebSocketHandler.InternalError.close(.unexpectedServerError)
-            }
-            frame.maskKey = self.makeMaskKey()
-            try await self.outbound.write(frame)
-
-            self.context.logger.trace("Sent \(frame.opcode)")
-        }
-
-        func finish() {
-            self.outbound.finish()
-        }
-
-        /// Respond to ping
-        func onPing(
-            _ frame: WebSocketFrame
-        ) async throws {
-            if frame.fin {
-                try await self.pong(data: frame.unmaskedData)
-            } else {
-                try await self.close(code: .protocolError)
-            }
-        }
-
-        /// Respond to pong
-        func onPong(
-            _ frame: WebSocketFrame
-        ) async throws {
-            guard !self.closed else { return }
-            let frameData = frame.unmaskedData
-            guard self.pingData.readableBytes == 0 || frameData == self.pingData else {
-                try await self.close(code: .goingAway)
-                return
-            }
-            self.pingData.clear()
-        }
-
-        /// Send ping
-        func ping() async throws {
-            guard !self.closed else { return }
-            if self.pingData.readableBytes == 0 {
-                // creating random payload
-                let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
-                self.pingData.writeBytes(random)
-            }
-            try await self.outbound.write(.init(fin: true, opcode: .ping, data: self.pingData))
-        }
-
-        /// Send pong
-        func pong(data: ByteBuffer?) async throws {
-            guard !self.closed else { return }
-            try await self.outbound.write(.init(fin: true, opcode: .pong, data: data ?? .init()))
-        }
-
-        /// Send close
-        func close(
-            code: WebSocketErrorCode = .normalClosure
-        ) async throws {
-            guard !self.closed else { return }
-            self.closed = true
-
-            var buffer = self.context.allocator.buffer(capacity: 2)
-            buffer.write(webSocketErrorCode: code)
-            try await self.outbound.write(.init(fin: true, opcode: .connectionClose, data: buffer))
-            self.outbound.finish()
-        }
-
-        /// Make mask key to be used in WebSocket frame
-        private func makeMaskKey() -> WebSocketMaskingKey? {
-            guard self.type == .client else { return nil }
-            let bytes: [UInt8] = (0...3).map { _ in UInt8.random(in: .min ... .max) }
-            return WebSocketMaskingKey(bytes)
-        }
     }
 }
 
