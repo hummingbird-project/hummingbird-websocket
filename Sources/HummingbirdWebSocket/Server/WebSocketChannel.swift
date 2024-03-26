@@ -216,7 +216,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - headers: Response headers
     ///   - logger: Logger
     /// - Returns: Response headers and extensions enabled
-    static func webSocketExtensionNegociation(
+    static func webSocketExtensionNegotiation(
         extensionBuilders: [any WebSocketExtensionBuilder],
         requestHeaders: HTTPFields,
         responseHeaders: HTTPFields,
