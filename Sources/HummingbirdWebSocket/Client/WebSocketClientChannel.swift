@@ -92,8 +92,13 @@ struct WebSocketClientChannel: ClientConnectionChannel {
     func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
         case .websocket(let webSocketChannel, let extensions):
-            let webSocket = WebSocketHandler(asyncChannel: webSocketChannel, type: .client, extensions: extensions)
-            await webSocket.handle(handler: self.handler, context: WebSocketContext(channel: webSocketChannel.channel, logger: logger))
+            await WebSocketHandler.handle(
+                type: .client,
+                extensions: extensions,
+                asyncChannel: webSocketChannel,
+                context: WebSocketContext(channel: webSocketChannel.channel, logger: logger),
+                handler: self.handler
+            )
         case .notUpgraded:
             // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")
