@@ -8,7 +8,7 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17)],
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
-        // .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
+        .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "main"),
@@ -18,7 +18,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
-        .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.5.0"),
         .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
     ],
     targets: [
@@ -32,13 +31,13 @@ let package = Package(
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
-        /*    .target(name: "HummingbirdWSCompression", dependencies: [
-                .byName(name: "HummingbirdWSCore"),
-                .product(name: "CompressNIO", package: "compress-nio"),
-            ]),*/
+        .target(name: "HummingbirdWSCompression", dependencies: [
+            .byName(name: "HummingbirdWebSocket"),
+            .product(name: "CompressNIO", package: "compress-nio"),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
-            // .byName(name: "HummingbirdWSCompression"),
+            .byName(name: "HummingbirdWSCompression"),
             .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),

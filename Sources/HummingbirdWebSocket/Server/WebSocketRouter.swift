@@ -117,8 +117,8 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     }
 }
 
-extension HTTP1AndWebSocketChannel {
-    ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
+extension HTTP1WebSocketUpgradeChannel {
+    ///  Initialize HTTP1WebSocketUpgradeChannel with async `shouldUpgrade` function
     /// - Parameters:
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - responder: HTTP responder
@@ -141,8 +141,14 @@ extension HTTP1AndWebSocketChannel {
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
-                        return .upgrade(response.headers) { asyncChannel, _ in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server)
+                        let (headers, extensions) = try Self.webSocketExtensionNegotiation(
+                            extensionBuilders: configuration.extensions,
+                            requestHeaders: head.headerFields,
+                            responseHeaders: response.headers,
+                            logger: logger
+                        )
+                        return .upgrade(headers) { asyncChannel, _ in
+                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
                         }
                     } else {
@@ -174,10 +180,10 @@ extension HTTPChannelBuilder {
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
-    ) -> HTTPChannelBuilder<HTTP1AndWebSocketChannel> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+    ) -> HTTPChannelBuilder<HTTP1WebSocketUpgradeChannel> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
-            return HTTP1AndWebSocketChannel(
+            return HTTP1WebSocketUpgradeChannel(
                 responder: responder,
                 webSocketResponder: webSocketReponder,
                 configuration: configuration,

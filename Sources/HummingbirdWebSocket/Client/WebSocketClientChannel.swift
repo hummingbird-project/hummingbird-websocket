@@ -22,7 +22,7 @@ import NIOWebSocket
 
 struct WebSocketClientChannel: ClientConnectionChannel {
     enum UpgradeResult {
-        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>)
+        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
         case notUpgraded
     }
 
@@ -42,10 +42,16 @@ struct WebSocketClientChannel: ClientConnectionChannel {
         channel.eventLoop.makeCompletedFuture {
             let upgrader = NIOTypedWebSocketClientUpgrader<UpgradeResult>(
                 maxFrameSize: self.configuration.maxFrameSize,
-                upgradePipelineHandler: { channel, _ in
+                upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
-                        return UpgradeResult.websocket(asyncChannel)
+                        // work out what extensions we should add based off the server response
+                        let headerFields = HTTPFields(head.headers, splitCookie: false)
+                        let serverExtensions = WebSocketExtensionHTTPParameters.parseHeaders(headerFields)
+                        let extensions = try configuration.extensions.compactMap {
+                            try $0.clientExtension(from: serverExtensions)
+                        }
+                        return UpgradeResult.websocket(asyncChannel, extensions)
                     }
                 }
             )
@@ -55,6 +61,8 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             headers.add(name: "Content-Length", value: "0")
             let additionalHeaders = HTTPHeaders(self.configuration.additionalHeaders)
             headers.add(contentsOf: additionalHeaders)
+            // add websocket extensions to headers
+            headers.add(contentsOf: self.configuration.extensions.map { (name: "Sec-WebSocket-Extensions", value: $0.clientRequestHeader()) })
 
             let requestHead = HTTPRequestHead(
                 version: .http1_1,
@@ -83,8 +91,8 @@ struct WebSocketClientChannel: ClientConnectionChannel {
 
     func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
-        case .websocket(let webSocketChannel):
-            let webSocket = WebSocketHandler(asyncChannel: webSocketChannel, type: .client)
+        case .websocket(let webSocketChannel, let extensions):
+            let webSocket = WebSocketHandler(asyncChannel: webSocketChannel, type: .client, extensions: extensions)
             await webSocket.handle(handler: self.handler, context: WebSocketContext(channel: webSocketChannel.channel, logger: logger))
         case .notUpgraded:
             // The upgrade to websocket did not succeed.
