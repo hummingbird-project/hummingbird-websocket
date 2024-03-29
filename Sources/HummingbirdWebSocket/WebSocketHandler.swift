@@ -39,6 +39,7 @@ actor WebSocketHandler {
     let extensions: [any WebSocketExtension]
     let context: WebSocketContext
     var pingData: ByteBuffer
+    var pingTime: ContinuousClock.Instant = .now
     var closed = false
 
     private init(
@@ -58,15 +59,37 @@ actor WebSocketHandler {
     static func handle<Context: WebSocketContextProtocol>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
+        pingTimeout: Duration = .seconds(5),
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
         context: Context,
         handler: @escaping WebSocketDataHandler<Context>
     ) async {
         try? await asyncChannel.executeThenClose { inbound, outbound in
             await withTaskCancellationHandler {
-                await withThrowingTaskGroup(of: Void.self) { _ in
+                await withThrowingTaskGroup(of: Void.self) { group in
                     let webSocketHandler = Self(outbound: outbound, type: type, extensions: extensions, context: context)
+                    /// Add task sending ping frames every so often and verifying a pong frame was sent back
+                    group.addTask {
+                        var waitTime = pingTimeout
+                        while true {
+                            try await Task.sleep(for: waitTime)
+                            if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
+                                // if time is less than timeout value, set wait time to when it would timeout
+                                // and re-run loop
+                                if timeSinceLastPing < pingTimeout {
+                                    waitTime = pingTimeout - timeSinceLastPing
+                                    continue
+                                } else {
+                                    try await asyncChannel.channel.close(mode: .input)
+                                    return
+                                }
+                            }
+                            try await webSocketHandler.ping()
+                            waitTime = pingTimeout
+                        }
+                    }
                     await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
+                    group.cancelAll()
                 }
             } onCancel: {
                 Task {
@@ -152,12 +175,11 @@ actor WebSocketHandler {
     /// Respond to pong
     func onPong(
         _ frame: WebSocketFrame
-    ) async throws {
+    ) throws {
         let frameData = frame.unmaskedData
-        guard self.pingData.readableBytes == 0 || frameData == self.pingData else {
-            try await self.close(code: .goingAway)
-            return
-        }
+        // ignore pong frames with frame data not the same as the last ping
+        guard frameData == self.pingData else { return }
+        // clear ping data
         self.pingData.clear()
     }
 
@@ -169,13 +191,20 @@ actor WebSocketHandler {
             let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
             self.pingData.writeBytes(random)
         }
-        try await self.outbound.write(.init(fin: true, opcode: .ping, data: self.pingData))
+        self.pingTime = .now
+        try await self.write(frame: .init(fin: true, opcode: .ping, data: self.pingData))
     }
 
     /// Send pong
     func pong(data: ByteBuffer?) async throws {
         guard !self.closed else { return }
-        try await self.outbound.write(.init(fin: true, opcode: .pong, data: data ?? .init()))
+        try await self.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
+    }
+
+    /// Return time ping occurred if it is still waiting for a pong
+    func getTimeSinceLastWaitingPing() -> Duration? {
+        guard self.pingData.readableBytes > 0 else { return nil }
+        return .now - self.pingTime
     }
 
     /// Send close
