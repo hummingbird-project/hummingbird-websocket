@@ -65,6 +65,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             await WebSocketHandler.handle(
                                 type: .server,
                                 extensions: extensions,
+                                autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
                                 context: context,
                                 handler: handler
@@ -107,6 +108,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             await WebSocketHandler.handle(
                                 type: .server,
                                 extensions: extensions,
+                                autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
                                 context: context,
                                 handler: handler

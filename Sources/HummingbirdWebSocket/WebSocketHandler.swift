@@ -24,6 +24,14 @@ public enum WebSocketType: Sendable {
     case server
 }
 
+/// Automatic ping setup
+public enum AutoPingSetup: Sendable {
+    /// disable auto ping
+    case disabled
+    /// send ping with fixed period
+    case enabled(timePeriod: Duration)
+}
+
 /// Handler processing raw WebSocket packets.
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
@@ -59,7 +67,7 @@ actor WebSocketHandler {
     static func handle<Context: WebSocketContextProtocol>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
-        pingTimeout: Duration = .seconds(5),
+        autoPing: AutoPingSetup,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
         context: Context,
         handler: @escaping WebSocketDataHandler<Context>
@@ -68,24 +76,26 @@ actor WebSocketHandler {
             await withTaskCancellationHandler {
                 await withThrowingTaskGroup(of: Void.self) { group in
                     let webSocketHandler = Self(outbound: outbound, type: type, extensions: extensions, context: context)
-                    /// Add task sending ping frames every so often and verifying a pong frame was sent back
-                    group.addTask {
-                        var waitTime = pingTimeout
-                        while true {
-                            try await Task.sleep(for: waitTime)
-                            if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
-                                // if time is less than timeout value, set wait time to when it would timeout
-                                // and re-run loop
-                                if timeSinceLastPing < pingTimeout {
-                                    waitTime = pingTimeout - timeSinceLastPing
-                                    continue
-                                } else {
-                                    try await asyncChannel.channel.close(mode: .input)
-                                    return
+                    if case .enabled(let period) = autoPing {
+                        /// Add task sending ping frames every so often and verifying a pong frame was sent back
+                        group.addTask {
+                            var waitTime = period
+                            while true {
+                                try await Task.sleep(for: waitTime)
+                                if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
+                                    // if time is less than timeout value, set wait time to when it would timeout
+                                    // and re-run loop
+                                    if timeSinceLastPing < period {
+                                        waitTime = period - timeSinceLastPing
+                                        continue
+                                    } else {
+                                        try await asyncChannel.channel.close(mode: .input)
+                                        return
+                                    }
                                 }
+                                try await webSocketHandler.ping()
+                                waitTime = period
                             }
-                            try await webSocketHandler.ping()
-                            waitTime = pingTimeout
                         }
                     }
                     await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
