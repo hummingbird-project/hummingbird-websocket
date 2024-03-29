@@ -95,7 +95,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             await WebSocketHandler.handle(
                 type: .client,
                 extensions: extensions,
-                autoPing: configuration.autoPing,
+                autoPing: self.configuration.autoPing,
                 asyncChannel: webSocketChannel,
                 context: WebSocketContext(channel: webSocketChannel.channel, logger: logger),
                 handler: self.handler
