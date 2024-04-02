@@ -25,11 +25,21 @@ public enum WebSocketType: Sendable {
 }
 
 /// Automatic ping setup
-public enum AutoPingSetup: Sendable {
+public struct AutoPingSetup: Sendable {
+    enum Internal {
+        case disabled
+        case enabled(timePeriod: Duration)
+    }
+
+    internal let value: Internal
+    internal init(_ value: Internal) {
+        self.value = value
+    }
+
     /// disable auto ping
-    case disabled
+    public static var disabled: Self { .init(.disabled) }
     /// send ping with fixed period
-    case enabled(timePeriod: Duration)
+    public static func enabled(timePeriod: Duration) -> Self { .init(.enabled(timePeriod: timePeriod)) }
 }
 
 /// Handler processing raw WebSocket packets.
@@ -76,7 +86,7 @@ actor WebSocketHandler {
             await withTaskCancellationHandler {
                 await withThrowingTaskGroup(of: Void.self) { group in
                     let webSocketHandler = Self(outbound: outbound, type: type, extensions: extensions, context: context)
-                    if case .enabled(let period) = autoPing {
+                    if case .enabled(let period) = autoPing.value {
                         /// Add task sending ping frames every so often and verifying a pong frame was sent back
                         group.addTask {
                             var waitTime = period
