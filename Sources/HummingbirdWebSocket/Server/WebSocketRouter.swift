@@ -151,6 +151,7 @@ extension HTTP1WebSocketUpgradeChannel {
                             await WebSocketHandler.handle(
                                 type: .server,
                                 extensions: extensions,
+                                autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
                                 context: webSocketHandler.context,
                                 handler: webSocketHandler.handler

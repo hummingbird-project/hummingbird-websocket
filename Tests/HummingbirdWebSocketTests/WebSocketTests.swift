@@ -75,101 +75,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testClientAndServer(
-        serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
-        shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
-    ) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            let promise = Promise<Int>()
-            let serverLogger = {
-                var logger = Logger(label: "WebSocketServer")
-                logger.logLevel = .debug
-                return logger
-            }()
-            let clientLogger = {
-                var logger = Logger(label: "WebSocketClient")
-                logger.logLevel = .debug
-                return logger
-            }()
-            let router = Router()
-            let serviceGroup: ServiceGroup
-            let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { head, _, _ in
-                if let headers = try shouldUpgrade(head) {
-                    return .upgrade(headers, serverHandler)
-                } else {
-                    return .dontUpgrade
-                }
-            }
-            if let serverTLSConfiguration {
-                let app = try Application(
-                    router: router,
-                    server: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
-                    onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                    logger: serverLogger
-                )
-                serviceGroup = ServiceGroup(
-                    configuration: .init(
-                        services: [app],
-                        gracefulShutdownSignals: [.sigterm, .sigint],
-                        logger: app.logger
-                    )
-                )
-            } else {
-                let app = Application(
-                    router: router,
-                    server: webSocketUpgrade,
-                    onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                    logger: serverLogger
-                )
-                serviceGroup = ServiceGroup(
-                    configuration: .init(
-                        services: [app],
-                        gracefulShutdownSignals: [.sigterm, .sigint],
-                        logger: app.logger
-                    )
-                )
-            }
-            group.addTask {
-                try await serviceGroup.run()
-            }
-            group.addTask {
-                let client = try await getClient(promise.wait(), clientLogger)
-                try await client.run()
-            }
-            do {
-                try await group.next()
-                await serviceGroup.triggerGracefulShutdown()
-            } catch {
-                await serviceGroup.triggerGracefulShutdown()
-                throw error
-            }
-        }
-    }
-
-    func testClientAndServer(
-        serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
-        shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
-    ) async throws {
-        try await self.testClientAndServer(
-            serverTLSConfiguration: serverTLSConfiguration,
-            server: serverHandler,
-            shouldUpgrade: shouldUpgrade,
-            getClient: { port, logger in
-                try WebSocketClient(
-                    url: .init("ws://localhost:\(port)"),
-                    logger: logger,
-                    handler: clientHandler
-                )
-            }
-        )
-    }
-
-    func testClientAndServerWithRouter(
-        webSocketRouter: Router<some WebSocketRequestContext>,
-        uri: URI,
+        serverChannel: HTTPChannelBuilder<some HTTPChannelHandler>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -188,7 +94,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let serviceGroup: ServiceGroup
             let app = Application(
                 router: router,
-                server: .webSocketUpgrade(webSocketRouter: webSocketRouter),
+                server: serverChannel,
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: serverLogger
             )
@@ -214,6 +120,63 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 throw error
             }
         }
+    }
+
+    func testClientAndServer(
+        serverTLSConfiguration: TLSConfiguration? = nil,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
+        shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
+        getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
+    ) async throws {
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { head, _, _ in
+            if let headers = try shouldUpgrade(head) {
+                return .upgrade(headers, serverHandler)
+            } else {
+                return .dontUpgrade
+            }
+        }
+        if let serverTLSConfiguration {
+            try await self.testClientAndServer(
+                serverChannel: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
+                getClient: getClient
+            )
+        } else {
+            try await self.testClientAndServer(
+                serverChannel: webSocketUpgrade,
+                getClient: getClient
+            )
+        }
+    }
+
+    func testClientAndServer(
+        serverTLSConfiguration: TLSConfiguration? = nil,
+        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
+        shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
+    ) async throws {
+        try await self.testClientAndServer(
+            serverTLSConfiguration: serverTLSConfiguration,
+            server: serverHandler,
+            shouldUpgrade: shouldUpgrade,
+            getClient: { port, logger in
+                try WebSocketClient(
+                    url: .init("ws://localhost:\(port)"),
+                    logger: logger,
+                    handler: clientHandler
+                )
+            }
+        )
+    }
+
+    func testClientAndServerWithRouter(
+        webSocketRouter: Router<some WebSocketRequestContext>,
+        getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
+    ) async throws {
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade(webSocketRouter: webSocketRouter)
+        try await self.testClientAndServer(
+            serverChannel: webSocketUpgrade,
+            getClient: getClient
+        )
     }
 
     // MARK: Tests
@@ -411,14 +374,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Two"))
         }
-        try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+        try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
             try WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("One"))
             }
         }
-        try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+        try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
             try WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
                 let msg = try await inboundIterator.next()
@@ -437,7 +400,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             })
             .get { _, _ -> Response in return .init(status: .ok) }
         do {
-            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+            try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
                 try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _, _ in }
             }
         }
@@ -451,7 +414,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text("One"))
         }
         do {
-            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+            try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
                 try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
             }
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
@@ -485,7 +448,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text(context.name))
         }
         do {
-            try await self.testClientAndServerWithRouter(webSocketRouter: router, uri: "localhost:8080") { port, logger in
+            try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
                 try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
                     let text = try await inbound.first { _ in true }
                     XCTAssertEqual(text, .text("Roger Moore"))
@@ -515,67 +478,28 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
         }
     }
-    /*
-     func testPingPong() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
 
-         let app = try self.setupClientAndServer(
-             onServer: { _ in
-             },
-             onClient: { ws in
-                 ws.onPong { _ in
-                     promise.succeed()
-                 }
-                 ws.sendPing(promise: nil)
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testAutoPing() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(30))
-         var count = 0
-
-         let app = try self.setupClientAndServer(
-             onServer: { ws in
-                 ws.initiateAutoPing(interval: .seconds(2))
-                 ws.onPong { _ in
-                     count += 1
-                     // wait for second pong, meaning auto ping caught the first one
-                     if count == 2 {
-                         promise.succeed()
-                     }
-                 }
-             },
-             onClient: { _ in
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     func testUnsolicitedPong() throws {
-         let promise = TimeoutPromise(eventLoop: Self.eventLoopGroup.next(), timeout: .seconds(10))
-
-         let app = try self.setupClientAndServer(
-             onServer: { ws in
-                 ws.onPong { _ in
-                     promise.succeed()
-                 }
-             },
-             onClient: { ws in
-                 ws.sendPong(.init(), promise: nil)
-             }
-         )
-         defer { app.stop() }
-
-         try promise.wait()
-     }
-
-     */
+    func testAutoPing() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        router.ws("/ws") { inbound, _, _ in
+            for try await _ in inbound {}
+        }
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade(
+            webSocketRouter: router,
+            configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
+        )
+        try await self.testClientAndServer(serverChannel: webSocketUpgrade) { port, logger in
+            try WebSocketClient(
+                url: .init("ws://localhost:\(port)/ws"),
+                configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
+                logger: logger
+            ) { inbound, _, _ in
+                // don't handle any inbound data for a period much longer than the auto ping period
+                try await Task.sleep(for: .milliseconds(500))
+                for try await _ in inbound {}
+            }
+        }
+    }
 }
 
 extension Logger {
