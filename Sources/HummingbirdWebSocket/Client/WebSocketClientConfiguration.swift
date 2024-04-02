@@ -21,6 +21,8 @@ public struct WebSocketClientConfiguration: Sendable {
     public var additionalHeaders: HTTPFields
     /// WebSocket extensions
     public var extensions: [any WebSocketExtensionBuilder]
+    /// Automatic ping setup
+    public var autoPing: AutoPingSetup
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
@@ -29,10 +31,12 @@ public struct WebSocketClientConfiguration: Sendable {
     public init(
         maxFrameSize: Int = (1 << 14),
         additionalHeaders: HTTPFields = .init(),
-        extensions: [WebSocketExtensionFactory] = []
+        extensions: [WebSocketExtensionFactory] = [],
+        autoPing: AutoPingSetup = .disabled
     ) {
         self.maxFrameSize = maxFrameSize
         self.additionalHeaders = additionalHeaders
         self.extensions = extensions.map { $0.build() }
+        self.autoPing = autoPing
     }
 }

@@ -61,9 +61,15 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
-                            await webSocket.handle(handler: handler, context: context)
+                            await WebSocketHandler.handle(
+                                type: .server,
+                                extensions: extensions,
+                                autoPing: configuration.autoPing,
+                                asyncChannel: asyncChannel,
+                                context: context,
+                                handler: handler
+                            )
                         })
                     }
             }
@@ -98,9 +104,15 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
                             let context = WebSocketContext(channel: channel, logger: logger)
-                            await webSocket.handle(handler: handler, context: context)
+                            await WebSocketHandler.handle(
+                                type: .server,
+                                extensions: extensions,
+                                autoPing: configuration.autoPing,
+                                asyncChannel: asyncChannel,
+                                context: context,
+                                handler: handler
+                            )
                         })
                     }
             }

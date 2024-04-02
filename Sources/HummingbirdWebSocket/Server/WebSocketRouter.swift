@@ -148,8 +148,14 @@ extension HTTP1WebSocketUpgradeChannel {
                             logger: logger
                         )
                         return .upgrade(headers) { asyncChannel, _ in
-                            let webSocket = WebSocketHandler(asyncChannel: asyncChannel, type: .server, extensions: extensions)
-                            await webSocket.handle(handler: webSocketHandler.handler, context: webSocketHandler.context)
+                            await WebSocketHandler.handle(
+                                type: .server,
+                                extensions: extensions,
+                                autoPing: configuration.autoPing,
+                                asyncChannel: asyncChannel,
+                                context: webSocketHandler.context,
+                                handler: webSocketHandler.handler
+                            )
                         }
                     } else {
                         return .dontUpgrade

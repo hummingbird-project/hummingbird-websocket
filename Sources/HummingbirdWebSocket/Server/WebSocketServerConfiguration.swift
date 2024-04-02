@@ -18,16 +18,21 @@ public struct WebSocketServerConfiguration: Sendable {
     public var maxFrameSize: Int
     /// WebSocket extensions
     public var extensions: [any WebSocketExtensionBuilder]
+    /// Autoping
+    public var autoPing: AutoPingSetup
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
     ///     - maxFrameSize: Max websocket frame size that can be sent/received
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
+    ///     - autoPing: Whether we should enable an automatic ping at a fixed period
     public init(
         maxFrameSize: Int = (1 << 14),
-        extensions: [WebSocketExtensionFactory] = []
+        extensions: [WebSocketExtensionFactory] = [],
+        autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30))
     ) {
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions.map { $0.build() }
+        self.autoPing = autoPing
     }
 }
