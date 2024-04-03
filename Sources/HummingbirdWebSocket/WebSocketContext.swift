@@ -17,15 +17,21 @@ import Logging
 import NIOCore
 
 /// Base context passed around when we only need the logger or allocator
-public protocol BaseWebSocketContext {
+public protocol BaseWebSocketContext: Sendable {
     var allocator: ByteBufferAllocator { get }
     var logger: Logger { get }
+}
+
+/// Base context passed around when we only need the logger or allocator
+public struct BasicWebSocketContext: BaseWebSocketContext {
+    public let allocator: ByteBufferAllocator
+    public let logger: Logger
 }
 
 /// Context that created this WebSocket
 ///
 /// Include the HTTP request and context that initiated the WebSocket connection
-public struct WebSocketContext<Context: RequestContext>: BaseWebSocketContext {
+public struct WebSocketContext<Context: BaseWebSocketContext>: BaseWebSocketContext {
     /// HTTP request that initiated the WebSocket connection
     public let request: HTTPRequest
     /// Request context at the time of WebSocket connection was initiated

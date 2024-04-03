@@ -51,7 +51,7 @@ public struct WebSocketClient {
     /// WebSocket URL
     let url: URI
     /// WebSocket data handler
-    let handler: WebSocketDataHandler<BasicRequestContext>
+    let handler: WebSocketDataHandler<BasicWebSocketContext>
     /// configuration
     let configuration: WebSocketClientConfiguration
     /// EventLoopGroup to use
@@ -76,7 +76,7 @@ public struct WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicRequestContext>
+        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) throws {
         self.url = url
         self.handler = handler
@@ -102,7 +102,7 @@ public struct WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicRequestContext>
+        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) throws {
         self.url = url
         self.handler = handler
@@ -194,7 +194,7 @@ extension WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicRequestContext>
+        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
         let ws = try self.init(
             url: url,
@@ -223,7 +223,7 @@ extension WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicRequestContext>
+        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
         let ws = try self.init(
             url: url,

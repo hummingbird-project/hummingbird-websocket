@@ -51,17 +51,11 @@ actor WebSocketHandler {
         case close(WebSocketErrorCode)
     }
 
-    /// Context used internally by WebSocketHandler
-    struct BaseContext: BaseWebSocketContext {
-        let allocator: ByteBufferAllocator
-        let logger: Logger
-    }
-
     static let pingDataSize = 16
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let extensions: [any WebSocketExtension]
-    let context: BaseContext
+    let context: BasicWebSocketContext
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closed = false
@@ -80,7 +74,7 @@ actor WebSocketHandler {
         self.closed = false
     }
 
-    static func handle<Context: RequestContext>(
+    static func handle<Context: BaseWebSocketContext>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
         autoPing: AutoPingSetup,
@@ -126,7 +120,7 @@ actor WebSocketHandler {
         context.logger.debug("Closed WebSocket")
     }
 
-    func handle<Context: RequestContext>(
+    func handle<Context: BaseWebSocketContext>(
         inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,

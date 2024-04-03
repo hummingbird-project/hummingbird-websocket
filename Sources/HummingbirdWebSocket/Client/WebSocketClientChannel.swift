@@ -30,10 +30,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
     typealias Value = EventLoopFuture<UpgradeResult>
 
     let url: String
-    let handler: WebSocketDataHandler<BasicRequestContext>
+    let handler: WebSocketDataHandler<BasicWebSocketContext>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<BasicRequestContext>, url: String, configuration: WebSocketClientConfiguration) {
+    init(handler: @escaping WebSocketDataHandler<BasicWebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -46,10 +46,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
                         let request = HTTPRequest(
-                            method: .get, 
-                            scheme: nil, 
-                            authority: nil, 
-                            path: self.url, 
+                            method: .get,
+                            scheme: nil,
+                            authority: nil,
+                            path: self.url,
                             headerFields: self.configuration.additionalHeaders
                         )
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
@@ -107,7 +107,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 asyncChannel: webSocketChannel,
                 context: WebSocketContext(
                     request: request,
-                    context: BasicRequestContext(channel: webSocketChannel.channel, logger: logger)
+                    context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger)
                 ),
                 handler: self.handler
             )

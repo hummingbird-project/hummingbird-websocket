@@ -124,7 +124,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<BasicRequestContext>,
+        server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
@@ -150,9 +150,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<BasicRequestContext>,
+        server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        client clientHandler: @escaping WebSocketDataHandler<BasicRequestContext>
+        client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
         try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
