@@ -124,7 +124,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
+        server serverHandler: @escaping WebSocketDataHandler<BasicRequestContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
@@ -150,9 +150,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
-        server serverHandler: @escaping WebSocketDataHandler<WebSocketContext>,
+        server serverHandler: @escaping WebSocketDataHandler<BasicRequestContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
-        client clientHandler: @escaping WebSocketDataHandler<WebSocketContext>
+        client clientHandler: @escaping WebSocketDataHandler<BasicRequestContext>
     ) async throws {
         try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
@@ -445,7 +445,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.ws("/ws") { _, _ in
             return .upgrade([:])
         } onUpgrade: { _, outbound, context in
-            try await outbound.write(.text(context.name))
+            try await outbound.write(.text(context.requestContext.name))
         }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in

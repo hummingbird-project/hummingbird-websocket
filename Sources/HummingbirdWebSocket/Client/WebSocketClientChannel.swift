@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
+import Hummingbird
 import HummingbirdCore
 import Logging
 import NIOCore
@@ -22,17 +23,17 @@ import NIOWebSocket
 
 struct WebSocketClientChannel: ClientConnectionChannel {
     enum UpgradeResult {
-        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
+        case websocket(HTTPRequest, NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
         case notUpgraded
     }
 
     typealias Value = EventLoopFuture<UpgradeResult>
 
     let url: String
-    let handler: WebSocketDataHandler<WebSocketContext>
+    let handler: WebSocketDataHandler<BasicRequestContext>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<WebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
+    init(handler: @escaping WebSocketDataHandler<BasicRequestContext>, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -44,6 +45,13 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 maxFrameSize: self.configuration.maxFrameSize,
                 upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
+                        let request = HTTPRequest(
+                            method: .get, 
+                            scheme: nil, 
+                            authority: nil, 
+                            path: self.url, 
+                            headerFields: self.configuration.additionalHeaders
+                        )
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
                         // work out what extensions we should add based off the server response
                         let headerFields = HTTPFields(head.headers, splitCookie: false)
@@ -51,7 +59,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                         let extensions = try configuration.extensions.compactMap {
                             try $0.clientExtension(from: serverExtensions)
                         }
-                        return UpgradeResult.websocket(asyncChannel, extensions)
+                        return UpgradeResult.websocket(request, asyncChannel, extensions)
                     }
                 }
             )
@@ -91,13 +99,16 @@ struct WebSocketClientChannel: ClientConnectionChannel {
 
     func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
-        case .websocket(let webSocketChannel, let extensions):
+        case .websocket(let request, let webSocketChannel, let extensions):
             await WebSocketHandler.handle(
                 type: .client,
                 extensions: extensions,
                 autoPing: self.configuration.autoPing,
                 asyncChannel: webSocketChannel,
-                context: WebSocketContext(channel: webSocketChannel.channel, logger: logger),
+                context: WebSocketContext(
+                    request: request,
+                    context: BasicRequestContext(channel: webSocketChannel.channel, logger: logger)
+                ),
                 handler: self.handler
             )
         case .notUpgraded:

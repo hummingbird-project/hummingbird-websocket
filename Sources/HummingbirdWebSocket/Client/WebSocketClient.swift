@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
+import Hummingbird
 import HummingbirdCore
 import HummingbirdTLS
 import Logging
@@ -50,7 +51,7 @@ public struct WebSocketClient {
     /// WebSocket URL
     let url: URI
     /// WebSocket data handler
-    let handler: WebSocketDataHandler<WebSocketContext>
+    let handler: WebSocketDataHandler<BasicRequestContext>
     /// configuration
     let configuration: WebSocketClientConfiguration
     /// EventLoopGroup to use
@@ -75,7 +76,7 @@ public struct WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<WebSocketContext>
+        handler: @escaping WebSocketDataHandler<BasicRequestContext>
     ) throws {
         self.url = url
         self.handler = handler
@@ -101,7 +102,7 @@ public struct WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<WebSocketContext>
+        handler: @escaping WebSocketDataHandler<BasicRequestContext>
     ) throws {
         self.url = url
         self.handler = handler
@@ -193,7 +194,7 @@ extension WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<WebSocketContext>
+        handler: @escaping WebSocketDataHandler<BasicRequestContext>
     ) async throws {
         let ws = try self.init(
             url: url,
@@ -222,7 +223,7 @@ extension WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<WebSocketContext>
+        handler: @escaping WebSocketDataHandler<BasicRequestContext>
     ) async throws {
         let ws = try self.init(
             url: url,

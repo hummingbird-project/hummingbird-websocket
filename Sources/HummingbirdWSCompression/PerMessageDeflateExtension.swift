@@ -165,7 +165,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             try self.decompressor.startStream()
         }
 
-        func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
+        func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: some BaseWebSocketContext) throws -> WebSocketFrame {
             var frame = frame
             precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
             // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
@@ -198,7 +198,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             try self.compressor.startStream()
         }
 
-        func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some WebSocketContextProtocol) throws -> WebSocketFrame {
+        func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some BaseWebSocketContext) throws -> WebSocketFrame {
             // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
             // compress the data
             let shouldWeCompress = frame.data.readableBytes > 16 || !frame.fin || self.sendState != .idle
@@ -258,7 +258,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         try? await self.compressor.shutdown()
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some BaseWebSocketContext) async throws -> WebSocketFrame {
         if frame.rsv1 {
             return try await self.decompressor.decompress(
                 frame,
@@ -270,7 +270,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         return frame
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: some BaseWebSocketContext) async throws -> WebSocketFrame {
         let isCorrectType = frame.opcode == .text || frame.opcode == .binary
         if isCorrectType {
             return try await self.compressor.compress(frame, resetStream: self.configuration.sendNoContextTakeover, context: context)

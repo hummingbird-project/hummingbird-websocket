@@ -51,11 +51,17 @@ actor WebSocketHandler {
         case close(WebSocketErrorCode)
     }
 
+    /// Context used internally by WebSocketHandler
+    struct BaseContext: BaseWebSocketContext {
+        let allocator: ByteBufferAllocator
+        let logger: Logger
+    }
+
     static let pingDataSize = 16
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let extensions: [any WebSocketExtension]
-    let context: WebSocketContext
+    let context: BaseContext
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closed = false
@@ -64,7 +70,7 @@ actor WebSocketHandler {
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         type: WebSocketType,
         extensions: [any WebSocketExtension],
-        context: some WebSocketContextProtocol
+        context: some BaseWebSocketContext
     ) {
         self.outbound = outbound
         self.type = type
@@ -74,12 +80,12 @@ actor WebSocketHandler {
         self.closed = false
     }
 
-    static func handle<Context: WebSocketContextProtocol>(
+    static func handle<Context: RequestContext>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
         autoPing: AutoPingSetup,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
-        context: Context,
+        context: WebSocketContext<Context>,
         handler: @escaping WebSocketDataHandler<Context>
     ) async {
         try? await asyncChannel.executeThenClose { inbound, outbound in
@@ -120,11 +126,11 @@ actor WebSocketHandler {
         context.logger.debug("Closed WebSocket")
     }
 
-    func handle<Context: WebSocketContextProtocol>(
+    func handle<Context: RequestContext>(
         inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,
-        context: Context
+        context: WebSocketContext<Context>
     ) async {
         let webSocketOutbound = WebSocketOutboundWriter(handler: self)
         var inboundIterator = inbound.makeAsyncIterator()

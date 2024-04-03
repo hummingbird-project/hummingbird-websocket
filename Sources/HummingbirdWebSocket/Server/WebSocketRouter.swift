@@ -38,7 +38,7 @@ public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable
 }
 
 /// Request context protocol requirement for routers that support websockets
-public protocol WebSocketRequestContext: RequestContext, WebSocketContextProtocol {
+public protocol WebSocketRequestContext: RequestContext, BaseWebSocketContext {
     var webSocket: WebSocketRouterContext<Self> { get }
 }
 
@@ -153,7 +153,7 @@ extension HTTP1WebSocketUpgradeChannel {
                                 extensions: extensions,
                                 autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
-                                context: webSocketHandler.context,
+                                context: .init(request: request.head, context: webSocketHandler.context),
                                 handler: webSocketHandler.handler
                             )
                         }
