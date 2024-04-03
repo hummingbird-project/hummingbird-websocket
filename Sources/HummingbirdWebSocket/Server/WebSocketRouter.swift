@@ -153,7 +153,7 @@ extension HTTP1WebSocketUpgradeChannel {
                                 extensions: extensions,
                                 autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
-                                context: .init(request: request.head, context: webSocketHandler.context),
+                                context: .init(request: request, context: webSocketHandler.context),
                                 handler: webSocketHandler.handler
                             )
                         }

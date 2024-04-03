@@ -61,8 +61,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
+                            let request = Request(head: head, body: .init(buffer: .init()))
                             let context = WebSocketContext(
-                                request: head,
+                                request: request,
                                 context: BasicWebSocketContext(allocator: channel.allocator, logger: logger)
                             )
                             await WebSocketHandler.handle(
@@ -107,8 +108,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
+                            let request = Request(head: head, body: .init(buffer: .init()))
                             let context = WebSocketContext(
-                                request: head,
+                                request: request,
                                 context: BasicWebSocketContext(allocator: channel.allocator, logger: logger)
                             )
                             await WebSocketHandler.handle(

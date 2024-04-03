@@ -33,11 +33,11 @@ public struct BasicWebSocketContext: BaseWebSocketContext {
 /// Include the HTTP request and context that initiated the WebSocket connection
 public struct WebSocketContext<Context: BaseWebSocketContext>: BaseWebSocketContext {
     /// HTTP request that initiated the WebSocket connection
-    public let request: HTTPRequest
+    public let request: Request
     /// Request context at the time of WebSocket connection was initiated
     public let requestContext: Context
 
-    init(request: HTTPRequest, context: Context) {
+    init(request: Request, context: Context) {
         self.request = request
         self.requestContext = context
     }

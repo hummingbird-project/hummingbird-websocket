@@ -23,7 +23,7 @@ import NIOWebSocket
 
 struct WebSocketClientChannel: ClientConnectionChannel {
     enum UpgradeResult {
-        case websocket(HTTPRequest, NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
+        case websocket(Request, NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
         case notUpgraded
     }
 
@@ -45,13 +45,14 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 maxFrameSize: self.configuration.maxFrameSize,
                 upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
-                        let request = HTTPRequest(
+                        let requestHead = HTTPRequest(
                             method: .get,
                             scheme: nil,
                             authority: nil,
                             path: self.url,
                             headerFields: self.configuration.additionalHeaders
                         )
+                        let request = Request(head: requestHead, body: .init(buffer: .init()))
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
                         // work out what extensions we should add based off the server response
                         let headerFields = HTTPFields(head.headers, splitCookie: false)
