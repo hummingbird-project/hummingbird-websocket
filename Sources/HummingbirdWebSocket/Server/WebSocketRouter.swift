@@ -182,7 +182,7 @@ extension HTTPChannelBuilder {
     ///   - configuration: WebSocket server configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
     /// - Returns:
-    public static func webSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder>(
+    public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder>(
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []

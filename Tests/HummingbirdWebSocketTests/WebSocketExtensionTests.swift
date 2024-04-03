@@ -45,6 +45,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: serverChannel,
+                configuration: .init(address: .hostname("127.0.0.1", port: 0)),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: serverLogger
             )
@@ -90,7 +91,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
         try await self.testClientAndServer(
-            serverChannel: .webSocketUpgrade(configuration: .init(extensions: serverExtensions)) { _, _, _ in
+            serverChannel: .http1WebSocketUpgrade(configuration: .init(extensions: serverExtensions)) { _, _, _ in
                 .upgrade([:], serverHandler)
             },
             clientExtensions: clientExtensions,
@@ -252,7 +253,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             XCTAssertEqual(secondMessage, .text("Hello"))
         }
         try await self.testClientAndServer(
-            serverChannel: .webSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
+            serverChannel: .http1WebSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
             clientExtensions: [.perMessageDeflate()]
         ) { inbound, outbound, _ in
             try await outbound.write(.text("Hello, testing this is compressed"))

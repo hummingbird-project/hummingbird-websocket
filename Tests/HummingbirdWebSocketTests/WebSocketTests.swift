@@ -95,6 +95,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: serverChannel,
+                configuration: .init(address: .hostname("127.0.0.1", port: 0)),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: serverLogger
             )
@@ -128,7 +129,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade { head, _, _ in
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade { head, _, _ in
             if let headers = try shouldUpgrade(head) {
                 return .upgrade(headers, serverHandler)
             } else {
@@ -172,7 +173,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         webSocketRouter: Router<some WebSocketRequestContext>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws {
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade(webSocketRouter: webSocketRouter)
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
         try await self.testClientAndServer(
             serverChannel: webSocketUpgrade,
             getClient: getClient
@@ -332,11 +333,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let serviceGroup: ServiceGroup
             let app = Application(
                 router: router,
-                server: .webSocketUpgrade { _, _, _ in
+                server: .http1WebSocketUpgrade { _, _, _ in
                     return .upgrade([:]) { _, outbound, _ in
                         try await outbound.write(.text("Hello"))
                     }
                 },
+                configuration: .init(address: .hostname("127.0.0.1", port: 0)),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: logger
             )
@@ -469,7 +471,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         let application = Application(
             router: router,
-            server: .webSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await application.test(.live) { client in
             try await client.execute(uri: "/http", method: .get) { response in
@@ -484,7 +487,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.ws("/ws") { inbound, _, _ in
             for try await _ in inbound {}
         }
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .webSocketUpgrade(
+        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade(
             webSocketRouter: router,
             configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
         )

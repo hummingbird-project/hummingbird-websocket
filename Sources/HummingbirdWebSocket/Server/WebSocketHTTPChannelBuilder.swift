@@ -21,7 +21,7 @@ import NIOCore
 extension HTTPChannelBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///  - parameters
-    public static func webSocketUpgrade(
+    public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
@@ -37,7 +37,7 @@ extension HTTPChannelBuilder {
     }
 
     /// HTTP1 channel builder supporting a websocket upgrade
-    public static func webSocketUpgrade(
+    public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
