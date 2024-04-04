@@ -267,7 +267,7 @@ struct XorWebSocketExtension: WebSocketExtension {
     let name = "xor"
     func shutdown() {}
 
-    func xorFrame(_ frame: WebSocketFrame, context: some BaseWebSocketContext) -> WebSocketFrame {
+    func xorFrame(_ frame: WebSocketFrame, context: some WebSocketContext) -> WebSocketFrame {
         var newBuffer = context.allocator.buffer(capacity: frame.data.readableBytes)
         for byte in frame.data.readableBytesView {
             newBuffer.writeInteger(byte ^ self.value)
@@ -277,11 +277,11 @@ struct XorWebSocketExtension: WebSocketExtension {
         return frame
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some BaseWebSocketContext) -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) -> WebSocketFrame {
         return self.xorFrame(frame, context: context)
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some BaseWebSocketContext) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
         return self.xorFrame(frame, context: context)
     }
 

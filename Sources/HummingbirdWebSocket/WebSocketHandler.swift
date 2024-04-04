@@ -64,7 +64,7 @@ actor WebSocketHandler {
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         type: WebSocketType,
         extensions: [any WebSocketExtension],
-        context: some BaseWebSocketContext
+        context: some WebSocketContext
     ) {
         self.outbound = outbound
         self.type = type
@@ -74,12 +74,12 @@ actor WebSocketHandler {
         self.closed = false
     }
 
-    static func handle<Context: BaseWebSocketContext>(
+    static func handle<Context: WebSocketContext>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
         autoPing: AutoPingSetup,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
-        context: WebSocketContext<Context>,
+        context: Context,
         handler: @escaping WebSocketDataHandler<Context>
     ) async {
         try? await asyncChannel.executeThenClose { inbound, outbound in
@@ -120,11 +120,11 @@ actor WebSocketHandler {
         context.logger.debug("Closed WebSocket")
     }
 
-    func handle<Context: BaseWebSocketContext>(
+    func handle<Context: WebSocketContext>(
         inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,
-        context: WebSocketContext<Context>
+        context: Context
     ) async {
         let webSocketOutbound = WebSocketOutboundWriter(handler: self)
         var inboundIterator = inbound.makeAsyncIterator()

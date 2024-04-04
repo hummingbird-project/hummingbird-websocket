@@ -392,6 +392,24 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    func testAccessingRequestSelection() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        router.ws("/ws") { request, _ in
+            guard request.uri.queryParameters["test"] != nil else { return .dontUpgrade }
+            return .upgrade([:])
+        } onUpgrade: { _, outbound, context in
+            guard let test = context.request.uri.queryParameters["test"] else { return }
+            try await outbound.write(.text(String(test)))
+        }
+        try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
+            try WebSocketClient(url: .init("ws://localhost:\(port)/ws?test=123"), logger: logger) { inbound, _, _ in
+                var inboundIterator = inbound.makeAsyncIterator()
+                let msg = try await inboundIterator.next()
+                XCTAssertEqual(msg, .text("123"))
+            }
+        }
+    }
+
     func testWebSocketMiddleware() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.group("/ws")
@@ -426,7 +444,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testRouterContextUpdate() async throws {
         struct MyRequestContext: WebSocketRequestContext {
             var coreContext: CoreRequestContext
-            var webSocket: WebSocketRouterContext<MyRequestContext>
+            var webSocket: WebSocketHandlerReference<MyRequestContext>
             var name: String
 
             init(channel: Channel, logger: Logger) {

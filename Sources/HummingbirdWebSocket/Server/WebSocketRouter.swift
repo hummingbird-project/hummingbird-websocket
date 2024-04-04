@@ -20,14 +20,35 @@ import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 
-/// WebSocket Router context type.
+/// WebSocket Context for upgrades initiated via a router
 ///
-/// Includes reference to optional websocket handler
-public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable {
+/// Include the HTTP request and context that initiated the WebSocket connection
+public struct WebSocketContextFromRouter<Context: WebSocketContext>: WebSocketContext {
+    /// HTTP request that initiated the WebSocket connection
+    public let request: Request
+    /// Request context at the time of WebSocket connection was initiated
+    public let requestContext: Context
+
+    init(request: Request, context: Context) {
+        self.request = request
+        self.requestContext = context
+    }
+
+    /// Logger attached to request context
+    public var logger: Logger { self.requestContext.logger }
+    /// ByteBuffer allocator attached to request context
+    public var allocator: ByteBufferAllocator { self.requestContext.allocator }
+}
+
+/// Reference to a WebSocket handler
+///
+/// This is used by the WebSocket upgrade via router. If a WebSocket route is matched it passes back
+/// the associated WebSocket handler from the router via the request context.
+public struct WebSocketHandlerReference<RequestContext: WebSocketRequestContext>: Sendable {
     /// Holds WebSocket context and handler to call
     struct Value: Sendable {
-        let context: Context
-        let handler: WebSocketDataHandler<Context>
+        let context: RequestContext
+        let handler: WebSocketDataHandler<WebSocketContextFromRouter<RequestContext>>
     }
 
     public init() {
@@ -37,15 +58,15 @@ public struct WebSocketRouterContext<Context: WebSocketRequestContext>: Sendable
     let handler: NIOLockedValueBox<Value?>
 }
 
-/// Request context protocol requirement for routers that support websockets
-public protocol WebSocketRequestContext: RequestContext, BaseWebSocketContext {
-    var webSocket: WebSocketRouterContext<Self> { get }
+/// Request context protocol requirement for routers that support WebSockets
+public protocol WebSocketRequestContext: RequestContext, WebSocketContext {
+    var webSocket: WebSocketHandlerReference<Self> { get }
 }
 
 /// Default implementation of a request context that supports WebSockets
 public struct BasicWebSocketRequestContext: WebSocketRequestContext {
     public var coreContext: CoreRequestContext
-    public let webSocket: WebSocketRouterContext<Self>
+    public let webSocket: WebSocketHandlerReference<Self>
 
     public init(channel: Channel, logger: Logger) {
         self.coreContext = .init(allocator: channel.allocator, logger: logger)
@@ -69,7 +90,7 @@ extension RouterMethods {
     @discardableResult public func ws(
         _ path: String = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        onUpgrade handler: @escaping WebSocketDataHandler<Context>
+        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketContextFromRouter<Context>>
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
@@ -77,7 +98,7 @@ extension RouterMethods {
             case .dontUpgrade:
                 return .init(status: .methodNotAllowed)
             case .upgrade(let headers):
-                context.webSocket.handler.withLockedValue { $0 = WebSocketRouterContext.Value(context: context, handler: handler) }
+                context.webSocket.handler.withLockedValue { $0 = WebSocketHandlerReference.Value(context: context, handler: handler) }
                 return .init(status: .ok, headers: headers)
             }
         }
@@ -90,7 +111,7 @@ extension RouterMethods {
 /// with ``Hummingbird/Router`` if you add a route immediately after it.
 public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: RouterMiddleware {
     let shouldUpgrade: @Sendable (Request, Context) async throws -> RouterShouldUpgrade
-    let handler: WebSocketDataHandler<Context>
+    let handler: WebSocketDataHandler<WebSocketContextFromRouter<Context>>
 
     /// Initialize WebSocketUpgradeMiddleare
     /// - Parameters:
@@ -98,7 +119,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     ///   - handle: WebSocket handler
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        onUpgrade handler: @escaping WebSocketDataHandler<Context>
+        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketContextFromRouter<Context>>
     ) {
         self.shouldUpgrade = shouldUpgrade
         self.handler = handler
@@ -153,7 +174,7 @@ extension HTTP1WebSocketUpgradeChannel {
                                 extensions: extensions,
                                 autoPing: configuration.autoPing,
                                 asyncChannel: asyncChannel,
-                                context: .init(request: request, context: webSocketHandler.context),
+                                context: WebSocketContextFromRouter(request: request, context: webSocketHandler.context),
                                 handler: webSocketHandler.handler
                             )
                         }

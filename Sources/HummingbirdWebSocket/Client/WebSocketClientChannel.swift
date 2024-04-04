@@ -23,7 +23,7 @@ import NIOWebSocket
 
 struct WebSocketClientChannel: ClientConnectionChannel {
     enum UpgradeResult {
-        case websocket(Request, NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
+        case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, [any WebSocketExtension])
         case notUpgraded
     }
 
@@ -45,14 +45,6 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 maxFrameSize: self.configuration.maxFrameSize,
                 upgradePipelineHandler: { channel, head in
                     channel.eventLoop.makeCompletedFuture {
-                        let requestHead = HTTPRequest(
-                            method: .get,
-                            scheme: nil,
-                            authority: nil,
-                            path: self.url,
-                            headerFields: self.configuration.additionalHeaders
-                        )
-                        let request = Request(head: requestHead, body: .init(buffer: .init()))
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
                         // work out what extensions we should add based off the server response
                         let headerFields = HTTPFields(head.headers, splitCookie: false)
@@ -60,7 +52,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                         let extensions = try configuration.extensions.compactMap {
                             try $0.clientExtension(from: serverExtensions)
                         }
-                        return UpgradeResult.websocket(request, asyncChannel, extensions)
+                        return UpgradeResult.websocket(asyncChannel, extensions)
                     }
                 }
             )
@@ -100,16 +92,13 @@ struct WebSocketClientChannel: ClientConnectionChannel {
 
     func handle(value: Value, logger: Logger) async throws {
         switch try await value.get() {
-        case .websocket(let request, let webSocketChannel, let extensions):
+        case .websocket(let webSocketChannel, let extensions):
             await WebSocketHandler.handle(
                 type: .client,
                 extensions: extensions,
                 autoPing: self.configuration.autoPing,
                 asyncChannel: webSocketChannel,
-                context: WebSocketContext(
-                    request: request,
-                    context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger)
-                ),
+                context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger),
                 handler: self.handler
             )
         case .notUpgraded:
