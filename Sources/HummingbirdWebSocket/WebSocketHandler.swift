@@ -19,7 +19,7 @@ import NIOWebSocket
 import ServiceLifecycle
 
 /// WebSocket type
-public enum WebSocketType: Sendable {
+enum WebSocketType: Sendable {
     case client
     case server
 }
