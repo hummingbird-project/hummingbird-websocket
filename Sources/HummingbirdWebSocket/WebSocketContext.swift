@@ -12,28 +12,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Hummingbird
 import Logging
 import NIOCore
 
-/// Protocol for Context passsed to ``WebSocketDataHandler``
-public protocol WebSocketContextProtocol: Sendable {
-    var logger: Logger { get }
+/// Context for WebSocket
+public protocol WebSocketContext: Sendable {
     var allocator: ByteBufferAllocator { get }
-    init(channel: Channel, logger: Logger)
+    var logger: Logger { get }
 }
 
-/// Default implementation of ``WebSocketContextProtocol``
-public struct WebSocketContext: WebSocketContextProtocol {
-    public let logger: Logger
+/// Basic context implementation of ``WebSocketContext``.
+///
+/// Used by non-router and client WebSocket connections
+public struct BasicWebSocketContext: WebSocketContext {
     public let allocator: ByteBufferAllocator
-
-    public init(channel: Channel, logger: Logger) {
-        self.logger = logger
-        self.allocator = channel.allocator
-    }
-
-    init(allocator: ByteBufferAllocator, logger: Logger) {
-        self.allocator = allocator
-        self.logger = logger
-    }
+    public let logger: Logger
 }

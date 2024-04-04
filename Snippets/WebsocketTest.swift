@@ -23,7 +23,7 @@ router.ws("/ws") { inbound, outbound, _ in
 
 let app = Application(
     router: router,
-    server: .webSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
+    server: .http1WebSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
     logger: logger
 )
 try await app.runService()

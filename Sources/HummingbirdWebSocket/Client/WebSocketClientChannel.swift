@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
+import Hummingbird
 import HummingbirdCore
 import Logging
 import NIOCore
@@ -29,10 +30,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
     typealias Value = EventLoopFuture<UpgradeResult>
 
     let url: String
-    let handler: WebSocketDataHandler<WebSocketContext>
+    let handler: WebSocketDataHandler<BasicWebSocketContext>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<WebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
+    init(handler: @escaping WebSocketDataHandler<BasicWebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -97,7 +98,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 extensions: extensions,
                 autoPing: self.configuration.autoPing,
                 asyncChannel: webSocketChannel,
-                context: WebSocketContext(channel: webSocketChannel.channel, logger: logger),
+                context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger),
                 handler: self.handler
             )
         case .notUpgraded:

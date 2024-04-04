@@ -7,7 +7,7 @@ Adds support for upgrading HTTP connections to WebSocket.
 ```swift
 let app = HBApplication(
     router: router,
-    server: .httpAndWebSocket { channel, head in
+    server: .http1WebSocketUpgrade { channel, head in
         if head.uri == "ws" {
             return .upgrade(HTTPHeaders()) { inbound, outbound, _ in
                 for try await packet in inbound {
@@ -27,4 +27,4 @@ app.runService()
 
 ## Documentation
 
-You can find reference documentation for HummingbirdWebSocket [here](https://hummingbird-project.github.io/hummingbird-docs/1.0/documentation/hummingbirdwebsocket). The [hummingbird-examples](https://github.com/hummingbird-project/hummingbird-examples) repository has a number of examples of different uses of the library.
+You can find reference documentation for HummingbirdWebSocket [here](https://hummingbird-project.github.io/hummingbird-docs/2.0/documentation/hummingbirdwebsocket). The [hummingbird-examples](https://github.com/hummingbird-project/hummingbird-examples) repository has a number of examples of different uses of the library.

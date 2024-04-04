@@ -21,9 +21,9 @@ public protocol WebSocketExtension: Sendable {
     /// Extension name
     var name: String { get }
     /// Process frame received from websocket
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContextProtocol) async throws -> WebSocketFrame
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame
     /// shutdown extension
     func shutdown() async
 }

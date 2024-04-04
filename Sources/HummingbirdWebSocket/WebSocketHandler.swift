@@ -55,7 +55,7 @@ actor WebSocketHandler {
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let extensions: [any WebSocketExtension]
-    let context: WebSocketContext
+    let context: BasicWebSocketContext
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closed = false
@@ -64,7 +64,7 @@ actor WebSocketHandler {
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         type: WebSocketType,
         extensions: [any WebSocketExtension],
-        context: some WebSocketContextProtocol
+        context: some WebSocketContext
     ) {
         self.outbound = outbound
         self.type = type
@@ -74,7 +74,7 @@ actor WebSocketHandler {
         self.closed = false
     }
 
-    static func handle<Context: WebSocketContextProtocol>(
+    static func handle<Context: WebSocketContext>(
         type: WebSocketType,
         extensions: [any WebSocketExtension],
         autoPing: AutoPingSetup,
@@ -120,7 +120,7 @@ actor WebSocketHandler {
         context.logger.debug("Closed WebSocket")
     }
 
-    func handle<Context: WebSocketContextProtocol>(
+    func handle<Context: WebSocketContext>(
         inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,
