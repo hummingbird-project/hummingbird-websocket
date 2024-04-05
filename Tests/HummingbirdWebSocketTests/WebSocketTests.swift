@@ -160,7 +160,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             server: serverHandler,
             shouldUpgrade: shouldUpgrade,
             getClient: { port, logger in
-                try WebSocketClient(
+                WebSocketClient(
                     url: .init("ws://localhost:\(port)"),
                     logger: logger,
                     handler: clientHandler
@@ -243,7 +243,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     func testNoConnection() async throws {
-        let client = try WebSocketClient(
+        let client = WebSocketClient(
             url: .init("ws://localhost:10245"),
             logger: Logger(label: "TestNoConnection")
         ) { _, _, _ in
@@ -260,7 +260,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         } getClient: { port, logger in
             var clientTLSConfiguration = try getClientTLSConfiguration()
             clientTLSConfiguration.certificateVerification = .none
-            return try WebSocketClient(
+            return WebSocketClient(
                 url: .init("wss://localhost:\(port)"),
                 tlsConfiguration: clientTLSConfiguration,
                 logger: logger
@@ -279,7 +279,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(head.path, "/ws")
             return [:]
         } getClient: { port, logger in
-            try WebSocketClient(
+            WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws"),
                 logger: logger
             ) { _, _, _ in
@@ -295,7 +295,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(request.uri.query, "query=parameters&test=true")
             return [:]
         } getClient: { port, logger in
-            try WebSocketClient(
+            WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 logger: logger
             ) { _, _, _ in
@@ -311,7 +311,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
             return [:]
         } getClient: { port, logger in
-            try WebSocketClient(
+            WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws?query=parameters&test=true"),
                 configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
                 logger: logger
@@ -377,14 +377,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text("Two"))
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
+            WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("One"))
             }
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
+            WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Two"))
@@ -402,7 +402,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.text(String(test)))
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-            try WebSocketClient(url: .init("ws://localhost:\(port)/ws?test=123"), logger: logger) { inbound, _, _ in
+            WebSocketClient(url: .init("ws://localhost:\(port)/ws?test=123"), logger: logger) { inbound, _, _ in
                 var inboundIterator = inbound.makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("123"))
@@ -421,7 +421,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             .get { _, _ -> Response in return .init(status: .ok) }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _, _ in }
+                WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { _, _, _ in }
             }
         }
     }
@@ -435,7 +435,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
+                WebSocketClient(url: .init("ws://localhost:\(port)/not-ws"), logger: logger) { _, _, _ in }
             }
         } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
     }
@@ -469,7 +469,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
-                try WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
+                WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
                     let text = try await inbound.first { _ in true }
                     XCTAssertEqual(text, .text("Roger Moore"))
                 }
@@ -510,7 +510,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
         )
         try await self.testClientAndServer(serverChannel: webSocketUpgrade) { port, logger in
-            try WebSocketClient(
+            WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws"),
                 configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
                 logger: logger

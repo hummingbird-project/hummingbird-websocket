@@ -77,7 +77,7 @@ public struct WebSocketClient {
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) throws {
+    ) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -103,7 +103,7 @@ public struct WebSocketClient {
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) throws {
+    ) {
         self.url = url
         self.handler = handler
         self.configuration = configuration
@@ -196,7 +196,7 @@ extension WebSocketClient {
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
-        let ws = try self.init(
+        let ws = self.init(
             url: url,
             configuration: configuration,
             tlsConfiguration: tlsConfiguration,
@@ -225,7 +225,7 @@ extension WebSocketClient {
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {
-        let ws = try self.init(
+        let ws = self.init(
             url: url,
             configuration: configuration,
             transportServicesTLSOptions: transportServicesTLSOptions,

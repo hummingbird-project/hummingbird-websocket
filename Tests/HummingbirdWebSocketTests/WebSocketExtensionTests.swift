@@ -61,7 +61,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             }
             group.addTask {
                 let port = await promise.wait()
-                let client = try WebSocketClient(
+                let client = WebSocketClient(
                     url: .init("ws://localhost:\(port)/test"),
                     configuration: .init(extensions: clientExtensions),
                     logger: clientLogger,
