@@ -14,6 +14,7 @@
 
 import HTTPTypes
 
+/// Configuration for a client connecting to a WebSocket
 public struct WebSocketClientConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int

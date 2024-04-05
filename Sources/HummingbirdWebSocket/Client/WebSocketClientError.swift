@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Errors returned by ``WebSocketClient``
 public struct WebSocketClientError: Swift.Error, Equatable {
     private enum _Internal: Equatable {
         case invalidURL
