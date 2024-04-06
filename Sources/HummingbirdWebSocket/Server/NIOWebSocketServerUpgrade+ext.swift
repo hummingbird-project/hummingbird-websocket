@@ -22,7 +22,7 @@ import NIOWebSocket
 /// Should HTTP channel upgrade to WebSocket
 public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
     case dontUpgrade
-    case upgrade(HTTPFields, Value)
+    case upgrade(HTTPFields = [:], Value)
 
     /// Map upgrade result to difference type
     func map<Result>(_ map: (HTTPFields, Value) throws -> (HTTPFields, Result)) rethrows -> ShouldUpgradeResult<Result> {

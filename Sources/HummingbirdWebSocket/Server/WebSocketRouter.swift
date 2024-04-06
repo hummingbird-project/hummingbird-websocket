@@ -78,7 +78,7 @@ public struct BasicWebSocketRequestContext: WebSocketRequestContext {
 /// WebSocket upgrade or not
 public enum RouterShouldUpgrade: Sendable {
     case dontUpgrade
-    case upgrade(HTTPFields)
+    case upgrade(HTTPFields = [:])
 }
 
 extension RouterMethods {
