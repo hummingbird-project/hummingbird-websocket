@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Hummingbird
 import Logging
 import NIOCore
 

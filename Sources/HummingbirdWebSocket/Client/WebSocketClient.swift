@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import Hummingbird
 import HummingbirdCore
 import HummingbirdTLS
 import Logging

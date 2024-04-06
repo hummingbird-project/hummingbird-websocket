@@ -14,7 +14,6 @@
 
 import AsyncAlgorithms
 import HTTPTypes
-import Hummingbird
 import Logging
 import NIOCore
 import NIOWebSocket
