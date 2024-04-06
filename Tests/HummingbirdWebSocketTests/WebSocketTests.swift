@@ -334,7 +334,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: .http1WebSocketUpgrade { _, _, _ in
-                    return .upgrade([:]) { _, outbound, _ in
+                    return .upgrade { _, outbound, _ in
                         try await outbound.write(.text("Hello"))
                     }
                 },
@@ -367,12 +367,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testRouteSelection() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Two"))
         }
@@ -396,7 +396,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { request, _ in
             guard request.uri.queryParameters["test"] != nil else { return .dontUpgrade }
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, context in
             guard let test = context.request.uri.queryParameters["test"] else { return }
             try await outbound.write(.text(String(test)))
@@ -414,7 +414,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.group("/ws")
             .add(middleware: WebSocketUpgradeMiddleware { _, _ in
-                return .upgrade([:])
+                return .upgrade()
             } onUpgrade: { _, outbound, _ in
                 try await outbound.write(.text("One"))
             })
@@ -429,7 +429,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testRouteSelectionFail() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
@@ -463,7 +463,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: MyRequestContext.self)
         router.middlewares.add(MyMiddleware())
         router.ws("/ws") { _, _ in
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, context in
             try await outbound.write(.text(context.requestContext.name))
         }
@@ -480,7 +480,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testHTTPRequest() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
-            return .upgrade([:])
+            return .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Hello"))
         }
