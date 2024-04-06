@@ -334,7 +334,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: .http1WebSocketUpgrade { _, _, _ in
-                    return .upgrade() { _, outbound, _ in
+                    return .upgrade { _, outbound, _ in
                         try await outbound.write(.text("Hello"))
                     }
                 },
