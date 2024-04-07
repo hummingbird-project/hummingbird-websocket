@@ -172,7 +172,6 @@ extension HTTP1WebSocketUpgradeChannel {
                             await WebSocketHandler.handle(
                                 type: .server,
                                 configuration: .init(
-                                    maxMessageSize: configuration.maxMessageSize,
                                     extensions: extensions,
                                     autoPing: configuration.autoPing
                                 ),

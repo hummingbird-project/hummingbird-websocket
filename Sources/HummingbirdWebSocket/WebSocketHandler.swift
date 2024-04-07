@@ -51,7 +51,6 @@ actor WebSocketHandler {
     }
 
     struct Configuration {
-        let maxMessageSize: Int
         let extensions: [any WebSocketExtension]
         let autoPing: AutoPingSetup
     }
@@ -175,7 +174,10 @@ actor WebSocketHandler {
             self.context.logger.debug("Closing as we failed to generate valid frame data")
             throw WebSocketHandler.InternalError.close(.unexpectedServerError)
         }
-        frame.maskKey = self.makeMaskKey()
+        // Set mask key if client
+        if self.type == .client {
+            frame.maskKey = self.makeMaskKey()
+        }
         try await self.outbound.write(frame)
 
         self.context.logger.trace("Sent \(frame.opcode)")

@@ -50,4 +50,51 @@ public struct WebSocketOutboundWriter: Sendable {
             try await self.handler.write(frame: frame)
         }
     }
+
+    struct MessageWriter {
+        let handler: WebSocketHandler
+        var prevFrame: WebSocketFrame?
+        mutating func write(_ data: ByteBuffer, opcode: WebSocketOpcode) async throws {
+            if let prevFrame {
+                try await self.handler.write(frame: prevFrame)
+                self.prevFrame = .init(fin: false, opcode: .continuation, data: data)
+            } else {
+                self.prevFrame = .init(fin: false, opcode: opcode, data: data)
+            }
+        }
+
+        func finish() async throws {
+            if var prevFrame {
+                prevFrame.fin = true
+                try await self.handler.write(frame: prevFrame)
+            }
+        }
+    }
+
+    public func withTextMessageWriter(_ write: ((String) async throws -> Void) async throws -> Void) async throws {
+        var writer = MessageWriter(handler: self.handler)
+        do {
+            try await write { text in
+                let data = writer.handler.context.allocator.buffer(string: text)
+                try await writer.write(data, opcode: .text)
+            }
+        } catch {
+            try await writer.finish()
+            throw error
+        }
+        try await writer.finish()
+    }
+
+    public func withBinaryMessageWriter(_ write: ((ByteBuffer) async throws -> Void) async throws -> Void) async throws {
+        var writer = MessageWriter(handler: self.handler)
+        do {
+            try await write { data in
+                try await writer.write(data, opcode: .binary)
+            }
+        } catch {
+            try await writer.finish()
+            throw error
+        }
+        try await writer.finish()
+    }
 }

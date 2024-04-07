@@ -65,7 +65,6 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             await WebSocketHandler.handle(
                                 type: .server,
                                 configuration: .init(
-                                    maxMessageSize: configuration.maxMessageSize,
                                     extensions: extensions,
                                     autoPing: configuration.autoPing
                                 ),
@@ -111,7 +110,6 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             await WebSocketHandler.handle(
                                 type: .server,
                                 configuration: .init(
-                                    maxMessageSize: configuration.maxMessageSize,
                                     extensions: extensions,
                                     autoPing: configuration.autoPing
                                 ),

@@ -26,8 +26,12 @@ struct WebSocketFrameSequence {
         self.size = 0
     }
 
+    var finished: Bool {
+        self.frames[self.frames.count - 1].fin
+    }
+
     mutating func append(_ frame: WebSocketFrame) {
-        assert(frame.opcode == self.first.opcode)
+        assert(frame.opcode == .continuation)
         self.frames.append(frame)
         self.size += frame.data.readableBytes
     }
@@ -45,7 +49,7 @@ struct WebSocketFrameSequence {
         }
     }
 
-    var data: WebSocketDataFrame {
+    var data: WebSocketMessage {
         .init(frame: self.collapsed)!
     }
 

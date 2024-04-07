@@ -13,11 +13,23 @@ router.get { _, _ in
 }
 
 router.ws("/ws") { inbound, outbound, _ in
-    for try await packet in inbound {
-        if case .text("disconnect") = packet {
+    for try await frame in inbound {
+        if frame.opcode == .text, String(buffer: frame.data) == "disconnect", frame.fin == true {
             break
         }
-        try await outbound.write(.custom(packet.webSocketFrame))
+        if frame.opcode == .binary, frame.data.readableBytes > 2 {
+            var unmaskedData = frame.unmaskedData
+            try await outbound.withBinaryMessageWriter { write in
+                let firstHalf = unmaskedData.readSlice(length: frame.data.readableBytes / 2)!
+                try await write(firstHalf)
+                try await write(unmaskedData)
+            }
+        } else {
+            var frame = frame
+            frame.data = frame.unmaskedData
+            frame.maskKey = nil
+            try await outbound.write(.custom(frame))
+        }
     }
 }
 

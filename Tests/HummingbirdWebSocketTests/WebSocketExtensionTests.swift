@@ -180,7 +180,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.perMessageDeflate()],
             clientExtensions: [.perMessageDeflate()]
         ) { inbound, _, _ in
-            var iterator = inbound.makeAsyncIterator()
+            var iterator = inbound.messages(maxMessageSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
             XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
             let secondMessage = try await iterator.next()
@@ -200,7 +200,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         ) { inbound, outbound, _ in
             let extensions = await outbound.handler.configuration.extensions
             XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
-            for try await data in inbound {
+            for try await data in inbound.messages(maxMessageSize: .max) {
                 XCTAssertEqual(data, .binary(buffer))
             }
         } client: { _, outbound, _ in
@@ -218,7 +218,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         ) { inbound, outbound, _ in
             let extensions = await outbound.handler.configuration.extensions
             XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
-            for try await data in inbound {
+            for try await data in inbound.messages(maxMessageSize: .max) {
                 XCTAssertEqual(data, .binary(buffer))
             }
         } client: { _, outbound, _ in
@@ -235,7 +235,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             serverExtensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true)],
             clientExtensions: [.xor(value: 34), .perMessageDeflate()]
         ) { inbound, _, _ in
-            for try await data in inbound {
+            for try await data in inbound.messages(maxMessageSize: .max) {
                 XCTAssertEqual(data, .binary(buffer))
             }
         } client: { _, outbound, _ in
@@ -246,7 +246,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testPerMessageDeflateWithRouter() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/test") { inbound, _, _ in
-            var iterator = inbound.makeAsyncIterator()
+            var iterator = inbound.messages(maxMessageSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
             XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
             let secondMessage = try await iterator.next()
@@ -261,6 +261,23 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             for try await _ in inbound {}
         }
     }
+
+    func testPerMessageDeflateMultiFrameMessage() async throws {
+        try await self.testClientAndServer(
+            serverExtensions: [.perMessageDeflate()],
+            clientExtensions: [.perMessageDeflate()]
+        ) { inbound, _, _ in
+            var iterator = inbound.messages(maxMessageSize: .max).makeAsyncIterator()
+            let firstMessage = try await iterator.next()
+            XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+        } client: { inbound, outbound, _ in
+            try await outbound.withTextMessageWriter { write in
+                try await write("Hello, ")
+                try await write("testing this is compressed")
+            }
+            for try await _ in inbound {}
+        }
+    }
 }
 
 struct XorWebSocketExtension: WebSocketExtension {
@@ -269,11 +286,12 @@ struct XorWebSocketExtension: WebSocketExtension {
 
     func xorFrame(_ frame: WebSocketFrame, context: some WebSocketContext) -> WebSocketFrame {
         var newBuffer = context.allocator.buffer(capacity: frame.data.readableBytes)
-        for byte in frame.data.readableBytesView {
+        for byte in frame.unmaskedData.readableBytesView {
             newBuffer.writeInteger(byte ^ self.value)
         }
         var frame = frame
         frame.data = newBuffer
+        frame.maskKey = nil
         return frame
     }
 

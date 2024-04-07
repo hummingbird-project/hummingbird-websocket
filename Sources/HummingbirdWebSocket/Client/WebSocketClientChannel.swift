@@ -95,7 +95,6 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             await WebSocketHandler.handle(
                 type: .client,
                 configuration: .init(
-                    maxMessageSize: self.configuration.maxMessageSize,
                     extensions: extensions,
                     autoPing: self.configuration.autoPing
                 ),
