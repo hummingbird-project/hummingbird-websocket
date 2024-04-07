@@ -76,6 +76,9 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                     case .continuation:
                         if var frameSeq = frameSequence {
                             frameSeq.append(frame)
+                            if frameSeq.size > self.handler.configuration.maxMessageSize {
+                                try await self.handler.close(code: .messageTooLarge)
+                            }
                             frameSequence = frameSeq
                         } else {
                             try await self.handler.close(code: .protocolError)
@@ -86,7 +89,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                     if let frameSeq = frameSequence, frame.fin {
                         var collatedFrame = frameSeq.collapsed
                         // apply extensions
-                        for ext in self.handler.extensions.reversed() {
+                        for ext in self.handler.configuration.extensions.reversed() {
                             collatedFrame = try await ext.processReceivedFrame(collatedFrame, context: self.handler.context)
                         }
                         if let finalFrame = WebSocketDataFrame(frame: collatedFrame) {

@@ -94,8 +94,11 @@ struct WebSocketClientChannel: ClientConnectionChannel {
         case .websocket(let webSocketChannel, let extensions):
             await WebSocketHandler.handle(
                 type: .client,
-                extensions: extensions,
-                autoPing: self.configuration.autoPing,
+                configuration: .init(
+                    maxMessageSize: self.configuration.maxMessageSize,
+                    extensions: extensions,
+                    autoPing: self.configuration.autoPing
+                ),
                 asyncChannel: webSocketChannel,
                 context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger),
                 handler: self.handler

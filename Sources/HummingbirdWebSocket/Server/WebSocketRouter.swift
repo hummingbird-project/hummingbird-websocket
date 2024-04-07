@@ -171,8 +171,11 @@ extension HTTP1WebSocketUpgradeChannel {
                         return .upgrade(headers) { asyncChannel, _ in
                             await WebSocketHandler.handle(
                                 type: .server,
-                                extensions: extensions,
-                                autoPing: configuration.autoPing,
+                                configuration: .init(
+                                    maxMessageSize: configuration.maxMessageSize,
+                                    extensions: extensions,
+                                    autoPing: configuration.autoPing
+                                ),
                                 asyncChannel: asyncChannel,
                                 context: WebSocketContextFromRouter(request: request, context: webSocketHandler.context),
                                 handler: webSocketHandler.handler

@@ -16,6 +16,8 @@
 public struct WebSocketServerConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
+    /// Max size of a collated message
+    public var maxMessageSize: Int
     /// WebSocket extensions
     public var extensions: [any WebSocketExtensionBuilder]
     /// Autoping
@@ -28,10 +30,12 @@ public struct WebSocketServerConfiguration: Sendable {
     ///     - autoPing: Whether we should enable an automatic ping at a fixed period
     public init(
         maxFrameSize: Int = (1 << 14),
+        maxMessageSize: Int = (1 << 14),
         extensions: [WebSocketExtensionFactory] = [],
         autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30))
     ) {
         self.maxFrameSize = maxFrameSize
+        self.maxMessageSize = maxMessageSize
         self.extensions = extensions.map { $0.build() }
         self.autoPing = autoPing
     }

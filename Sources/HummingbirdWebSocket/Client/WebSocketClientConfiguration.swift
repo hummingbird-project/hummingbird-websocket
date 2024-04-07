@@ -18,6 +18,8 @@ import HTTPTypes
 public struct WebSocketClientConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
+    /// Max size of a collated message
+    public var maxMessageSize: Int
     /// Additional headers to be sent with the initial HTTP request
     public var additionalHeaders: HTTPFields
     /// WebSocket extensions
@@ -31,11 +33,13 @@ public struct WebSocketClientConfiguration: Sendable {
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     public init(
         maxFrameSize: Int = (1 << 14),
+        maxMessageSize: Int = (1 << 14),
         additionalHeaders: HTTPFields = .init(),
         extensions: [WebSocketExtensionFactory] = [],
         autoPing: AutoPingSetup = .disabled
     ) {
         self.maxFrameSize = maxFrameSize
+        self.maxMessageSize = maxMessageSize
         self.additionalHeaders = additionalHeaders
         self.extensions = extensions.map { $0.build() }
         self.autoPing = autoPing

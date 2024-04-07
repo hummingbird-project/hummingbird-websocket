@@ -64,8 +64,11 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
                             await WebSocketHandler.handle(
                                 type: .server,
-                                extensions: extensions,
-                                autoPing: configuration.autoPing,
+                                configuration: .init(
+                                    maxMessageSize: configuration.maxMessageSize,
+                                    extensions: extensions,
+                                    autoPing: configuration.autoPing
+                                ),
                                 asyncChannel: asyncChannel,
                                 context: context,
                                 handler: handler
@@ -107,8 +110,11 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
                             await WebSocketHandler.handle(
                                 type: .server,
-                                extensions: extensions,
-                                autoPing: configuration.autoPing,
+                                configuration: .init(
+                                    maxMessageSize: configuration.maxMessageSize,
+                                    extensions: extensions,
+                                    autoPing: configuration.autoPing
+                                ),
                                 asyncChannel: asyncChannel,
                                 context: context,
                                 handler: handler
