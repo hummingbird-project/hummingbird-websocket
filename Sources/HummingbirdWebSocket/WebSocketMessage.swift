@@ -16,7 +16,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Enumeration holding WebSocket data
-public enum WebSocketMessage: Equatable, Sendable, CustomStringConvertible {
+public enum WebSocketMessage: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     case text(String)
     case binary(ByteBuffer)
 
@@ -37,6 +37,15 @@ public enum WebSocketMessage: Equatable, Sendable, CustomStringConvertible {
             return "string(\"\(string)\")"
         case .binary(let buffer):
             return "binary(\(buffer.description))"
+        }
+    }
+
+    public var debugDescription: String {
+        switch self {
+        case .text(let string):
+            return "string(\"\(string)\")"
+        case .binary(let buffer):
+            return "binary(\(buffer.debugDescription))"
         }
     }
 }
