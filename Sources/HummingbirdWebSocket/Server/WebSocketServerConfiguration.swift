@@ -30,7 +30,7 @@ public struct WebSocketServerConfiguration: Sendable {
     ///     - autoPing: Whether we should enable an automatic ping at a fixed period
     public init(
         maxFrameSize: Int = (1 << 14),
-        maxMessageSize: Int = (1 << 14),
+        maxMessageSize: Int = (1 << 20),
         extensions: [WebSocketExtensionFactory] = [],
         autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30))
     ) {

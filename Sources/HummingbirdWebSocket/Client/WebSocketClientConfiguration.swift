@@ -33,7 +33,7 @@ public struct WebSocketClientConfiguration: Sendable {
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     public init(
         maxFrameSize: Int = (1 << 14),
-        maxMessageSize: Int = (1 << 14),
+        maxMessageSize: Int = (1 << 20),
         additionalHeaders: HTTPFields = .init(),
         extensions: [WebSocketExtensionFactory] = [],
         autoPing: AutoPingSetup = .disabled
