@@ -15,7 +15,7 @@
 import NIOCore
 import NIOWebSocket
 
-/// WebSocket data frame. 
+/// WebSocket data frame.
 public struct WebSocketDataFrame: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public enum Opcode: String, Sendable {
         case text
