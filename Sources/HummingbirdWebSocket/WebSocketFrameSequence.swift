@@ -26,10 +26,6 @@ struct WebSocketFrameSequence {
         self.size = 0
     }
 
-    var finished: Bool {
-        self.frames[self.frames.count - 1].fin
-    }
-
     mutating func append(_ frame: WebSocketDataFrame) {
         assert(frame.opcode == .continuation)
         self.frames.append(frame)
