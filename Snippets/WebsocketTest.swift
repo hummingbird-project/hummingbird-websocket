@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdWebSocket
 import HummingbirdWSCompression
 import Logging
+import NIOWebSocket
 
 var logger = Logger(label: "Echo")
 logger.logLevel = .trace
@@ -13,11 +14,21 @@ router.get { _, _ in
 }
 
 router.ws("/ws") { inbound, outbound, _ in
-    for try await packet in inbound {
-        if case .text("disconnect") = packet {
+    for try await frame in inbound {
+        if frame.opcode == .text, String(buffer: frame.data) == "disconnect", frame.fin == true {
             break
         }
-        try await outbound.write(.custom(packet.webSocketFrame))
+        let opcode: WebSocketOpcode = switch frame.opcode {
+        case .text: .text
+        case .binary: .binary
+        case .continuation: .continuation
+        }
+        let frame = WebSocketFrame(
+            fin: frame.fin,
+            opcode: opcode,
+            data: frame.data
+        )
+        try await outbound.write(.custom(frame))
     }
 }
 

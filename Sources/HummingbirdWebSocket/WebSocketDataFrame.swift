@@ -15,46 +15,34 @@
 import NIOCore
 import NIOWebSocket
 
-/// Enumeration holding WebSocket data
-public enum WebSocketDataFrame: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
-    case text(String)
-    case binary(ByteBuffer)
-
-    init?(frame: WebSocketFrame) {
-        switch frame.opcode {
-        case .text:
-            self = .text(String(buffer: frame.unmaskedData))
-        case .binary:
-            self = .binary(frame.unmaskedData)
-        default:
-            return nil
-        }
+/// WebSocket data frame.
+public struct WebSocketDataFrame: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+    public enum Opcode: String, Sendable {
+        case text
+        case binary
+        case continuation
     }
 
-    public var webSocketFrame: WebSocketFrame {
-        switch self {
-        case .text(let string):
-            return .init(fin: true, opcode: .text, data: ByteBuffer(string: string))
-        case .binary(let buffer):
-            return .init(fin: true, opcode: .binary, data: buffer)
+    public var opcode: Opcode
+    public var data: ByteBuffer
+    public var fin: Bool
+
+    init?(from frame: WebSocketFrame) {
+        switch frame.opcode {
+        case .binary: self.opcode = .binary
+        case .text: self.opcode = .text
+        case .continuation: self.opcode = .continuation
+        default: return nil
         }
+        self.data = frame.unmaskedData
+        self.fin = frame.fin
     }
 
     public var description: String {
-        switch self {
-        case .text(let string):
-            return "string(\"\(string)\")"
-        case .binary(let buffer):
-            return "binary(\(buffer.description))"
-        }
+        return "\(self.opcode): \(self.data.description), finished: \(self.fin)"
     }
 
     public var debugDescription: String {
-        switch self {
-        case .text(let string):
-            return "string(\"\(string)\")"
-        case .binary(let buffer):
-            return "binary(\(buffer.debugDescription))"
-        }
+        return "\(self.opcode): \(self.data.debugDescription), finished: \(self.fin)"
     }
 }

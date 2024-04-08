@@ -12,13 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-import AsyncAlgorithms
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOWebSocket
 
-/// Inbound websocket data AsyncSequence
+/// Inbound WebSocket data frame AsyncSequence
+///
+/// This AsyncSequence only returns binary, text and continuation frames. All other frames
+/// are dealt with internally
 public final class WebSocketInboundStream: AsyncSequence, Sendable {
+    public typealias Element = WebSocketDataFrame
+
     typealias UnderlyingIterator = NIOAsyncChannelInboundStream<WebSocketFrame>.AsyncIterator
     /// Underlying NIOAsyncChannelInboundStream
     let underlyingIterator: UnsafeTransfer<UnderlyingIterator>
@@ -51,7 +55,6 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
         public mutating func next() async throws -> WebSocketDataFrame? {
             guard !self.closed else { return nil }
             // parse messages coming from inbound
-            var frameSequence: WebSocketFrameSequence?
             while let frame = try await self.iterator.next() {
                 do {
                     self.handler.context.logger.trace("Received \(frame.opcode)")
@@ -66,33 +69,15 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         try await self.handler.onPing(frame)
                     case .pong:
                         try await self.handler.onPong(frame)
-                    case .text, .binary:
-                        if var frameSeq = frameSequence {
-                            frameSeq.append(frame)
-                            frameSequence = frameSeq
-                        } else {
-                            frameSequence = WebSocketFrameSequence(frame: frame)
+                    case .text, .binary, .continuation:
+                        // apply extensions
+                        var frame = frame
+                        for ext in self.handler.configuration.extensions.reversed() {
+                            frame = try await ext.processReceivedFrame(frame, context: self.handler.context)
                         }
-                    case .continuation:
-                        if var frameSeq = frameSequence {
-                            frameSeq.append(frame)
-                            frameSequence = frameSeq
-                        } else {
-                            try await self.handler.close(code: .protocolError)
-                        }
+                        return .init(from: frame)
                     default:
                         break
-                    }
-                    if let frameSeq = frameSequence, frame.fin {
-                        var collatedFrame = frameSeq.collapsed
-                        // apply extensions
-                        for ext in self.handler.extensions.reversed() {
-                            collatedFrame = try await ext.processReceivedFrame(collatedFrame, context: self.handler.context)
-                        }
-                        if let finalFrame = WebSocketDataFrame(frame: collatedFrame) {
-                            frameSequence = nil
-                            return finalFrame
-                        }
                     }
                 } catch {
                     // catch errors while processing websocket frames so responding close message
@@ -104,9 +89,43 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
 
             return nil
         }
-    }
 
-    public typealias Element = WebSocketDataFrame
+        /// Return next WebSocket messsage, while dealing with any other frames
+        ///
+        /// A WebSocket message can be fragmented across multiple WebSocket frames. This
+        /// function collates fragmented frames until it has a full message
+        public mutating func nextMessage(maxSize: Int) async throws -> WebSocketMessage? {
+            var frameSequence: WebSocketFrameSequence
+            // parse first frame
+            guard let frame = try await self.next() else { return nil }
+            switch frame.opcode {
+            case .text, .binary:
+                frameSequence = .init(frame: frame)
+                if frame.fin {
+                    return frameSequence.message
+                }
+            default:
+                try await self.handler.close(code: .protocolError)
+                return nil
+            }
+            // parse continuation frames until we get a frame with a FIN flag
+            while let frame = try await self.next() {
+                guard frame.opcode == .continuation else {
+                    try await self.handler.close(code: .protocolError)
+                    return nil
+                }
+                guard frameSequence.size + frame.data.readableBytes <= maxSize else {
+                    try await self.handler.close(code: .messageTooLarge)
+                    return nil
+                }
+                frameSequence.append(frame)
+                if frame.fin {
+                    return frameSequence.message
+                }
+            }
+            return nil
+        }
+    }
 
     /// Creates the Asynchronous Iterator
     public func makeAsyncIterator() -> AsyncIterator {

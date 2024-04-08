@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2023 the Hummingbird authors
+// Copyright (c) 2021-2024 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -186,7 +186,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try await self.testClientAndServer { _, outbound, _ in
             try await outbound.write(.text("Hello"))
         } client: { inbound, _, _ in
-            var inboundIterator = inbound.makeAsyncIterator()
+            var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         }
@@ -194,7 +194,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientToServerMessage() async throws {
         try await self.testClientAndServer { inbound, _, _ in
-            var inboundIterator = inbound.makeAsyncIterator()
+            var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello"))
         } client: { _, outbound, _ in
@@ -204,16 +204,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testClientToServerSplitPacket() async throws {
         try await self.testClientAndServer { inbound, outbound, _ in
-            for try await packet in inbound {
-                try await outbound.write(.custom(packet.webSocketFrame))
+            for try await packet in inbound.messages(maxSize: .max) {
+                switch packet {
+                case .binary(let buffer):
+                    try await outbound.write(.binary(buffer))
+                case .text(let string):
+                    try await outbound.write(.text(string))
+                }
             }
         } client: { inbound, outbound, _ in
             let buffer = ByteBuffer(string: "Hello ")
             try await outbound.write(.custom(.init(fin: false, opcode: .text, data: buffer)))
             let buffer2 = ByteBuffer(string: "World!")
-            try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer2)))
+            try await outbound.write(.custom(.init(fin: true, opcode: .continuation, data: buffer2)))
 
-            var inboundIterator = inbound.makeAsyncIterator()
+            var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let msg = try await inboundIterator.next()
             XCTAssertEqual(msg, .text("Hello World!"))
         }
@@ -227,6 +232,36 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } client: { inbound, _, _ in
             for try await _ in inbound {}
+        }
+    }
+
+    // test connection is closed when message size is too large
+    func testTooLargeMessage() async throws {
+        try await self.testClientAndServer { inbound, outbound, _ in
+            try await outbound.withBinaryMessageWriter { write in
+                let buffer = ByteBuffer(repeating: 1, count: 1025)
+                try await write(buffer)
+                try await write(buffer)
+            }
+            for try await _ in inbound {}
+        } client: { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        }
+    }
+
+    // test text message writer works
+    func testTextMessageWriter() async throws {
+        try await self.testClientAndServer { inbound, outbound, _ in
+            try await outbound.withTextMessageWriter { writer in
+                try await writer("Merry Christmas ")
+                try await writer("and a ")
+                try await writer("Happy new year")
+            }
+            for try await _ in inbound {}
+        } client: { inbound, _, _ in
+            var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+            let text = try await iterator.next()
+            XCTAssertEqual(.text("Merry Christmas and a Happy new year"), text)
         }
     }
 
@@ -265,7 +300,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 tlsConfiguration: clientTLSConfiguration,
                 logger: logger
             ) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Hello"))
             }
@@ -354,7 +389,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
             group.addTask {
                 try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
-                    var inboundIterator = inbound.makeAsyncIterator()
+                    var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let msg = try await inboundIterator.next()
                     XCTAssertEqual(msg, .text("Hello"))
                 }
@@ -378,14 +413,14 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
             WebSocketClient(url: .init("ws://localhost:\(port)/ws1"), logger: logger) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("One"))
             }
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
             WebSocketClient(url: .init("ws://localhost:\(port)/ws2"), logger: logger) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("Two"))
             }
@@ -403,7 +438,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
             WebSocketClient(url: .init("ws://localhost:\(port)/ws?test=123"), logger: logger) { inbound, _, _ in
-                var inboundIterator = inbound.makeAsyncIterator()
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
                 XCTAssertEqual(msg, .text("123"))
             }
@@ -470,7 +505,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         do {
             try await self.testClientAndServerWithRouter(webSocketRouter: router) { port, logger in
                 WebSocketClient(url: .init("ws://localhost:\(port)/ws"), logger: logger) { inbound, _, _ in
-                    let text = try await inbound.first { _ in true }
+                    let text = try await inbound.messages(maxSize: .max).first { _ in true }
                     XCTAssertEqual(text, .text("Roger Moore"))
                 }
             }

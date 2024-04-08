@@ -158,22 +158,47 @@ struct PerMessageDeflateExtension: WebSocketExtension {
     }
 
     actor Decompressor {
+        enum ReceiveState: Sendable {
+            case idle
+            case receivingMessage
+            case decompressingMessage
+        }
+
         fileprivate let decompressor: any NIODecompressor
+        var state: ReceiveState
 
         init(_ decompressor: any NIODecompressor) throws {
+            self.state = .idle
             self.decompressor = decompressor
             try self.decompressor.startStream()
         }
 
         func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: some WebSocketContext) throws -> WebSocketFrame {
-            var frame = frame
-            precondition(frame.fin, "Only concatenated frames with fin set can be processed by the permessage-deflate extension")
-            // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
-            // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
-            frame.data.writeBytes([0, 0, 255, 255])
-            frame.data = try frame.data.decompressStream(with: self.decompressor, maxSize: maxSize, allocator: context.allocator)
-            if resetStream {
-                try self.decompressor.resetStream()
+            if self.state == .idle {
+                if frame.rsv1 {
+                    self.state = .decompressingMessage
+                } else {
+                    self.state = .receivingMessage
+                }
+            }
+            if self.state == .decompressingMessage {
+                var frame = frame
+                var unmaskedData = frame.unmaskedData
+                if frame.fin {
+                    // Reinstate last four bytes 0x00 0x00 0xff 0xff that were removed in the frame
+                    // send (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2).
+                    unmaskedData.writeBytes([0, 0, 255, 255])
+                    self.state = .idle
+                }
+                frame.data = try unmaskedData.decompressStream(with: self.decompressor, maxSize: maxSize, allocator: context.allocator)
+                frame.maskKey = nil
+                if resetStream, frame.fin {
+                    try self.decompressor.resetStream()
+                }
+                return frame
+            }
+            if frame.fin {
+                self.state = .idle
             }
             return frame
         }
@@ -259,19 +284,16 @@ struct PerMessageDeflateExtension: WebSocketExtension {
     }
 
     func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame {
-        if frame.rsv1 {
-            return try await self.decompressor.decompress(
-                frame,
-                maxSize: self.configuration.maxDecompressedFrameSize,
-                resetStream: self.configuration.receiveNoContextTakeover,
-                context: context
-            )
-        }
-        return frame
+        return try await self.decompressor.decompress(
+            frame,
+            maxSize: self.configuration.maxDecompressedFrameSize,
+            resetStream: self.configuration.receiveNoContextTakeover,
+            context: context
+        )
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame {
-        let isCorrectType = frame.opcode == .text || frame.opcode == .binary
+        let isCorrectType = frame.opcode == .text || frame.opcode == .binary || frame.opcode == .continuation
         if isCorrectType {
             return try await self.compressor.compress(frame, resetStream: self.configuration.sendNoContextTakeover, context: context)
         }

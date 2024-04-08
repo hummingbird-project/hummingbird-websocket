@@ -50,10 +50,15 @@ actor WebSocketHandler {
         case close(WebSocketErrorCode)
     }
 
+    struct Configuration {
+        let extensions: [any WebSocketExtension]
+        let autoPing: AutoPingSetup
+    }
+
     static let pingDataSize = 16
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
-    let extensions: [any WebSocketExtension]
+    let configuration: Configuration
     let context: BasicWebSocketContext
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
@@ -62,12 +67,12 @@ actor WebSocketHandler {
     private init(
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         type: WebSocketType,
-        extensions: [any WebSocketExtension],
+        configuration: Configuration,
         context: some WebSocketContext
     ) {
         self.outbound = outbound
         self.type = type
-        self.extensions = extensions
+        self.configuration = configuration
         self.context = .init(allocator: context.allocator, logger: context.logger)
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
         self.closed = false
@@ -75,8 +80,7 @@ actor WebSocketHandler {
 
     static func handle<Context: WebSocketContext>(
         type: WebSocketType,
-        extensions: [any WebSocketExtension],
-        autoPing: AutoPingSetup,
+        configuration: Configuration,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
         context: Context,
         handler: @escaping WebSocketDataHandler<Context>
@@ -84,8 +88,8 @@ actor WebSocketHandler {
         try? await asyncChannel.executeThenClose { inbound, outbound in
             await withTaskCancellationHandler {
                 await withThrowingTaskGroup(of: Void.self) { group in
-                    let webSocketHandler = Self(outbound: outbound, type: type, extensions: extensions, context: context)
-                    if case .enabled(let period) = autoPing.value {
+                    let webSocketHandler = Self(outbound: outbound, type: type, configuration: configuration, context: context)
+                    if case .enabled(let period) = configuration.autoPing.value {
                         /// Add task sending ping frames every so often and verifying a pong frame was sent back
                         group.addTask {
                             var waitTime = period
@@ -163,14 +167,17 @@ actor WebSocketHandler {
     func write(frame: WebSocketFrame) async throws {
         var frame = frame
         do {
-            for ext in self.extensions {
+            for ext in self.configuration.extensions {
                 frame = try await ext.processFrameToSend(frame, context: self.context)
             }
         } catch {
             self.context.logger.debug("Closing as we failed to generate valid frame data")
             throw WebSocketHandler.InternalError.close(.unexpectedServerError)
         }
-        frame.maskKey = self.makeMaskKey()
+        // Set mask key if client
+        if self.type == .client {
+            frame.maskKey = self.makeMaskKey()
+        }
         try await self.outbound.write(frame)
 
         self.context.logger.trace("Sent \(frame.opcode)")

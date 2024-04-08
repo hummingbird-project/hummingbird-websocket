@@ -50,4 +50,67 @@ public struct WebSocketOutboundWriter: Sendable {
             try await self.handler.write(frame: frame)
         }
     }
+
+    public struct MessageWriter {
+        let opcode: WebSocketOpcode
+        let handler: WebSocketHandler
+        var prevFrame: WebSocketFrame?
+
+        /// Write string to WebSocket frame
+        public mutating func callAsFunction(_ text: String) async throws {
+            let buffer = self.handler.context.allocator.buffer(string: text)
+            try await self.write(buffer, opcode: self.opcode)
+        }
+
+        /// Write buffer to WebSocket frame
+        public mutating func callAsFunction(_ buffer: ByteBuffer) async throws {
+            try await self.write(buffer, opcode: self.opcode)
+        }
+
+        mutating func write(_ data: ByteBuffer, opcode: WebSocketOpcode) async throws {
+            if let prevFrame {
+                try await self.handler.write(frame: prevFrame)
+                self.prevFrame = .init(fin: false, opcode: .continuation, data: data)
+            } else {
+                self.prevFrame = .init(fin: false, opcode: opcode, data: data)
+            }
+        }
+
+        func finish() async throws {
+            if var prevFrame {
+                prevFrame.fin = true
+                try await self.handler.write(frame: prevFrame)
+            }
+        }
+    }
+
+    /// Write a single WebSocket text message as a series of fragmented frames
+    /// - Parameter write: Function writing frames
+    public func withTextMessageWriter<Value>(_ write: (inout MessageWriter) async throws -> Value) async throws -> Value {
+        var writer = MessageWriter(opcode: .text, handler: self.handler)
+        let value: Value
+        do {
+            value = try await write(&writer)
+        } catch {
+            try await writer.finish()
+            throw error
+        }
+        try await writer.finish()
+        return value
+    }
+
+    /// Write a single WebSocket binary message as a series of fragmented frames
+    /// - Parameter write: Function writing frames
+    public func withBinaryMessageWriter<Value>(_ write: (inout MessageWriter) async throws -> Value) async throws -> Value {
+        var writer = MessageWriter(opcode: .binary, handler: self.handler)
+        let value: Value
+        do {
+            value = try await write(&writer)
+        } catch {
+            try await writer.finish()
+            throw error
+        }
+        try await writer.finish()
+        return value
+    }
 }
