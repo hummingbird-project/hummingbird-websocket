@@ -22,7 +22,7 @@ struct WebSocketFrameSequence {
     var first: WebSocketDataFrame { self.frames[0] }
 
     init(frame: WebSocketDataFrame) {
-        precondition(frame.opcode != .continuation, "Cannot create a WebSocketFrameSequence starting with a continuation")
+        assert(frame.opcode != .continuation, "Cannot create a WebSocketFrameSequence starting with a continuation")
         self.frames = [frame]
         self.size = 0
     }
