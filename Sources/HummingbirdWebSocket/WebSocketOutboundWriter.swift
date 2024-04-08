@@ -71,10 +71,13 @@ public struct WebSocketOutboundWriter: Sendable {
         }
     }
 
-    public func withTextMessageWriter(_ write: ((String) async throws -> Void) async throws -> Void) async throws {
+    /// Write a single WebSocket text message as a series of fragmented frames
+    /// - Parameter write: Function writing frames
+    public func withTextMessageWriter<Value>(_ write: ((String) async throws -> Void) async throws -> Value) async throws -> Value {
         var writer = MessageWriter(handler: self.handler)
+        let value: Value
         do {
-            try await write { text in
+            value = try await write { text in
                 let data = writer.handler.context.allocator.buffer(string: text)
                 try await writer.write(data, opcode: .text)
             }
@@ -83,12 +86,16 @@ public struct WebSocketOutboundWriter: Sendable {
             throw error
         }
         try await writer.finish()
+        return value
     }
 
-    public func withBinaryMessageWriter(_ write: ((ByteBuffer) async throws -> Void) async throws -> Void) async throws {
+    /// Write a single WebSocket binary message as a series of fragmented frames
+    /// - Parameter write: Function writing frames
+    public func withBinaryMessageWriter<Value>(_ write: ((ByteBuffer) async throws -> Void) async throws -> Value) async throws -> Value {
         var writer = MessageWriter(handler: self.handler)
+        let value: Value
         do {
-            try await write { data in
+            value = try await write { data in
                 try await writer.write(data, opcode: .binary)
             }
         } catch {
@@ -96,5 +103,6 @@ public struct WebSocketOutboundWriter: Sendable {
             throw error
         }
         try await writer.finish()
+        return value
     }
 }

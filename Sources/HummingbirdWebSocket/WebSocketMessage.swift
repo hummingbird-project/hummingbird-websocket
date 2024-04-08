@@ -15,17 +15,17 @@
 import NIOCore
 import NIOWebSocket
 
-/// Enumeration holding WebSocket data
+/// Enumeration holding WebSocket message
 public enum WebSocketMessage: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     case text(String)
     case binary(ByteBuffer)
 
-    init?(frame: WebSocketFrame) {
+    init?(frame: WebSocketDataFrame) {
         switch frame.opcode {
         case .text:
-            self = .text(String(buffer: frame.unmaskedData))
+            self = .text(String(buffer: frame.data))
         case .binary:
-            self = .binary(frame.unmaskedData)
+            self = .binary(frame.data)
         default:
             return nil
         }

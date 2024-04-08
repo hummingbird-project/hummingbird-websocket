@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdWebSocket
 import HummingbirdWSCompression
 import Logging
+import NIOWebSocket
 
 var logger = Logger(label: "Echo")
 logger.logLevel = .trace
@@ -17,19 +18,17 @@ router.ws("/ws") { inbound, outbound, _ in
         if frame.opcode == .text, String(buffer: frame.data) == "disconnect", frame.fin == true {
             break
         }
-        if frame.opcode == .binary, frame.data.readableBytes > 2 {
-            var unmaskedData = frame.unmaskedData
-            try await outbound.withBinaryMessageWriter { write in
-                let firstHalf = unmaskedData.readSlice(length: frame.data.readableBytes / 2)!
-                try await write(firstHalf)
-                try await write(unmaskedData)
-            }
-        } else {
-            var frame = frame
-            frame.data = frame.unmaskedData
-            frame.maskKey = nil
-            try await outbound.write(.custom(frame))
+        let opcode: WebSocketOpcode = switch frame.opcode {
+        case .text: .text
+        case .binary: .binary
+        case .continuation: .continuation
         }
+        let frame = WebSocketFrame(
+            fin: frame.fin,
+            opcode: opcode,
+            data: frame.data
+        )
+        try await outbound.write(.custom(frame))
     }
 }
 

@@ -12,17 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-import AsyncAlgorithms
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOWebSocket
 
-/// Inbound WebSocket frame AsyncSequence
+/// Inbound WebSocket data frame AsyncSequence
 ///
 /// This AsyncSequence only returns binary, text and continuation frames. All other frames
 /// are dealt with internally
 public final class WebSocketInboundStream: AsyncSequence, Sendable {
-    public typealias Element = WebSocketFrame
+    public typealias Element = WebSocketDataFrame
 
     typealias UnderlyingIterator = NIOAsyncChannelInboundStream<WebSocketFrame>.AsyncIterator
     /// Underlying NIOAsyncChannelInboundStream
@@ -53,7 +52,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
         }
 
         /// Return next WebSocket frame, while dealing with any other frames
-        public mutating func next() async throws -> WebSocketFrame? {
+        public mutating func next() async throws -> WebSocketDataFrame? {
             guard !self.closed else { return nil }
             // parse messages coming from inbound
             while let frame = try await self.iterator.next() {
@@ -72,11 +71,11 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         try await self.handler.onPong(frame)
                     case .text, .binary, .continuation:
                         // apply extensions
-                        var collatedFrame = frame
+                        var frame = frame
                         for ext in self.handler.configuration.extensions.reversed() {
-                            collatedFrame = try await ext.processReceivedFrame(collatedFrame, context: self.handler.context)
+                            frame = try await ext.processReceivedFrame(frame, context: self.handler.context)
                         }
-                        return collatedFrame
+                        return .init(from: frame)
                     default:
                         break
                     }
@@ -88,6 +87,48 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                 }
             }
 
+            return nil
+        }
+
+        /// Return next WebSocket messsage, while dealing with any other frames
+        ///
+        /// A WebSocket message can be fragmented across multiple WebSocket frames. This
+        /// function collates fragmented frames until it has a full message
+        public mutating func nextMessage(maxSize: Int) async throws -> WebSocketMessage? {
+            var frameSequence: WebSocketFrameSequence
+            // parse first frame
+            guard let frame = try await self.next() else { return nil }
+            switch frame.opcode {
+            case .text, .binary:
+                frameSequence = .init(frame: frame)
+                if frame.fin {
+                    let collatedFrame = frameSequence.collapsed
+                    if let finalFrame = WebSocketMessage(frame: collatedFrame) {
+                        return finalFrame
+                    }
+                }
+            default:
+                try await self.handler.close(code: .protocolError)
+                return nil
+            }
+            // parse continuation frames until we get a frame with a FIN flag
+            while let frame = try await self.next() {
+                guard frame.opcode == .continuation else {
+                    try await self.handler.close(code: .protocolError)
+                    return nil
+                }
+                guard frameSequence.size + frame.data.readableBytes <= maxSize else {
+                    try await self.handler.close(code: .messageTooLarge)
+                    return nil
+                }
+                frameSequence.append(frame)
+                if frame.fin {
+                    let collatedFrame = frameSequence.collapsed
+                    if let finalFrame = WebSocketMessage(frame: collatedFrame) {
+                        return finalFrame
+                    }
+                }
+            }
             return nil
         }
     }
@@ -104,73 +145,5 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
             return done
         }
         return .init(sequence: self, closed: done)
-    }
-}
-
-/// Inbound WebSocket messages AsyncSequence.
-public struct WebSocketInboundMessageStream: AsyncSequence, Sendable {
-    public typealias Element = WebSocketMessage
-
-    let inboundStream: WebSocketInboundStream
-    let maxMessageSize: Int
-
-    public struct AsyncIterator: AsyncIteratorProtocol {
-        var frameIterator: WebSocketInboundStream.AsyncIterator
-        let maxMessageSize: Int
-
-        public mutating func next() async throws -> Element? {
-            // parse messages coming from inbound
-            var frameSequence: WebSocketFrameSequence?
-            while let frame = try await self.frameIterator.next() {
-                do {
-                    switch frame.opcode {
-                    case .text, .binary:
-                        guard frameSequence == nil else {
-                            try await self.frameIterator.handler.close(code: .protocolError)
-                            return nil
-                        }
-                        frameSequence = .init(frame: frame)
-                    case .continuation:
-                        if var frameSeq = frameSequence {
-                            frameSeq.append(frame)
-                            guard frameSeq.size <= self.maxMessageSize else {
-                                try await self.frameIterator.handler.close(code: .messageTooLarge)
-                                return nil
-                            }
-                            frameSequence = frameSeq
-                        } else {
-                            try await self.frameIterator.handler.close(code: .protocolError)
-                            return nil
-                        }
-                    default:
-                        break
-                    }
-                    if let frameSeq = frameSequence, frameSeq.finished {
-                        let collatedFrame = frameSeq.collapsed
-                        if let finalFrame = WebSocketMessage(frame: collatedFrame) {
-                            frameSequence = nil
-                            return finalFrame
-                        }
-                    }
-                }
-            }
-            return nil
-        }
-    }
-
-    public func makeAsyncIterator() -> AsyncIterator {
-        .init(frameIterator: self.inboundStream.makeAsyncIterator(), maxMessageSize: self.maxMessageSize)
-    }
-}
-
-extension WebSocketInboundStream {
-    /// Convert to AsyncSequence of WebSocket messages
-    ///
-    /// A WebSocket message is a text or binary frame combined with any subsequent continuation
-    /// frames until a frame with a FIN flag is reached.
-    ///
-    /// - Parameter maxMessageSize: The maximum size of message we are allowed to create
-    public func messages(maxMessageSize: Int) -> WebSocketInboundMessageStream {
-        .init(inboundStream: self, maxMessageSize: maxMessageSize)
     }
 }
