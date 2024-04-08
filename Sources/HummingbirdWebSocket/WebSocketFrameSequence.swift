@@ -45,11 +45,11 @@ struct WebSocketFrameSequence {
         }
     }
 
-    var data: WebSocketMessage {
-        .init(frame: self.collapsed)!
+    var message: WebSocketMessage {
+        .init(frame: self.collated)!
     }
 
-    var collapsed: WebSocketDataFrame {
+    var collated: WebSocketDataFrame {
         var frame = self.first
         frame.data = self.bytes
         frame.fin = true

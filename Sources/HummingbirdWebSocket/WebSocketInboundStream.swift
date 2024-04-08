@@ -102,10 +102,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
             case .text, .binary:
                 frameSequence = .init(frame: frame)
                 if frame.fin {
-                    let collatedFrame = frameSequence.collapsed
-                    if let finalFrame = WebSocketMessage(frame: collatedFrame) {
-                        return finalFrame
-                    }
+                    return frameSequence.message
                 }
             default:
                 try await self.handler.close(code: .protocolError)
@@ -123,10 +120,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                 }
                 frameSequence.append(frame)
                 if frame.fin {
-                    let collatedFrame = frameSequence.collapsed
-                    if let finalFrame = WebSocketMessage(frame: collatedFrame) {
-                        return finalFrame
-                    }
+                    return frameSequence.message
                 }
             }
             return nil
