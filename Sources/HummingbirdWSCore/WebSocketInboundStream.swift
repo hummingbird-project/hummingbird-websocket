@@ -87,7 +87,8 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         }
                         return .init(from: frame)
                     default:
-                        break
+                        // if we receive a reserved opcode we should fail the connection
+                        throw WebSocketHandler.InternalError.close(.protocolError)
                     }
                 } catch {
                     // catch errors while processing websocket frames so responding close message
