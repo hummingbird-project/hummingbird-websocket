@@ -18,7 +18,7 @@ import NIOWebSocket
 import ServiceLifecycle
 
 /// WebSocket type
-enum WebSocketType: Sendable {
+package enum WebSocketType: Sendable {
     case client
     case server
 }
@@ -45,14 +45,19 @@ public struct AutoPingSetup: Sendable {
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
-actor WebSocketHandler {
+package actor WebSocketHandler {
     enum InternalError: Error {
         case close(WebSocketErrorCode)
     }
 
-    struct Configuration {
+    package struct Configuration {
         let extensions: [any WebSocketExtension]
         let autoPing: AutoPingSetup
+
+        package init(extensions: [any WebSocketExtension], autoPing: AutoPingSetup) {
+            self.extensions = extensions
+            self.autoPing = autoPing
+        }
     }
 
     static let pingDataSize = 16
@@ -78,7 +83,7 @@ actor WebSocketHandler {
         self.closed = false
     }
 
-    static func handle<Context: WebSocketContext>(
+    package static func handle<Context: WebSocketContext>(
         type: WebSocketType,
         configuration: Configuration,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,

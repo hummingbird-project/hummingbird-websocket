@@ -8,12 +8,11 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17)],
     products: [
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
+        .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
         .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-beta.2"),
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
@@ -22,23 +21,30 @@ let package = Package(
     ],
     targets: [
         .target(name: "HummingbirdWebSocket", dependencies: [
+            .byName(name: "HummingbirdWSCore"),
             .product(name: "Hummingbird", package: "hummingbird"),
-            .product(name: "HummingbirdTLS", package: "hummingbird"),
-            .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-            .product(name: "HTTPTypes", package: "swift-http-types"),
-            .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOHTTPTypes", package: "swift-nio-extras"),
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
+        ]),
+        .target(name: "HummingbirdWSClient", dependencies: [
+            .byName(name: "HummingbirdWSCore"),
+            .product(name: "HummingbirdCore", package: "hummingbird"),
+            .product(name: "HummingbirdTLS", package: "hummingbird"),
+            .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
+        ]),
+        .target(name: "HummingbirdWSCore", dependencies: [
+            .product(name: "HTTPTypes", package: "swift-http-types"),
+            .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
         .target(name: "HummingbirdWSCompression", dependencies: [
-            .byName(name: "HummingbirdWebSocket"),
+            .byName(name: "HummingbirdWSCore"),
             .product(name: "CompressNIO", package: "compress-nio"),
         ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
+            .byName(name: "HummingbirdWSClient"),
             .byName(name: "HummingbirdWSCompression"),
-            .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),
             .product(name: "HummingbirdTLS", package: "hummingbird"),

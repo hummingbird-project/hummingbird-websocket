@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Foundation
 import HTTPTypes
-import NIOCore
 import NIOWebSocket
 
 /// Protocol for WebSocket extension
@@ -117,7 +117,7 @@ public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
     }
 
     public let parameters: [String: Parameter]
-    let name: String
+    public let name: String
 
     /// initialise WebSocket extension parameters from string
     init?(from header: some StringProtocol) {
@@ -156,7 +156,7 @@ public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
 
 extension WebSocketExtensionHTTPParameters {
     /// Initialiser used by tests
-    init(_ name: String, parameters: [String: Parameter]) {
+    package init(_ name: String, parameters: [String: Parameter]) {
         self.name = name
         self.parameters = parameters
     }

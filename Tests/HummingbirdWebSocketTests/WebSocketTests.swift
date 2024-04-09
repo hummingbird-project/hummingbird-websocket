@@ -18,6 +18,7 @@ import HummingbirdCore
 import HummingbirdTesting
 import HummingbirdTLS
 import HummingbirdWebSocket
+import HummingbirdWSClient
 import Logging
 import NIOCore
 import NIOPosix

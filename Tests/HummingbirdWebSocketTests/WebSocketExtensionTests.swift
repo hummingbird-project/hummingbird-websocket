@@ -14,8 +14,10 @@
 
 import Hummingbird
 import HummingbirdCore
-@testable import HummingbirdWebSocket
+import HummingbirdWebSocket
+import HummingbirdWSClient
 @testable import HummingbirdWSCompression
+@testable import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOWebSocket

@@ -29,7 +29,7 @@ public struct WebSocketOutboundWriter: Sendable {
         case custom(WebSocketFrame)
     }
 
-    let handler: WebSocketHandler
+    package let handler: WebSocketHandler
 
     /// Write WebSocket frame
     public func write(_ frame: OutboundFrame) async throws {

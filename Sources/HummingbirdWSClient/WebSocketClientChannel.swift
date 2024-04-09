@@ -14,6 +14,7 @@
 
 import HTTPTypes
 import HummingbirdCore
+import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOHTTP1
@@ -57,7 +58,6 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             )
 
             var headers = HTTPHeaders()
-            headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
             headers.add(name: "Content-Length", value: "0")
             let additionalHeaders = HTTPHeaders(self.configuration.additionalHeaders)
             headers.add(contentsOf: additionalHeaders)
