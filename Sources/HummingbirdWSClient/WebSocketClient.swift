@@ -118,14 +118,12 @@ public struct WebSocketClient {
         guard let host = url.host else { throw WebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
         let port = self.url.port ?? (requiresTLS ? 443 : 80)
-        // url path must include query values as well
-        let urlPath = self.url.path + (self.url.query.map { "?\($0)" } ?? "")
         if requiresTLS {
             switch self.tlsConfiguration {
             case .niossl(let tlsConfiguration):
                 let client = try ClientConnection(
                     TLSClientChannel(
-                        WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
+                        WebSocketClientChannel(handler: handler, url: url, configuration: self.configuration),
                         tlsConfiguration: tlsConfiguration
                     ),
                     address: .hostname(host, port: port),
@@ -137,7 +135,7 @@ public struct WebSocketClient {
             #if canImport(Network)
             case .ts(let tlsOptions):
                 let client = try ClientConnection(
-                    WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
+                    WebSocketClientChannel(handler: handler, url: url, configuration: self.configuration),
                     address: .hostname(host, port: port),
                     transportServicesTLSOptions: tlsOptions,
                     eventLoopGroup: self.eventLoopGroup,
@@ -151,7 +149,7 @@ public struct WebSocketClient {
                     TLSClientChannel(
                         WebSocketClientChannel(
                             handler: handler,
-                            url: urlPath,
+                            url: url,
                             configuration: self.configuration
                         ),
                         tlsConfiguration: TLSConfiguration.makeClientConfiguration()
@@ -163,10 +161,10 @@ public struct WebSocketClient {
                 try await client.run()
             }
         } else {
-            let client = ClientConnection(
+            let client = try ClientConnection(
                 WebSocketClientChannel(
                     handler: handler,
-                    url: urlPath,
+                    url: url,
                     configuration: self.configuration
                 ),
                 address: .hostname(host, port: port),

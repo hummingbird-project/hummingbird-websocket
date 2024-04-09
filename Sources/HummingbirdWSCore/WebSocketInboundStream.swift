@@ -63,7 +63,6 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         // we received a connection close.
                         // send a close back if it hasn't already been send and exit
                         _ = try await self.handler.close(code: .normalClosure)
-                        self.closed = true
                         return nil
                     case .ping:
                         try await self.handler.onPing(frame)
