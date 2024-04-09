@@ -85,8 +85,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 }
             )
 
+            var pipelineConfiguration = NIOUpgradableHTTPClientPipelineConfiguration(upgradeConfiguration: clientUpgradeConfiguration)
+            pipelineConfiguration.leftOverBytesStrategy = .forwardBytes
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPClientPipeline(
-                configuration: .init(upgradeConfiguration: clientUpgradeConfiguration)
+                configuration: pipelineConfiguration
             )
 
             return negotiationResultFuture
