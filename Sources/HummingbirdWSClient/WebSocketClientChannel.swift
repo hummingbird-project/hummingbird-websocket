@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdCore
 import HummingbirdWSCore
 import Logging
 import NIOCore
