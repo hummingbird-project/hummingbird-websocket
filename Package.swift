@@ -14,9 +14,11 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-beta.2"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
+        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.20.0"),
         .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
     ],
     targets: [
@@ -28,9 +30,14 @@ let package = Package(
         ]),
         .target(name: "HummingbirdWSClient", dependencies: [
             .byName(name: "HummingbirdWSCore"),
-            .product(name: "HummingbirdCore", package: "hummingbird"),
-            .product(name: "HummingbirdTLS", package: "hummingbird"),
+            .product(name: "HTTPTypes", package: "swift-http-types"),
+            .product(name: "Logging", package: "swift-log"),
+            .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
+            .product(name: "NIOPosix", package: "swift-nio"),
+            .product(name: "NIOSSL", package: "swift-nio-ssl"),
+            .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+            .product(name: "NIOWebSocket", package: "swift-nio"),
         ]),
         .target(name: "HummingbirdWSCore", dependencies: [
             .product(name: "HTTPTypes", package: "swift-http-types"),

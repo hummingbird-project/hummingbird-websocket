@@ -13,14 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdCore
-import HummingbirdTLS
 import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOPosix
+import NIOSSL
 import NIOTransportServices
-import ServiceLifecycle
 
 /// WebSocket client
 ///
@@ -71,14 +69,14 @@ public struct WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     public init(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) {
-        self.url = url
+        self.url = .init(url)
         self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
@@ -97,14 +95,14 @@ public struct WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     public init(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) {
-        self.url = url
+        self.url = .init(url)
         self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
@@ -187,7 +185,7 @@ extension WebSocketClient {
     ///   - logger: Logger
     ///   - process: Closure handling webSocket
     public static func connect(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
@@ -216,7 +214,7 @@ extension WebSocketClient {
     ///   - logger: Logger
     ///   - process: WebSocket data handler
     public static func connect(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
@@ -235,6 +233,3 @@ extension WebSocketClient {
     }
     #endif
 }
-
-/// conform to Service
-extension WebSocketClient: Service {}
