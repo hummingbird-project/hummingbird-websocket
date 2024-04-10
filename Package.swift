@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.20.0"),
-        .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
+        .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.2.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
     ],
     targets: [
