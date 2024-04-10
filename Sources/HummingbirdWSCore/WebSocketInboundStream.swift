@@ -57,7 +57,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
             // parse messages coming from inbound
             while let frame = try await self.iterator.next() {
                 do {
-                    self.handler.context.logger.trace("Received \(frame.opcode)")
+                    self.handler.context.logger.trace("Received \(frame.traceDescription)")
                     switch frame.opcode {
                     case .connectionClose:
                         // we received a connection close.
@@ -152,5 +152,37 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
             return done
         }
         return .init(sequence: self, closed: done)
+    }
+}
+
+/// Extend WebSocketFrame to provide debug description for trace logs
+extension WebSocketFrame {
+    var traceDescription: String {
+        var flags: [String] = []
+        if self.fin {
+            flags.append("FIN")
+        }
+        if self.rsv1 {
+            flags.append("RSV1")
+        }
+        if self.rsv2 {
+            flags.append("RSV2")
+        }
+        if self.rsv3 {
+            flags.append("RSV3")
+        }
+        let unmaskedData = self.unmaskedData
+        var desc = "["
+        let slice = unmaskedData.getSlice(at: unmaskedData.readerIndex, length: min(24, unmaskedData.readableBytes))
+        for byte in slice!.readableBytesView {
+            let hexByte = String(byte, radix: 16)
+            desc += " \(hexByte.count == 1 ? "0" : "")\(hexByte)"
+        }
+        if unmaskedData.readableBytes > 24 {
+            desc += " ..."
+        }
+        desc += " ]"
+
+        return "WebSocketFrame(\(self.opcode), flags: \(flags.joined(separator: ",")), data: {length: \(unmaskedData.readableBytes), bytes: \(desc)})"
     }
 }

@@ -185,7 +185,7 @@ package actor WebSocketHandler {
         }
         try await self.outbound.write(frame)
 
-        self.context.logger.trace("Sent \(frame.opcode)")
+        self.context.logger.trace("Sent \(frame.traceDescription)")
     }
 
     func finish() {
