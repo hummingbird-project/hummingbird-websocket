@@ -122,7 +122,8 @@ public struct WebSocketClient {
                 let client = try ClientConnection(
                     TLSClientChannel(
                         WebSocketClientChannel(handler: handler, url: url, configuration: self.configuration),
-                        tlsConfiguration: tlsConfiguration
+                        tlsConfiguration: tlsConfiguration,
+                        serverHostname: host
                     ),
                     address: .hostname(host, port: port),
                     eventLoopGroup: self.eventLoopGroup,
@@ -150,7 +151,8 @@ public struct WebSocketClient {
                             url: url,
                             configuration: self.configuration
                         ),
-                        tlsConfiguration: TLSConfiguration.makeClientConfiguration()
+                        tlsConfiguration: TLSConfiguration.makeClientConfiguration(),
+                        serverHostname: host
                     ),
                     address: .hostname(host, port: port),
                     eventLoopGroup: self.eventLoopGroup,
