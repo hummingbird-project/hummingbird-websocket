@@ -27,5 +27,14 @@ public struct WebSocketClientError: Swift.Error, Equatable {
     /// Provided URL is invalid
     public static var invalidURL: Self { .init(.invalidURL) }
     /// WebSocket upgrade failed.
-    public static var webSocketUpgradeFailed: Self { .init(.invalidURL) }
+    public static var webSocketUpgradeFailed: Self { .init(.webSocketUpgradeFailed) }
+}
+
+extension WebSocketClientError: CustomStringConvertible {
+    public var description: String {
+        switch self.value {
+        case .invalidURL: "Invalid URL"
+        case .webSocketUpgradeFailed: "WebSocket upgrade failed"
+        }
+    }
 }

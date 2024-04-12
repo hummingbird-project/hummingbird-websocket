@@ -15,6 +15,7 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
+import HummingbirdWSCore
 import Logging
 import NIOCore
 

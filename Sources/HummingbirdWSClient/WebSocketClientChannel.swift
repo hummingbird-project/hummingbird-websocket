@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdCore
+import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOHTTP1
@@ -28,12 +28,15 @@ struct WebSocketClientChannel: ClientConnectionChannel {
 
     typealias Value = EventLoopFuture<UpgradeResult>
 
-    let url: String
+    let urlPath: String
+    let hostHeader: String
     let handler: WebSocketDataHandler<BasicWebSocketContext>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<BasicWebSocketContext>, url: String, configuration: WebSocketClientConfiguration) {
-        self.url = url
+    init(handler: @escaping WebSocketDataHandler<BasicWebSocketContext>, url: URI, configuration: WebSocketClientConfiguration) throws {
+        guard let hostHeader = Self.urlHostHeader(for: url) else { throw WebSocketClientError.invalidURL }
+        self.hostHeader = hostHeader
+        self.urlPath = Self.urlPath(for: url)
         self.handler = handler
         self.configuration = configuration
     }
@@ -57,8 +60,8 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             )
 
             var headers = HTTPHeaders()
-            headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
             headers.add(name: "Content-Length", value: "0")
+            headers.add(name: "Host", value: self.hostHeader)
             let additionalHeaders = HTTPHeaders(self.configuration.additionalHeaders)
             headers.add(contentsOf: additionalHeaders)
             // add websocket extensions to headers
@@ -67,7 +70,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             let requestHead = HTTPRequestHead(
                 version: .http1_1,
                 method: .GET,
-                uri: self.url,
+                uri: self.urlPath,
                 headers: headers
             )
 
@@ -81,8 +84,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                 }
             )
 
+            var pipelineConfiguration = NIOUpgradableHTTPClientPipelineConfiguration(upgradeConfiguration: clientUpgradeConfiguration)
+            pipelineConfiguration.leftOverBytesStrategy = .forwardBytes
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPClientPipeline(
-                configuration: .init(upgradeConfiguration: clientUpgradeConfiguration)
+                configuration: pipelineConfiguration
             )
 
             return negotiationResultFuture
@@ -106,6 +111,19 @@ struct WebSocketClientChannel: ClientConnectionChannel {
             // The upgrade to websocket did not succeed.
             logger.debug("Upgrade declined")
             throw WebSocketClientError.webSocketUpgradeFailed
+        }
+    }
+
+    static func urlPath(for url: URI) -> String {
+        url.path + (url.query.map { "?\($0)" } ?? "")
+    }
+
+    static func urlHostHeader(for url: URI) -> String? {
+        guard let host = url.host else { return nil }
+        if let port = url.port {
+            return "\(host):\(port)"
+        } else {
+            return host
         }
     }
 }

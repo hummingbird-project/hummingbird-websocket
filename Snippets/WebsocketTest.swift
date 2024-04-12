@@ -14,6 +14,7 @@ router.get { _, _ in
 }
 
 router.ws("/ws") { inbound, outbound, _ in
+    try await outbound.write(.text("Hello"))
     for try await frame in inbound {
         if frame.opcode == .text, String(buffer: frame.data) == "disconnect", frame.fin == true {
             break

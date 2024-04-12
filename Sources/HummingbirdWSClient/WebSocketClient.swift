@@ -13,13 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdCore
-import HummingbirdTLS
+import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOPosix
+import NIOSSL
 import NIOTransportServices
-import ServiceLifecycle
 
 /// WebSocket client
 ///
@@ -70,14 +69,14 @@ public struct WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     public init(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) {
-        self.url = url
+        self.url = .init(url)
         self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
@@ -96,14 +95,14 @@ public struct WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     public init(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) {
-        self.url = url
+        self.url = .init(url)
         self.handler = handler
         self.configuration = configuration
         self.eventLoopGroup = eventLoopGroup
@@ -117,15 +116,14 @@ public struct WebSocketClient {
         guard let host = url.host else { throw WebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
         let port = self.url.port ?? (requiresTLS ? 443 : 80)
-        // url path must include query values as well
-        let urlPath = self.url.path + (self.url.query.map { "?\($0)" } ?? "")
         if requiresTLS {
             switch self.tlsConfiguration {
             case .niossl(let tlsConfiguration):
                 let client = try ClientConnection(
                     TLSClientChannel(
-                        WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
-                        tlsConfiguration: tlsConfiguration
+                        WebSocketClientChannel(handler: handler, url: url, configuration: self.configuration),
+                        tlsConfiguration: tlsConfiguration,
+                        serverHostname: host
                     ),
                     address: .hostname(host, port: port),
                     eventLoopGroup: self.eventLoopGroup,
@@ -136,7 +134,7 @@ public struct WebSocketClient {
             #if canImport(Network)
             case .ts(let tlsOptions):
                 let client = try ClientConnection(
-                    WebSocketClientChannel(handler: handler, url: urlPath, configuration: self.configuration),
+                    WebSocketClientChannel(handler: handler, url: url, configuration: self.configuration),
                     address: .hostname(host, port: port),
                     transportServicesTLSOptions: tlsOptions,
                     eventLoopGroup: self.eventLoopGroup,
@@ -150,10 +148,11 @@ public struct WebSocketClient {
                     TLSClientChannel(
                         WebSocketClientChannel(
                             handler: handler,
-                            url: urlPath,
+                            url: url,
                             configuration: self.configuration
                         ),
-                        tlsConfiguration: TLSConfiguration.makeClientConfiguration()
+                        tlsConfiguration: TLSConfiguration.makeClientConfiguration(),
+                        serverHostname: host
                     ),
                     address: .hostname(host, port: port),
                     eventLoopGroup: self.eventLoopGroup,
@@ -162,10 +161,10 @@ public struct WebSocketClient {
                 try await client.run()
             }
         } else {
-            let client = ClientConnection(
+            let client = try ClientConnection(
                 WebSocketClientChannel(
                     handler: handler,
-                    url: urlPath,
+                    url: url,
                     configuration: self.configuration
                 ),
                 address: .hostname(host, port: port),
@@ -188,7 +187,7 @@ extension WebSocketClient {
     ///   - logger: Logger
     ///   - process: Closure handling webSocket
     public static func connect(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
@@ -217,7 +216,7 @@ extension WebSocketClient {
     ///   - logger: Logger
     ///   - process: WebSocket data handler
     public static func connect(
-        url: URI,
+        url: String,
         configuration: WebSocketClientConfiguration = .init(),
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
@@ -236,6 +235,3 @@ extension WebSocketClient {
     }
     #endif
 }
-
-/// conform to Service
-extension WebSocketClient: Service {}

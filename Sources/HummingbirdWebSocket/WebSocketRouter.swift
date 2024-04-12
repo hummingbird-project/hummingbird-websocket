@@ -12,10 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Atomics
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
+import HummingbirdWSCore
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore

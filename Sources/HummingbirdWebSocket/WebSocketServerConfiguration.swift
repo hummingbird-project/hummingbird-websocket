@@ -12,31 +12,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-import HTTPTypes
+import HummingbirdWSCore
 
-/// Configuration for a client connecting to a WebSocket
-public struct WebSocketClientConfiguration: Sendable {
+/// Configuration for a WebSocket server
+public struct WebSocketServerConfiguration: Sendable {
     /// Max websocket frame size that can be sent/received
     public var maxFrameSize: Int
-    /// Additional headers to be sent with the initial HTTP request
-    public var additionalHeaders: HTTPFields
     /// WebSocket extensions
     public var extensions: [any WebSocketExtensionBuilder]
-    /// Automatic ping setup
+    /// Autoping
     public var autoPing: AutoPingSetup
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
     ///     - maxFrameSize: Max websocket frame size that can be sent/received
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
+    ///     - autoPing: Whether we should enable an automatic ping at a fixed period
     public init(
         maxFrameSize: Int = (1 << 14),
-        additionalHeaders: HTTPFields = .init(),
         extensions: [WebSocketExtensionFactory] = [],
-        autoPing: AutoPingSetup = .disabled
+        autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30))
     ) {
         self.maxFrameSize = maxFrameSize
-        self.additionalHeaders = additionalHeaders
         self.extensions = extensions.map { $0.build() }
         self.autoPing = autoPing
     }

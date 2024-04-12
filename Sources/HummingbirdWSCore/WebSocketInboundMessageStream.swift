@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOWebSocket
 
