@@ -60,20 +60,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                     self.handler.context.logger.trace("Received \(frame.traceDescription)")
                     switch frame.opcode {
                     case .connectionClose:
-                        // we received a connection close.
-                        // send a close back if it hasn't already been send and exit
-                        var data = frame.unmaskedData
-                        let dataSize = data.readableBytes
-                        let closeCode = data.readWebSocketErrorCode()
-                        if dataSize == 0 || closeCode != nil {
-                            if case .unknown = closeCode {
-                                _ = try await self.handler.close(code: .protocolError)
-                            } else {
-                                _ = try await self.handler.close(code: .normalClosure)
-                            }
-                        } else {
-                            _ = try await self.handler.close(code: .protocolError)
-                        }
+                        try await self.handler.receivedClose(frame)
                         return nil
                     case .ping:
                         try await self.handler.onPing(frame)

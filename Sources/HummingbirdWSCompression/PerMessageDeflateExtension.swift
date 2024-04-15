@@ -232,9 +232,9 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         }
 
         func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some WebSocketContext) throws -> WebSocketFrame {
-            // if the frame is larger than `minFrameSizeToCompress` bytes, we haven't received a final frame 
+            // if the frame is larger than `minFrameSizeToCompress` bytes, we haven't received a final frame
             // or we are in the process of sending a message compress the data
-            let shouldWeCompress = frame.data.readableBytes >= minFrameSizeToCompress || !frame.fin || self.sendState != .idle
+            let shouldWeCompress = frame.data.readableBytes >= self.minFrameSizeToCompress || !frame.fin || self.sendState != .idle
             if shouldWeCompress {
                 var newFrame = frame
                 if self.sendState == .idle {

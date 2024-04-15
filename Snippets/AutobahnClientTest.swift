@@ -2,7 +2,20 @@ import HummingbirdWSClient
 import HummingbirdWSCompression
 import Logging
 
-let cases = 1...1
+// Autobahn tests
+// 1. Framing
+// 2. Pings/Pongs
+// 3. Reserved bits
+// 4. Opcodes
+// 5. Fragmentation
+// 6. UTF8 handling
+// 7. Close handling
+// 9. Limits/performance
+// 10. Misc
+// 12. WebSocket compression (different payloads)
+// 13. WebSocket compression (different parameters)
+
+let cases = 1...102
 
 var logger = Logger(label: "TestClient")
 logger.logLevel = .trace

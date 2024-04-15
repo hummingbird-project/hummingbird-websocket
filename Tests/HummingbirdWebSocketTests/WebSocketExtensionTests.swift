@@ -179,8 +179,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
     func testPerMessageDeflate() async throws {
         try await self.testClientAndServer(
-            serverExtensions: [.perMessageDeflate()],
-            clientExtensions: [.perMessageDeflate()]
+            serverExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)],
+            clientExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]
         ) { inbound, _, _ in
             var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
@@ -197,8 +197,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testPerMessageDeflateMaxWindow() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         try await self.testClientAndServer(
-            serverExtensions: [.perMessageDeflate()],
-            clientExtensions: [.perMessageDeflate(maxWindow: 10)]
+            serverExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)],
+            clientExtensions: [.perMessageDeflate(maxWindow: 10, minFrameSizeToCompress: 16)]
         ) { inbound, outbound, _ in
             let extensions = await outbound.handler.configuration.extensions
             XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
@@ -215,8 +215,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testPerMessageDeflateNoContextTakeover() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         try await self.testClientAndServer(
-            serverExtensions: [.perMessageDeflate()],
-            clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true)]
+            serverExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)],
+            clientExtensions: [.perMessageDeflate(clientNoContextTakeover: true, minFrameSizeToCompress: 16)]
         ) { inbound, outbound, _ in
             let extensions = await outbound.handler.configuration.extensions
             XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
@@ -234,8 +234,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testPerMessageExtensionOrdering() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         try await self.testClientAndServer(
-            serverExtensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true)],
-            clientExtensions: [.xor(value: 34), .perMessageDeflate()]
+            serverExtensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true, minFrameSizeToCompress: 16)],
+            clientExtensions: [.xor(value: 34), .perMessageDeflate(minFrameSizeToCompress: 16)]
         ) { inbound, _, _ in
             for try await data in inbound.messages(maxSize: .max) {
                 XCTAssertEqual(data, .binary(buffer))
@@ -255,8 +255,11 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             XCTAssertEqual(secondMessage, .text("Hello"))
         }
         try await self.testClientAndServer(
-            serverChannel: .http1WebSocketUpgrade(webSocketRouter: router, configuration: .init(extensions: [.perMessageDeflate()])),
-            clientExtensions: [.perMessageDeflate()]
+            serverChannel: .http1WebSocketUpgrade(
+                webSocketRouter: router,
+                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+            ),
+            clientExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]
         ) { inbound, outbound, _ in
             try await outbound.write(.text("Hello, testing this is compressed"))
             try await outbound.write(.text("Hello"))
@@ -266,8 +269,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
 
     func testPerMessageDeflateMultiFrameMessage() async throws {
         try await self.testClientAndServer(
-            serverExtensions: [.perMessageDeflate()],
-            clientExtensions: [.perMessageDeflate()]
+            serverExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)],
+            clientExtensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]
         ) { inbound, _, _ in
             var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
@@ -280,8 +283,29 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             for try await _ in inbound {}
         }
     }
+
+    func testCheckDeflate() async throws {
+        try await self.testClientAndServer(
+            serverExtensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)],
+            clientExtensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)]
+        ) { inbound, _, context in
+            var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+            let firstMessage = try await iterator.next()
+            // The first message should be received
+            XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+            // The second message will not be received because the checkDeflate extension throws
+            // an error because it hasn't been compressed
+            let nextMessage = try await iterator.next()
+            XCTAssertEqual(nextMessage, nil)
+        } client: { inbound, outbound, context in
+            try await outbound.write(.text("Hello, testing this is compressed"))
+            try await outbound.write(.text("Hello"))
+            for try await _ in inbound {}
+        }
+    }
 }
 
+/// Extension that XORs data with a specific value
 struct XorWebSocketExtension: WebSocketExtension {
     let name = "xor"
     func shutdown() {}
@@ -344,5 +368,47 @@ struct XorWebSocketExtensionBuilder: WebSocketExtensionBuilder {
 extension WebSocketExtensionFactory {
     static func xor(value: UInt8? = nil) -> WebSocketExtensionFactory {
         .init { XorWebSocketExtensionBuilder(value: value) }
+    }
+}
+
+/// Extension that checks whether frames coming in have been compressed
+struct CheckDeflateWebSocketExtension: WebSocketExtension {
+    struct NoDeflateError: Error {}
+    let name = "check-deflate"
+    func shutdown() {}
+
+    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
+        guard frame.rsv1 else { throw NoDeflateError() }
+        return frame
+    }
+
+    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
+        return frame
+    }
+}
+
+struct CheckDeflateWebSocketExtensionBuilder: WebSocketExtensionBuilder {
+    static var name = "check-deflate"
+
+    func clientRequestHeader() -> String {
+        return Self.name
+    }
+
+    func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
+        return Self.name
+    }
+
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+        CheckDeflateWebSocketExtension()
+    }
+
+    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+        CheckDeflateWebSocketExtension()
+    }
+}
+
+extension WebSocketExtensionFactory {
+    static func checkDeflate() -> WebSocketExtensionFactory {
+        .init { CheckDeflateWebSocketExtensionBuilder() }
     }
 }
