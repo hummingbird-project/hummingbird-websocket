@@ -151,14 +151,16 @@ package actor WebSocketHandler {
             } catch {
                 closeCode = .unexpectedServerError
             }
-            try await self.close(code: closeCode)
-            // Close handshake. Wait for responding close or until inbound ends
-            while let packet = try await inboundIterator.next() {
-                if case .connectionClose = packet.opcode {
-                    // we received a connection close.
-                    // send a close back if it hasn't already been send and exit
-                    _ = try await self.close(code: .normalClosure)
-                    break
+            if !self.closed {
+                try await self.close(code: closeCode)
+                // Close handshake. Wait for responding close or until inbound ends
+                while let packet = try await inboundIterator.next() {
+                    if case .connectionClose = packet.opcode {
+                        // we received a connection close.
+                        // send a close back if it hasn't already been send and exit
+                        _ = try await self.close(code: .normalClosure)
+                        break
+                    }
                 }
             }
         } onGracefulShutdown: {

@@ -28,6 +28,7 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
     let compressionLevel: Int?
     let memoryLevel: Int?
     let maxDecompressedFrameSize: Int
+    let minFrameSizeToCompress: Int
 
     init(
         clientMaxWindow: Int? = nil,
@@ -36,7 +37,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
         serverNoContextTakeover: Bool = false,
         compressionLevel: Int? = nil,
         memoryLevel: Int? = nil,
-        maxDecompressedFrameSize: Int = (1 << 14)
+        maxDecompressedFrameSize: Int = (1 << 14),
+        minFrameSizeToCompress: Int = 256
     ) {
         self.clientMaxWindow = clientMaxWindow
         self.clientNoContextTakeover = clientNoContextTakeover
@@ -45,6 +47,7 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
         self.compressionLevel = compressionLevel
         self.memoryLevel = memoryLevel
         self.maxDecompressedFrameSize = maxDecompressedFrameSize
+        self.minFrameSizeToCompress = minFrameSizeToCompress
     }
 
     /// Return client request header
@@ -109,7 +112,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
             sendNoContextTakeover: clientNoContextTakeoverParam,
             compressionLevel: self.compressionLevel,
             memoryLevel: self.memoryLevel,
-            maxDecompressedFrameSize: self.maxDecompressedFrameSize
+            maxDecompressedFrameSize: self.maxDecompressedFrameSize,
+            minFrameSizeToCompress: self.minFrameSizeToCompress
         ))
     }
 
@@ -137,7 +141,8 @@ struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
             sendNoContextTakeover: requestServerNoContextTakeover || self.serverNoContextTakeover,
             compressionLevel: self.compressionLevel,
             memoryLevel: self.memoryLevel,
-            maxDecompressedFrameSize: self.maxDecompressedFrameSize
+            maxDecompressedFrameSize: self.maxDecompressedFrameSize,
+            minFrameSizeToCompress: self.minFrameSizeToCompress
         )
     }
 }
@@ -155,6 +160,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         let compressionLevel: Int?
         let memoryLevel: Int?
         let maxDecompressedFrameSize: Int
+        let minFrameSizeToCompress: Int
     }
 
     actor Decompressor {
@@ -216,17 +222,19 @@ struct PerMessageDeflateExtension: WebSocketExtension {
 
         fileprivate let compressor: any NIOCompressor
         var sendState: SendState
+        let minFrameSizeToCompress: Int
 
-        init(_ compressor: any NIOCompressor) throws {
+        init(_ compressor: any NIOCompressor, minFrameSizeToCompress: Int) throws {
             self.compressor = compressor
+            self.minFrameSizeToCompress = minFrameSizeToCompress
             self.sendState = .idle
             try self.compressor.startStream()
         }
 
         func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some WebSocketContext) throws -> WebSocketFrame {
-            // if the frame is larger than 16 bytes, we haven't received a final frame or we are in the process of sending a message
-            // compress the data
-            let shouldWeCompress = frame.data.readableBytes > 16 || !frame.fin || self.sendState != .idle
+            // if the frame is larger than `minFrameSizeToCompress` bytes, we haven't received a final frame 
+            // or we are in the process of sending a message compress the data
+            let shouldWeCompress = frame.data.readableBytes >= minFrameSizeToCompress || !frame.fin || self.sendState != .idle
             if shouldWeCompress {
                 var newFrame = frame
                 if self.sendState == .idle {
@@ -274,7 +282,8 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
                     memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
                 )
-            ).compressor
+            ).compressor,
+            minFrameSizeToCompress: self.configuration.minFrameSizeToCompress
         )
     }
 
@@ -306,10 +315,13 @@ extension WebSocketExtensionFactory {
     /// - Parameters:
     ///   - maxWindow: Max window to be used for decompression and compression
     ///   - noContextTakeover: Should we reset window on every message
+    ///   - maxDecompressedFrameSize: Maximum size for a decompressed frame
+    ///   - minFrameSizeToCompress: Minimum size of a frame before compression is applied
     public static func perMessageDeflate(
         maxWindow: Int? = nil,
         noContextTakeover: Bool = false,
-        maxDecompressedFrameSize: Int = 1 << 14
+        maxDecompressedFrameSize: Int = 1 << 14,
+        minFrameSizeToCompress: Int = 256
     ) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
@@ -319,7 +331,8 @@ extension WebSocketExtensionFactory {
                 serverNoContextTakeover: noContextTakeover,
                 compressionLevel: nil,
                 memoryLevel: nil,
-                maxDecompressedFrameSize: maxDecompressedFrameSize
+                maxDecompressedFrameSize: maxDecompressedFrameSize,
+                minFrameSizeToCompress: minFrameSizeToCompress
             )
         }
     }
@@ -334,6 +347,8 @@ extension WebSocketExtensionFactory {
     ///         give best compression and 0 gives no compression.
     ///   - memoryLevel: Defines how much memory should be given to compression. Value between 1 and 9 where 1
     ///         uses least memory and 9 give best compression and optimal speed.
+    ///   - maxDecompressedFrameSize: Maximum size for a decompressed frame
+    ///   - minFrameSizeToCompress: Minimum size of a frame before compression is applied
     public static func perMessageDeflate(
         clientMaxWindow: Int? = nil,
         clientNoContextTakeover: Bool = false,
@@ -341,7 +356,8 @@ extension WebSocketExtensionFactory {
         serverNoContextTakeover: Bool = false,
         compressionLevel: Int? = nil,
         memoryLevel: Int? = nil,
-        maxDecompressedFrameSize: Int = 1 << 14
+        maxDecompressedFrameSize: Int = 1 << 14,
+        minFrameSizeToCompress: Int = 256
     ) -> WebSocketExtensionFactory {
         return .init {
             PerMessageDeflateExtensionBuilder(
@@ -351,7 +367,8 @@ extension WebSocketExtensionFactory {
                 serverNoContextTakeover: serverNoContextTakeover,
                 compressionLevel: compressionLevel,
                 memoryLevel: memoryLevel,
-                maxDecompressedFrameSize: maxDecompressedFrameSize
+                maxDecompressedFrameSize: maxDecompressedFrameSize,
+                minFrameSizeToCompress: minFrameSizeToCompress
             )
         }
     }

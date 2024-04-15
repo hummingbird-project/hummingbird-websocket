@@ -16,6 +16,7 @@ import Logging
 import NIOCore
 
 /// ClientConnection child channel setup protocol
+@_documentation(visibility: internal)
 public protocol ClientConnectionChannel: Sendable {
     associatedtype Value: Sendable
 

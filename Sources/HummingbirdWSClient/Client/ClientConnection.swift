@@ -23,6 +23,7 @@ import NIOTransportServices
 /// A generic client connection to a server.
 ///
 /// Actual client protocol is implemented in `ClientChannel` generic parameter
+@_documentation(visibility: internal)
 public struct ClientConnection<ClientChannel: ClientConnectionChannel>: Sendable {
     /// Address to connect to
     public struct Address: Sendable, Equatable {
