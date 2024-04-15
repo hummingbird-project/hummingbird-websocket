@@ -20,6 +20,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.20.0"),
         .package(url: "https://github.com/adam-fowler/compress-nio.git", from: "1.0.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
     ],
     targets: [
         .target(name: "HummingbirdWebSocket", dependencies: [
@@ -43,6 +44,7 @@ let package = Package(
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
+            .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
         ]),
         .target(name: "HummingbirdWSCompression", dependencies: [
             .byName(name: "HummingbirdWSCore"),
