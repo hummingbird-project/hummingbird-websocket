@@ -19,6 +19,7 @@ import NIOPosix
 import Network
 import NIOTransportServices
 #endif
+import NIOWebSocket
 
 /// A generic client connection to a server.
 ///
@@ -86,12 +87,12 @@ public struct ClientConnection<ClientChannel: ClientConnectionChannel>: Sendable
     }
     #endif
 
-    public func run() async throws {
+    public func run() async throws -> ClientChannel.Result {
         let channelResult = try await self.makeClient(
             clientChannel: self.clientChannel,
             address: self.address
         )
-        try await self.clientChannel.handle(value: channelResult, logger: self.logger)
+        return try await self.clientChannel.handle(value: channelResult, logger: self.logger)
     }
 
     /// Connect to server

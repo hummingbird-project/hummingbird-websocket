@@ -94,10 +94,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
         }
     }
 
-    func handle(value: Value, logger: Logger) async throws {
+    func handle(value: Value, logger: Logger) async throws -> WebSocketErrorCode? {
         switch try await value.get() {
         case .websocket(let webSocketChannel, let extensions):
-            await WebSocketHandler.handle(
+            return try await WebSocketHandler.handle(
                 type: .client,
                 configuration: .init(
                     extensions: extensions,

@@ -53,7 +53,7 @@ package actor WebSocketHandler {
     enum CloseState {
         case open
         case closing
-        case closed
+        case closed(WebSocketErrorCode?)
     }
 
     package struct Configuration {
@@ -95,10 +95,13 @@ package actor WebSocketHandler {
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
         context: Context,
         handler: @escaping WebSocketDataHandler<Context>
-    ) async {
-        try? await asyncChannel.executeThenClose { inbound, outbound in
-            await withTaskCancellationHandler {
-                await withThrowingTaskGroup(of: Void.self) { group in
+    ) async throws -> WebSocketErrorCode? {
+        defer {
+            context.logger.debug("Closed WebSocket")
+        }
+        let rt = try await asyncChannel.executeThenClose { inbound, outbound in
+            try await withTaskCancellationHandler {
+                try await withThrowingTaskGroup(of: WebSocketErrorCode.self) { group in
                     let webSocketHandler = Self(outbound: outbound, type: type, configuration: configuration, context: context)
                     if case .enabled(let period) = configuration.autoPing.value {
                         /// Add task sending ping frames every so often and verifying a pong frame was sent back
@@ -114,7 +117,7 @@ package actor WebSocketHandler {
                                         continue
                                     } else {
                                         try await asyncChannel.channel.close(mode: .input)
-                                        return
+                                        return .goingAway
                                     }
                                 }
                                 try await webSocketHandler.ping()
@@ -122,8 +125,9 @@ package actor WebSocketHandler {
                             }
                         }
                     }
-                    await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
+                    let rt = try await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
                     group.cancelAll()
+                    return rt
                 }
             } onCancel: {
                 Task {
@@ -131,7 +135,7 @@ package actor WebSocketHandler {
                 }
             }
         }
-        context.logger.debug("Closed WebSocket")
+        return rt
     }
 
     func handle<Context: WebSocketContext>(
@@ -139,14 +143,14 @@ package actor WebSocketHandler {
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,
         context: Context
-    ) async {
+    ) async throws -> WebSocketErrorCode? {
         let webSocketOutbound = WebSocketOutboundWriter(handler: self)
         var inboundIterator = inbound.makeAsyncIterator()
         let webSocketInbound = WebSocketInboundStream(
             iterator: inboundIterator,
             handler: self
         )
-        try? await withGracefulShutdownHandler {
+        try await withGracefulShutdownHandler {
             let closeCode: WebSocketErrorCode
             do {
                 // handle websocket data and text
@@ -158,13 +162,11 @@ package actor WebSocketHandler {
                 closeCode = .unexpectedServerError
             }
             try await self.close(code: closeCode)
-            if self.closeState == .closing {
+            if case .closing = self.closeState {
                 // Close handshake. Wait for responding close or until inbound ends
-                while let packet = try await inboundIterator.next() {
-                    if case .connectionClose = packet.opcode {
-                        // we received a connection close.
-                        // send a close back if it hasn't already been send and exit
-                        _ = try await self.close(code: .normalClosure)
+                while let frame = try await inboundIterator.next() {
+                    if case .connectionClose = frame.opcode {
+                        try await self.receivedClose(frame)
                         break
                     }
                 }
@@ -173,6 +175,10 @@ package actor WebSocketHandler {
             Task {
                 try? await self.close(code: .normalClosure)
             }
+        }
+        return switch self.closeState {
+        case .closed(let code): code
+        default: nil
         }
     }
 
@@ -224,7 +230,7 @@ package actor WebSocketHandler {
 
     /// Send ping
     func ping() async throws {
-        guard self.closeState == .open else { return }
+        guard case .open = self.closeState else { return }
         if self.pingData.readableBytes == 0 {
             // creating random payload
             let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
@@ -236,7 +242,7 @@ package actor WebSocketHandler {
 
     /// Send pong
     func pong(data: ByteBuffer?) async throws {
-        guard self.closeState == .open else { return }
+        guard case .open = self.closeState else { return }
         try await self.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
 
@@ -299,7 +305,7 @@ package actor WebSocketHandler {
             self.closeState = .closing
 
         case .closing:
-            self.closeState = .closed
+            self.closeState = .closed(closeCode)
 
         default:
             break

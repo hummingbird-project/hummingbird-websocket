@@ -15,11 +15,13 @@
 import Logging
 import NIOCore
 import NIOSSL
+import NIOWebSocket
 
 /// Sets up client channel to use TLS before accessing base channel setup
 @_documentation(visibility: internal)
 public struct TLSClientChannel<BaseChannel: ClientConnectionChannel>: ClientConnectionChannel {
     public typealias Value = BaseChannel.Value
+    public typealias Result = BaseChannel.Result
 
     ///  Initialize TLSChannel
     /// - Parameters:
@@ -51,7 +53,7 @@ public struct TLSClientChannel<BaseChannel: ClientConnectionChannel>: ClientConn
     /// - Parameters:
     ///   - value: Object to process input/output on child channel
     ///   - logger: Logger to use while processing messages
-    public func handle(value: BaseChannel.Value, logger: Logging.Logger) async throws {
+    public func handle(value: BaseChannel.Value, logger: Logging.Logger) async throws -> Result {
         try await self.baseChannel.handle(value: value, logger: logger)
     }
 
