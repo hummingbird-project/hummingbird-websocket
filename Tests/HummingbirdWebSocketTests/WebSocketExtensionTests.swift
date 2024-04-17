@@ -288,7 +288,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         try await self.testClientAndServer(
             serverExtensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)],
             clientExtensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)]
-        ) { inbound, _, context in
+        ) { inbound, _, _ in
             var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
             // The first message should be received
@@ -297,7 +297,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
             // an error because it hasn't been compressed
             let nextMessage = try await iterator.next()
             XCTAssertEqual(nextMessage, nil)
-        } client: { inbound, outbound, context in
+        } client: { inbound, outbound, _ in
             try await outbound.write(.text("Hello, testing this is compressed"))
             try await outbound.write(.text("Hello"))
             for try await _ in inbound {}
