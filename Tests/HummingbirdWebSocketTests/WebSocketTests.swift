@@ -577,6 +577,39 @@ final class HummingbirdWebSocketTests: XCTestCase {
         // Send a message that was too large so expect a too large error message back
         XCTAssertEqual(rt, .messageTooLarge)
     }
+
+    func testUnrecognisedOpcode() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { inbound, outbound, _ in
+            try await outbound.write(.custom(.init(fin: true, opcode: WebSocketOpcode(encodedWebSocketOpcode: 0x4)!, data: ByteBuffer())))
+            for try await _ in inbound {}
+        }
+        // Send a message that was too large so expect a too large error message back
+        XCTAssertEqual(rt, .protocolError)
+    }
+
+    func testInvalidPing() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { inbound, outbound, _ in
+            try await outbound.write(.custom(.init(fin: false, opcode: .ping, data: ByteBuffer())))
+            for try await _ in inbound {}
+        }
+        // Send a message that was too large so expect a too large error message back
+        XCTAssertEqual(rt, .protocolError)
+    }
+
+    func testUnexpectedContinuation() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            try await outbound.write(.custom(.init(fin: true, opcode: .continuation, data: ByteBuffer(repeating: 1, count: 16))))
+            for try await _ in inbound {}
+        }
+        // Send a message that was too large so expect a too large error message back
+        XCTAssertEqual(rt, .protocolError)
+    }
 }
 
 extension Logger {
