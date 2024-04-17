@@ -99,43 +99,49 @@ package actor WebSocketHandler {
         defer {
             context.logger.debug("Closed WebSocket")
         }
-        let rt = try await asyncChannel.executeThenClose { inbound, outbound in
-            try await withTaskCancellationHandler {
-                try await withThrowingTaskGroup(of: WebSocketErrorCode.self) { group in
-                    let webSocketHandler = Self(outbound: outbound, type: type, configuration: configuration, context: context)
-                    if case .enabled(let period) = configuration.autoPing.value {
-                        /// Add task sending ping frames every so often and verifying a pong frame was sent back
-                        group.addTask {
-                            var waitTime = period
-                            while true {
-                                try await Task.sleep(for: waitTime)
-                                if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
-                                    // if time is less than timeout value, set wait time to when it would timeout
-                                    // and re-run loop
-                                    if timeSinceLastPing < period {
-                                        waitTime = period - timeSinceLastPing
-                                        continue
-                                    } else {
-                                        try await asyncChannel.channel.close(mode: .input)
-                                        return .goingAway
+        do {
+            let rt = try await asyncChannel.executeThenClose { inbound, outbound in
+                try await withTaskCancellationHandler {
+                    try await withThrowingTaskGroup(of: WebSocketErrorCode.self) { group in
+                        let webSocketHandler = Self(outbound: outbound, type: type, configuration: configuration, context: context)
+                        if case .enabled(let period) = configuration.autoPing.value {
+                            /// Add task sending ping frames every so often and verifying a pong frame was sent back
+                            group.addTask {
+                                var waitTime = period
+                                while true {
+                                    try await Task.sleep(for: waitTime)
+                                    if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
+                                        // if time is less than timeout value, set wait time to when it would timeout
+                                        // and re-run loop
+                                        if timeSinceLastPing < period {
+                                            waitTime = period - timeSinceLastPing
+                                            continue
+                                        } else {
+                                            try await asyncChannel.channel.close(mode: .input)
+                                            return .goingAway
+                                        }
                                     }
+                                    try await webSocketHandler.ping()
+                                    waitTime = period
                                 }
-                                try await webSocketHandler.ping()
-                                waitTime = period
                             }
                         }
+                        let rt = try await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
+                        group.cancelAll()
+                        return rt
                     }
-                    let rt = try await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
-                    group.cancelAll()
-                    return rt
-                }
-            } onCancel: {
-                Task {
-                    try await asyncChannel.channel.close(mode: .input)
+                } onCancel: {
+                    Task {
+                        try await asyncChannel.channel.close(mode: .input)
+                    }
                 }
             }
+            return rt
+        } catch let error as NIOAsyncWriterError {
+            // ignore already finished errors
+            if error == NIOAsyncWriterError.alreadyFinished() { return nil }
+            throw error
         }
-        return rt
     }
 
     func handle<Context: WebSocketContext>(
@@ -283,6 +289,7 @@ package actor WebSocketHandler {
 
         switch self.closeState {
         case .open:
+            self.closeState = .closed(closeCode)
             let code: WebSocketErrorCode = if dataSize == 0 || closeCode != nil {
                 if case .unknown = closeCode {
                     .protocolError
@@ -292,6 +299,7 @@ package actor WebSocketHandler {
             } else {
                 .protocolError
             }
+
             var buffer = self.context.allocator.buffer(capacity: 2)
             buffer.write(webSocketErrorCode: code)
 
@@ -302,7 +310,6 @@ package actor WebSocketHandler {
             if self.type == .server {
                 self.outbound.finish()
             }
-            self.closeState = .closing
 
         case .closing:
             self.closeState = .closed(closeCode)
