@@ -17,6 +17,7 @@ import NIOCore
 import NIOSSL
 
 /// Sets up client channel to use TLS before accessing base channel setup
+@_documentation(visibility: internal)
 public struct TLSClientChannel<BaseChannel: ClientConnectionChannel>: ClientConnectionChannel {
     public typealias Value = BaseChannel.Value
 
