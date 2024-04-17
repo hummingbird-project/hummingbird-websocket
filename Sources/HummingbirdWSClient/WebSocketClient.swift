@@ -112,7 +112,8 @@ public struct WebSocketClient {
     }
     #endif
 
-    ///  Connect and run handler
+    /// Connect and run handler
+    /// - Returns: WebSocket close code if server returned one
     @discardableResult public func run() async throws -> WebSocketErrorCode? {
         guard let host = url.host else { throw WebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
@@ -187,6 +188,7 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: Closure handling webSocket
+    /// - Returns: WebSocket close code if server returned one
     @discardableResult public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
@@ -216,6 +218,7 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: WebSocket data handler
+    /// - Returns: WebSocket close code if server returned one
     public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
