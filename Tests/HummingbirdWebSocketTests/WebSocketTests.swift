@@ -562,7 +562,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
             for try await _ in inbound {}
         } client: { _, _, _ in
         }
-        // Send a message that was too large so expect a too large error message back
         XCTAssertEqual(rt, .normalClosure)
     }
 
