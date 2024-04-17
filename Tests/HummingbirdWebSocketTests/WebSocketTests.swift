@@ -585,7 +585,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
             try await outbound.write(.custom(.init(fin: true, opcode: WebSocketOpcode(encodedWebSocketOpcode: 0x4)!, data: ByteBuffer())))
             for try await _ in inbound {}
         }
-        // Send a message that was too large so expect a too large error message back
         XCTAssertEqual(rt, .protocolError)
     }
 
@@ -593,10 +592,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let rt = try await self.testClientAndServer { inbound, _, _ in
             for try await _ in inbound {}
         } client: { inbound, outbound, _ in
+            // ping frames should be finished
             try await outbound.write(.custom(.init(fin: false, opcode: .ping, data: ByteBuffer())))
             for try await _ in inbound {}
         }
-        // Send a message that was too large so expect a too large error message back
         XCTAssertEqual(rt, .protocolError)
     }
 
@@ -604,10 +603,33 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let rt = try await self.testClientAndServer { inbound, _, _ in
             for try await _ in inbound.messages(maxSize: 1024) {}
         } client: { inbound, outbound, _ in
+            // send continuation frame without an initial text or binary frame
             try await outbound.write(.custom(.init(fin: true, opcode: .continuation, data: ByteBuffer(repeating: 1, count: 16))))
             for try await _ in inbound {}
         }
-        // Send a message that was too large so expect a too large error message back
+        XCTAssertEqual(rt, .protocolError)
+    }
+
+    func testBadCloseCode() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            var buffer = ByteBufferAllocator().buffer(capacity: 2)
+            buffer.write(webSocketErrorCode: .unknown(999))
+            try await outbound.write(.custom(.init(fin: true, opcode: .connectionClose, data: buffer)))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt, .protocolError)
+    }
+
+    func testBadControlFrame() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            // control frames can only have data length 125 bytes
+            try await outbound.write(.custom(.init(fin: true, opcode: .ping, data: ByteBuffer(repeating: 1, count: 126))))
+            for try await _ in inbound {}
+        }
         XCTAssertEqual(rt, .protocolError)
     }
 }
