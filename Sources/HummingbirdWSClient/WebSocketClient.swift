@@ -113,8 +113,8 @@ public struct WebSocketClient {
     #endif
 
     /// Connect and run handler
-    /// - Returns: WebSocket close code if server returned one
-    @discardableResult public func run() async throws -> WebSocketErrorCode? {
+    /// - Returns: WebSocket close frame details if server returned any
+    @discardableResult public func run() async throws -> WebSocketCloseFrame? {
         guard let host = url.host else { throw WebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
         let port = self.url.port ?? (requiresTLS ? 443 : 80)
@@ -188,7 +188,7 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: Closure handling webSocket
-    /// - Returns: WebSocket close code if server returned one
+    /// - Returns: WebSocket close frame details if server returned any
     @discardableResult public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
@@ -196,7 +196,7 @@ extension WebSocketClient {
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) async throws -> WebSocketErrorCode? {
+    ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,
             configuration: configuration,
@@ -218,7 +218,7 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: WebSocket data handler
-    /// - Returns: WebSocket close code if server returned one
+    /// - Returns: WebSocket close frame details if server returned any
     public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
@@ -226,7 +226,7 @@ extension WebSocketClient {
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) async throws -> WebSocketErrorCode? {
+    ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,
             configuration: configuration,
