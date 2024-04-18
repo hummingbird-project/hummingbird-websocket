@@ -51,6 +51,21 @@ public struct WebSocketOutboundWriter: Sendable {
         }
     }
 
+    /// Send close control frame.
+    ///
+    /// In most cases calling this is unnecessary as the WebSocket handling code will do
+    /// this for you automatically, but if you want to send a custom close code or reason
+    /// use this function.
+    ///
+    /// After calling this function you should not send anymore data
+    /// - Parameters:
+    ///   - closeCode: Close code
+    ///   - reason: Close reason string
+    public func close(_ closeCode: WebSocketErrorCode, reason: String?) async throws {
+        try await self.handler.close(code: closeCode, reason: reason)
+    }
+
+    /// Write WebSocket message as a series as frames
     public struct MessageWriter {
         let opcode: WebSocketOpcode
         let handler: WebSocketHandler

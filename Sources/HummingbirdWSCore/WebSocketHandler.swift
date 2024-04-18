@@ -268,12 +268,16 @@ package actor WebSocketHandler {
 
     /// Send close
     func close(
-        code: WebSocketErrorCode = .normalClosure
+        code: WebSocketErrorCode = .normalClosure,
+        reason: String? = nil
     ) async throws {
         switch self.closeState {
         case .open:
-            var buffer = self.context.allocator.buffer(capacity: 2)
+            var buffer = self.context.allocator.buffer(capacity: 2 + (reason?.utf8.count ?? 0))
             buffer.write(webSocketErrorCode: code)
+            if let reason {
+                buffer.writeString(reason)
+            }
 
             try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
             // Only server should initiate a connection close. Clients should wait for the
@@ -303,7 +307,9 @@ package actor WebSocketHandler {
         case .open:
             self.closeState = .closed(closeCode.map { .init(closeCode: $0, reason: reason) })
             let code: WebSocketErrorCode = if dataSize == 0 || closeCode != nil {
-                if case .unknown = closeCode {
+                // codes 3000 - 3999 are reserved for use by libraries, frameworks, and applications
+                // so are considered valid
+                if case .unknown(let code) = closeCode, code < 3000 || code > 3999 {
                     .protocolError
                 } else {
                     .normalClosure

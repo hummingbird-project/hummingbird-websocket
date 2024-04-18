@@ -565,6 +565,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
         XCTAssertEqual(rt?.closeCode, .normalClosure)
     }
 
+    func testCloseReason() async throws {
+        let rt = try await self.testClientAndServer { _, outbound, _ in
+            try await outbound.close(.unknown(3000), reason: "Because")
+        } client: { inbound, _, _ in
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .unknown(3000))
+        XCTAssertEqual(rt?.reason, "Because")
+    }
+
     func testCloseMessageTooLargeError() async throws {
         let rt = try await self.testClientAndServer { inbound, _, _ in
             for try await _ in inbound {}
