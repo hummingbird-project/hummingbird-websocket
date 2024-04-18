@@ -169,16 +169,20 @@ extension HTTP1WebSocketUpgradeChannel {
                             logger: logger
                         )
                         return .upgrade(headers) { asyncChannel, _ in
-                            await WebSocketHandler.handle(
-                                type: .server,
-                                configuration: .init(
-                                    extensions: extensions,
-                                    autoPing: configuration.autoPing
-                                ),
-                                asyncChannel: asyncChannel,
-                                context: WebSocketContextFromRouter(request: request, context: webSocketHandler.context),
-                                handler: webSocketHandler.handler
-                            )
+                            do {
+                                _ = try await WebSocketHandler.handle(
+                                    type: .server,
+                                    configuration: .init(
+                                        extensions: extensions,
+                                        autoPing: configuration.autoPing
+                                    ),
+                                    asyncChannel: asyncChannel,
+                                    context: WebSocketContextFromRouter(request: request, context: webSocketHandler.context),
+                                    handler: webSocketHandler.handler
+                                )
+                            } catch {
+                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                            }
                         }
                     } else {
                         return .dontUpgrade

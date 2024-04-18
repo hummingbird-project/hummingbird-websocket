@@ -19,6 +19,7 @@ import NIOCore
 @_documentation(visibility: internal)
 public protocol ClientConnectionChannel: Sendable {
     associatedtype Value: Sendable
+    associatedtype Result
 
     /// Setup child channel
     /// - Parameters:
@@ -31,5 +32,5 @@ public protocol ClientConnectionChannel: Sendable {
     /// - Parameters:
     ///   - value: Object to process input/output on child channel
     ///   - logger: Logger to use while processing messages
-    func handle(value: Value, logger: Logger) async throws
+    func handle(value: Value, logger: Logger) async throws -> Result
 }

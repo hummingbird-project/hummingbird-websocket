@@ -22,6 +22,7 @@ import HummingbirdWSClient
 import Logging
 import NIOCore
 import NIOPosix
+import NIOWebSocket
 import ServiceLifecycle
 import XCTest
 
@@ -75,20 +76,20 @@ final class HummingbirdWebSocketTests: XCTestCase {
         return ByteBuffer(bytes: data)
     }
 
-    func testClientAndServer(
+    @discardableResult func testClientAndServer(
         serverChannel: HTTPChannelBuilder<some HTTPChannelHandler>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
-    ) async throws {
+    ) async throws -> WebSocketCloseFrame? {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
             let serverLogger = {
                 var logger = Logger(label: "WebSocketServer")
-                logger.logLevel = .debug
+                logger.logLevel = .trace
                 return logger
             }()
             let clientLogger = {
                 var logger = Logger(label: "WebSocketClient")
-                logger.logLevel = .debug
+                logger.logLevel = .trace
                 return logger
             }()
             let router = Router()
@@ -110,13 +111,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
             group.addTask {
                 try await serviceGroup.run()
             }
-            group.addTask {
-                let client = try await getClient(promise.wait(), clientLogger)
-                try await client.run()
-            }
+            let client = try await getClient(promise.wait(), clientLogger)
             do {
-                try await group.next()
+                let rt = try await client.run()
                 await serviceGroup.triggerGracefulShutdown()
+                return rt
             } catch {
                 await serviceGroup.triggerGracefulShutdown()
                 throw error
@@ -124,12 +123,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testClientAndServer(
+    @discardableResult func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
         server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
-    ) async throws {
+    ) async throws -> WebSocketCloseFrame? {
         let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade { head, _, _ in
             if let headers = try shouldUpgrade(head) {
                 return .upgrade(headers, serverHandler)
@@ -138,25 +137,25 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
         }
         if let serverTLSConfiguration {
-            try await self.testClientAndServer(
+            return try await self.testClientAndServer(
                 serverChannel: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
                 getClient: getClient
             )
         } else {
-            try await self.testClientAndServer(
+            return try await self.testClientAndServer(
                 serverChannel: webSocketUpgrade,
                 getClient: getClient
             )
         }
     }
 
-    func testClientAndServer(
+    @discardableResult func testClientAndServer(
         serverTLSConfiguration: TLSConfiguration? = nil,
         server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) async throws {
-        try await self.testClientAndServer(
+    ) async throws -> WebSocketCloseFrame? {
+        return try await self.testClientAndServer(
             serverTLSConfiguration: serverTLSConfiguration,
             server: serverHandler,
             shouldUpgrade: shouldUpgrade,
@@ -170,12 +169,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         )
     }
 
-    func testClientAndServerWithRouter(
+    @discardableResult func testClientAndServerWithRouter(
         webSocketRouter: Router<some WebSocketRequestContext>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
-    ) async throws {
+    ) async throws -> WebSocketCloseFrame? {
         let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
-        try await self.testClientAndServer(
+        return try await self.testClientAndServer(
             serverChannel: webSocketUpgrade,
             getClient: getClient
         )
@@ -556,6 +555,91 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 for try await _ in inbound {}
             }
         }
+    }
+
+    func testCloseCode() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { _, _, _ in
+        }
+        XCTAssertEqual(rt?.closeCode, .normalClosure)
+    }
+
+    func testCloseReason() async throws {
+        let rt = try await self.testClientAndServer { _, outbound, _ in
+            try await outbound.close(.unknown(3000), reason: "Because")
+        } client: { inbound, _, _ in
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .unknown(3000))
+        XCTAssertEqual(rt?.reason, "Because")
+    }
+
+    func testCloseMessageTooLargeError() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { inbound, outbound, _ in
+            let buffer = ByteBuffer(repeating: 1, count: (1 << 14) + 1)
+            try await outbound.write(.binary(buffer))
+            for try await _ in inbound {}
+        }
+        // Send a message that was too large so expect a too large error message back
+        XCTAssertEqual(rt?.closeCode, .messageTooLarge)
+    }
+
+    func testUnrecognisedOpcode() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { inbound, outbound, _ in
+            try await outbound.write(.custom(.init(fin: true, opcode: WebSocketOpcode(encodedWebSocketOpcode: 0x4)!, data: ByteBuffer())))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .protocolError)
+    }
+
+    func testInvalidPing() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound {}
+        } client: { inbound, outbound, _ in
+            // ping frames should be finished
+            try await outbound.write(.custom(.init(fin: false, opcode: .ping, data: ByteBuffer())))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .protocolError)
+    }
+
+    func testUnexpectedContinuation() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            // send continuation frame without an initial text or binary frame
+            try await outbound.write(.custom(.init(fin: true, opcode: .continuation, data: ByteBuffer(repeating: 1, count: 16))))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .protocolError)
+    }
+
+    func testBadCloseCode() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            var buffer = ByteBufferAllocator().buffer(capacity: 2)
+            buffer.write(webSocketErrorCode: .unknown(999))
+            try await outbound.write(.custom(.init(fin: true, opcode: .connectionClose, data: buffer)))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .protocolError)
+    }
+
+    func testBadControlFrame() async throws {
+        let rt = try await self.testClientAndServer { inbound, _, _ in
+            for try await _ in inbound.messages(maxSize: 1024) {}
+        } client: { inbound, outbound, _ in
+            // control frames can only have data length 125 bytes
+            try await outbound.write(.custom(.init(fin: true, opcode: .ping, data: ByteBuffer(repeating: 1, count: 126))))
+            for try await _ in inbound {}
+        }
+        XCTAssertEqual(rt?.closeCode, .protocolError)
     }
 }
 

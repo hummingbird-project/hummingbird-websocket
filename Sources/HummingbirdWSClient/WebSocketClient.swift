@@ -19,6 +19,7 @@ import NIOCore
 import NIOPosix
 import NIOSSL
 import NIOTransportServices
+import NIOWebSocket
 
 /// WebSocket client
 ///
@@ -111,8 +112,9 @@ public struct WebSocketClient {
     }
     #endif
 
-    ///  Connect and run handler
-    public func run() async throws {
+    /// Connect and run handler
+    /// - Returns: WebSocket close frame details if server returned any
+    @discardableResult public func run() async throws -> WebSocketCloseFrame? {
         guard let host = url.host else { throw WebSocketClientError.invalidURL }
         let requiresTLS = self.url.scheme == .wss || self.url.scheme == .https
         let port = self.url.port ?? (requiresTLS ? 443 : 80)
@@ -129,7 +131,7 @@ public struct WebSocketClient {
                     eventLoopGroup: self.eventLoopGroup,
                     logger: self.logger
                 )
-                try await client.run()
+                return try await client.run()
 
             #if canImport(Network)
             case .ts(let tlsOptions):
@@ -140,7 +142,7 @@ public struct WebSocketClient {
                     eventLoopGroup: self.eventLoopGroup,
                     logger: self.logger
                 )
-                try await client.run()
+                return try await client.run()
 
             #endif
             case .none:
@@ -158,7 +160,7 @@ public struct WebSocketClient {
                     eventLoopGroup: self.eventLoopGroup,
                     logger: self.logger
                 )
-                try await client.run()
+                return try await client.run()
             }
         } else {
             let client = try ClientConnection(
@@ -171,7 +173,7 @@ public struct WebSocketClient {
                 eventLoopGroup: self.eventLoopGroup,
                 logger: self.logger
             )
-            try await client.run()
+            return try await client.run()
         }
     }
 }
@@ -186,14 +188,15 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: Closure handling webSocket
-    public static func connect(
+    /// - Returns: WebSocket close frame details if server returned any
+    @discardableResult public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) async throws {
+    ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,
             configuration: configuration,
@@ -202,7 +205,7 @@ extension WebSocketClient {
             logger: logger,
             handler: handler
         )
-        try await ws.run()
+        return try await ws.run()
     }
 
     #if canImport(Network)
@@ -215,6 +218,7 @@ extension WebSocketClient {
     ///   - eventLoopGroup: EventLoopGroup to run WebSocket client on
     ///   - logger: Logger
     ///   - process: WebSocket data handler
+    /// - Returns: WebSocket close frame details if server returned any
     public static func connect(
         url: String,
         configuration: WebSocketClientConfiguration = .init(),
@@ -222,7 +226,7 @@ extension WebSocketClient {
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
         handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
-    ) async throws {
+    ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,
             configuration: configuration,
@@ -231,7 +235,7 @@ extension WebSocketClient {
             logger: logger,
             handler: handler
         )
-        try await ws.run()
+        return try await ws.run()
     }
     #endif
 }

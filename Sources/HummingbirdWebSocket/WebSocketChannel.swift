@@ -63,16 +63,20 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                         )
                         return (headers, { asyncChannel, logger in
                             let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
-                            await WebSocketHandler.handle(
-                                type: .server,
-                                configuration: .init(
-                                    extensions: extensions,
-                                    autoPing: configuration.autoPing
-                                ),
-                                asyncChannel: asyncChannel,
-                                context: context,
-                                handler: handler
-                            )
+                            do {
+                                _ = try await WebSocketHandler.handle(
+                                    type: .server,
+                                    configuration: .init(
+                                        extensions: extensions,
+                                        autoPing: configuration.autoPing
+                                    ),
+                                    asyncChannel: asyncChannel,
+                                    context: context,
+                                    handler: handler
+                                )
+                            } catch {
+                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                            }
                         })
                     }
             }
@@ -108,16 +112,20 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                         )
                         return (headers, { asyncChannel, logger in
                             let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
-                            await WebSocketHandler.handle(
-                                type: .server,
-                                configuration: .init(
-                                    extensions: extensions,
-                                    autoPing: configuration.autoPing
-                                ),
-                                asyncChannel: asyncChannel,
-                                context: context,
-                                handler: handler
-                            )
+                            do {
+                                _ = try await WebSocketHandler.handle(
+                                    type: .server,
+                                    configuration: .init(
+                                        extensions: extensions,
+                                        autoPing: configuration.autoPing
+                                    ),
+                                    asyncChannel: asyncChannel,
+                                    context: context,
+                                    handler: handler
+                                )
+                            } catch {
+                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                            }
                         })
                     }
             }
