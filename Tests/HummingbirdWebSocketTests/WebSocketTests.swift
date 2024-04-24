@@ -77,7 +77,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     @discardableResult func testClientAndServer(
-        serverChannel: HTTPChannelBuilder<some HTTPChannelHandler>,
+        serverChannel: HTTPChannelBuilder,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -129,7 +129,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade { head, _, _ in
+        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade { head, _, _ in
             if let headers = try shouldUpgrade(head) {
                 return .upgrade(headers, serverHandler)
             } else {
@@ -173,7 +173,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         webSocketRouter: Router<some WebSocketRequestContext>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
+        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
         return try await self.testClientAndServer(
             serverChannel: webSocketUpgrade,
             getClient: getClient
@@ -540,7 +540,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.ws("/ws") { inbound, _, _ in
             for try await _ in inbound {}
         }
-        let webSocketUpgrade: HTTPChannelBuilder<some HTTPChannelHandler> = .http1WebSocketUpgrade(
+        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade(
             webSocketRouter: router,
             configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
         )
