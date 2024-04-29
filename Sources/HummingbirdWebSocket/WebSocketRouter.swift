@@ -213,7 +213,7 @@ extension HTTPChannelBuilder {
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
-    ) -> HTTPChannelBuilder<HTTP1WebSocketUpgradeChannel> where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+    ) -> HTTPChannelBuilder where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
             return HTTP1WebSocketUpgradeChannel(
