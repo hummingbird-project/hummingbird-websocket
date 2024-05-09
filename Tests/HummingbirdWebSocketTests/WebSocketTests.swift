@@ -19,6 +19,7 @@ import HummingbirdTesting
 import HummingbirdTLS
 import HummingbirdWebSocket
 import HummingbirdWSClient
+import HummingbirdWSTesting
 import Logging
 import NIOCore
 import NIOPosix
@@ -155,18 +156,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws -> WebSocketCloseFrame? {
-        return try await self.testClientAndServer(
-            serverTLSConfiguration: serverTLSConfiguration,
-            server: serverHandler,
-            shouldUpgrade: shouldUpgrade,
-            getClient: { port, logger in
-                WebSocketClient(
-                    url: .init("ws://localhost:\(port)"),
-                    logger: logger,
-                    handler: clientHandler
-                )
-            }
+        let router = Router()
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade { head, _, _ in
+                if let headers = try shouldUpgrade(head) {
+                    return .upgrade(headers, serverHandler)
+                } else {
+                    return .dontUpgrade
+                }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
+        return try await app.test(.live) { client in
+            return try await client.ws("/", handler: clientHandler)
+        }
     }
 
     @discardableResult func testClientAndServerWithRouter(
