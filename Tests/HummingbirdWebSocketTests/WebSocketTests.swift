@@ -156,6 +156,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws -> WebSocketCloseFrame? {
+        let serverLogger = {
+            var logger = Logger(label: "WebSocketServer")
+            logger.logLevel = .trace
+            return logger
+        }()
+        let clientLogger = {
+            var logger = Logger(label: "WebSocketClient")
+            logger.logLevel = .trace
+            return logger
+        }()
         let router = Router()
         let app = Application(
             router: router,
@@ -166,10 +176,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     return .dontUpgrade
                 }
             },
-            configuration: .init(address: .hostname("127.0.0.1", port: 0))
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: serverLogger
         )
-        return try await app.test(.live) { client in
-            return try await client.ws("/", handler: clientHandler)
+        return try await app.test(.ahc(.http)) { client in
+            return try await client.ws("/", logger: clientLogger, handler: clientHandler)
         }
     }
 
@@ -187,7 +198,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
     // MARK: Tests
 
     func testServerToClientMessage() async throws {
-        try await self.testClientAndServer { _, outbound, _ in
+        try await self.testClientAndServer { _, outbound, context in
+            context.logger.info("testServerToClientMessage enter")
             try await outbound.write(.text("Hello"))
         } client: { inbound, _, _ in
             var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
