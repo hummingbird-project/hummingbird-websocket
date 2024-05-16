@@ -197,7 +197,7 @@ extension HTTP1WebSocketUpgradeChannel {
     }
 }
 
-extension HTTPChannelBuilder {
+extension HTTPServerBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///
     /// With this function you provide a separate router from the one you have supplied
@@ -213,7 +213,7 @@ extension HTTPChannelBuilder {
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
-    ) -> HTTPChannelBuilder where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+    ) -> HTTPServerBuilder where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
             return HTTP1WebSocketUpgradeChannel(

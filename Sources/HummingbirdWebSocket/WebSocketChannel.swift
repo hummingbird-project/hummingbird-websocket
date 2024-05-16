@@ -28,13 +28,16 @@ import NIOWebSocket
 public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandler {
     public typealias WebSocketChannelHandler = @Sendable (NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, Logger) async -> Void
     /// Upgrade result (either a websocket AsyncChannel, or an HTTP1 AsyncChannel)
-    public enum UpgradeResult {
+    public enum UpgradeResult: Sendable {
         case websocket(NIOAsyncChannel<WebSocketFrame, WebSocketFrame>, WebSocketChannelHandler, Logger)
         case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>)
         case failedUpgrade(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, Logger)
     }
 
-    public typealias Value = EventLoopFuture<UpgradeResult>
+    public struct Value: ServerChildChannelValue {
+        let upgradeResult: EventLoopFuture<UpgradeResult>
+        public let channel: Channel
+    }
 
     ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
     /// - Parameters:
@@ -181,7 +184,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 configuration: .init(upgradeConfiguration: serverUpgradeConfiguration)
             )
 
-            return negotiationResultFuture
+            return .init(upgradeResult: negotiationResultFuture, channel: channel)
         }
     }
 
@@ -189,9 +192,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     /// - Parameters:
     ///   - upgradeResult: The upgrade result output by Channel
     ///   - logger: Logger to use
-    public func handle(value upgradeResult: EventLoopFuture<UpgradeResult>, logger: Logger) async {
+    public func handle(value: Value, logger: Logger) async {
         do {
-            let result = try await upgradeResult.get()
+            let result = try await value.upgradeResult.get()
             switch result {
             case .notUpgraded(let http1):
                 await self.handleHTTP(asyncChannel: http1, logger: logger)

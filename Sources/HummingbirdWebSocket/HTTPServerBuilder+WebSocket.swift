@@ -19,14 +19,14 @@ import HummingbirdWSCore
 import Logging
 import NIOCore
 
-extension HTTPChannelBuilder {
+extension HTTPServerBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
     ///  - parameters
     public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
-    ) -> HTTPChannelBuilder {
+    ) -> HTTPServerBuilder {
         return .init { responder in
             return HTTP1WebSocketUpgradeChannel(
                 responder: responder,
@@ -42,7 +42,7 @@ extension HTTPChannelBuilder {
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
-    ) -> HTTPChannelBuilder {
+    ) -> HTTPServerBuilder {
         return .init { responder in
             return HTTP1WebSocketUpgradeChannel(
                 responder: responder,
