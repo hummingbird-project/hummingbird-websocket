@@ -26,7 +26,7 @@ import XCTest
 
 final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
-        serverChannel: HTTPChannelBuilder,
+        serverChannel: HTTPServerBuilder,
         clientExtensions: [WebSocketExtensionFactory] = [],
         client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
     ) async throws {

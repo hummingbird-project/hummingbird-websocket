@@ -77,7 +77,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     }
 
     @discardableResult func testClientAndServer(
-        serverChannel: HTTPChannelBuilder,
+        server: HTTPServerBuilder,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -96,7 +96,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let serviceGroup: ServiceGroup
             let app = Application(
                 router: router,
-                server: serverChannel,
+                server: server,
                 configuration: .init(address: .hostname("127.0.0.1", port: 0)),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
                 logger: serverLogger
@@ -129,7 +129,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         shouldUpgrade: @escaping @Sendable (HTTPRequest) throws -> HTTPFields? = { _ in return [:] },
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
-        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade { head, _, _ in
+        let webSocketUpgrade: HTTPServerBuilder = .http1WebSocketUpgrade { head, _, _ in
             if let headers = try shouldUpgrade(head) {
                 return .upgrade(headers, serverHandler)
             } else {
@@ -138,12 +138,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         if let serverTLSConfiguration {
             return try await self.testClientAndServer(
-                serverChannel: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
+                server: .tls(webSocketUpgrade, tlsConfiguration: serverTLSConfiguration),
                 getClient: getClient
             )
         } else {
             return try await self.testClientAndServer(
-                serverChannel: webSocketUpgrade,
+                server: webSocketUpgrade,
                 getClient: getClient
             )
         }
@@ -173,9 +173,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
         webSocketRouter: Router<some WebSocketRequestContext>,
         getClient: @escaping @Sendable (Int, Logger) throws -> WebSocketClient
     ) async throws -> WebSocketCloseFrame? {
-        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
+        let webSocketUpgrade: HTTPServerBuilder = .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
         return try await self.testClientAndServer(
-            serverChannel: webSocketUpgrade,
+            server: webSocketUpgrade,
             getClient: getClient
         )
     }
@@ -540,11 +540,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         router.ws("/ws") { inbound, _, _ in
             for try await _ in inbound {}
         }
-        let webSocketUpgrade: HTTPChannelBuilder = .http1WebSocketUpgrade(
+        let webSocketUpgrade: HTTPServerBuilder = .http1WebSocketUpgrade(
             webSocketRouter: router,
             configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
         )
-        try await self.testClientAndServer(serverChannel: webSocketUpgrade) { port, logger in
+        try await self.testClientAndServer(server: webSocketUpgrade) { port, logger in
             WebSocketClient(
                 url: .init("ws://localhost:\(port)/ws"),
                 configuration: .init(additionalHeaders: [.secWebSocketExtensions: "hb"]),
