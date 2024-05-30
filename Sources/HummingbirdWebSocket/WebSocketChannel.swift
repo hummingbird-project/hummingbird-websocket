@@ -47,7 +47,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
     /// - Returns: Upgrade result future
     public init(
-        responder: @escaping @Sendable (Request, Channel) async throws -> Response,
+        responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
@@ -95,7 +95,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
     /// - Returns: Upgrade result future
     public init(
-        responder: @escaping @Sendable (Request, Channel) async throws -> Response,
+        responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
@@ -272,7 +272,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         return (responseHeaders, extensions)
     }
 
-    public var responder: @Sendable (Request, Channel) async throws -> Response
+    public let responder: HTTPChannelHandler.Responder
     let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>>
     let configuration: WebSocketServerConfiguration
     let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
