@@ -147,7 +147,7 @@ extension HTTP1WebSocketUpgradeChannel {
     ///   - webSocketRouter: WebSocket router
     /// - Returns: Upgrade result future
     public init<WSResponder: HTTPResponder>(
-        responder: @escaping @Sendable (Request, Channel) async throws -> Response,
+        responder: @escaping HTTPChannelHandler.Responder,
         webSocketResponder: WSResponder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] }
