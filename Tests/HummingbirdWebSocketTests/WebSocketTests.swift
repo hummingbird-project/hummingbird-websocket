@@ -482,8 +482,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
             var webSocket: WebSocketHandlerReference<MyRequestContext>
             var name: String
 
-            init(channel: Channel, logger: Logger) {
-                self.coreContext = .init(allocator: channel.allocator, logger: logger)
+            init(source: Source) {
+                self.coreContext = .init(source: source)
                 self.webSocket = .init()
                 self.name = ""
             }
