@@ -477,8 +477,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     /// Test context from router is passed through to web socket
     func testRouterContextUpdate() async throws {
-        struct MyRequestContext: WebSocketRequestContext {
-            var coreContext: CoreRequestContext
+        struct MyRequestContext: RequestContext, WebSocketRequestContext {
+            var coreContext: CoreRequestContextStorage
             var webSocket: WebSocketHandlerReference<MyRequestContext>
             var name: String
 
