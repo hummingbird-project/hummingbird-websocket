@@ -59,17 +59,17 @@ public struct WebSocketHandlerReference<RequestContext: WebSocketRequestContext>
 }
 
 /// Request context protocol requirement for routers that support WebSockets
-public protocol WebSocketRequestContext: RequestContext, WebSocketContext {
+public protocol WebSocketRequestContext: InitializableFromSource<ApplicationRequestContextSource>, WebSocketContext {
     var webSocket: WebSocketHandlerReference<Self> { get }
 }
 
 /// Default implementation of a request context that supports WebSockets
-public struct BasicWebSocketRequestContext: WebSocketRequestContext {
-    public var coreContext: CoreRequestContext
+public struct BasicWebSocketRequestContext: RequestContext, WebSocketRequestContext {
+    public var coreContext: CoreRequestContextStorage
     public let webSocket: WebSocketHandlerReference<Self>
 
-    public init(channel: Channel, logger: Logger) {
-        self.coreContext = .init(allocator: channel.allocator, logger: logger)
+    public init(source: Source) {
+        self.coreContext = .init(source: source)
         self.webSocket = .init()
     }
 }
@@ -158,7 +158,7 @@ extension HTTP1WebSocketUpgradeChannel {
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
             promise.completeWithTask {
                 let request = Request(head: head, body: .init(buffer: .init()))
-                let context = WSResponder.Context(channel: channel, logger: logger)
+                let context = WSResponder.Context(source: .init(channel: channel, logger: logger))
                 do {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
