@@ -59,7 +59,7 @@ public struct WebSocketHandlerReference<RequestContext: WebSocketRequestContext>
 }
 
 /// Request context protocol requirement for routers that support WebSockets
-public protocol WebSocketRequestContext: InstantiableRequestContext, WebSocketContext where Source == ServerRequestContextSource {
+public protocol WebSocketRequestContext: InitializableFromSource<ApplicationRequestContextSource>, WebSocketContext {
     var webSocket: WebSocketHandlerReference<Self> { get }
 }
 
