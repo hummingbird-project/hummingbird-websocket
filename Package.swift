@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", branch: "2.0.0-rc.1"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-rc.1"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
