@@ -88,7 +88,7 @@ extension RouterMethods {
     ///   - shouldUpgrade: Should request be upgraded
     ///   - handler: WebSocket channel handler
     @discardableResult public func ws(
-        _ path: String = "",
+        _ path: RouterPath = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
         onUpgrade handler: @escaping WebSocketDataHandler<WebSocketContextFromRouter<Context>>
     ) -> Self where Context: WebSocketRequestContext {
