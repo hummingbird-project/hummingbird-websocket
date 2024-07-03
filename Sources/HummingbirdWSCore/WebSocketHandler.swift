@@ -54,6 +54,17 @@ public struct WebSocketCloseFrame {
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
 package actor WebSocketHandler {
+    /// Basic context implementation of ``WebSocketContext``.
+    public struct Context: WebSocketContext {
+        public let allocator: ByteBufferAllocator
+        public let logger: Logger
+
+        package init(allocator: ByteBufferAllocator, logger: Logger) {
+            self.allocator = allocator
+            self.logger = logger
+        }
+    }
+
     enum InternalError: Error {
         case close(WebSocketErrorCode)
     }
@@ -78,7 +89,7 @@ package actor WebSocketHandler {
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let configuration: Configuration
-    let context: BasicWebSocketContext
+    let context: Context
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closeState: CloseState

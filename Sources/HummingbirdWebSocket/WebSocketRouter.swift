@@ -23,7 +23,7 @@ import NIOCore
 /// WebSocket Context for upgrades initiated via a router
 ///
 /// Include the HTTP request and context that initiated the WebSocket connection
-public struct WebSocketContextFromRouter<Context: WebSocketContext>: WebSocketContext {
+public struct WebSocketRouterContext<Context: WebSocketContext>: WebSocketContext {
     /// HTTP request that initiated the WebSocket connection
     public let request: Request
     /// Request context at the time of WebSocket connection was initiated
@@ -35,8 +35,10 @@ public struct WebSocketContextFromRouter<Context: WebSocketContext>: WebSocketCo
     }
 
     /// Logger attached to request context
+    @inlinable
     public var logger: Logger { self.requestContext.logger }
     /// ByteBuffer allocator attached to request context
+    @inlinable
     public var allocator: ByteBufferAllocator { self.requestContext.allocator }
 }
 
@@ -48,7 +50,7 @@ public struct WebSocketHandlerReference<RequestContext: WebSocketRequestContext>
     /// Holds WebSocket context and handler to call
     struct Value: Sendable {
         let context: RequestContext
-        let handler: WebSocketDataHandler<WebSocketContextFromRouter<RequestContext>>
+        let handler: WebSocketDataHandler<WebSocketRouterContext<RequestContext>>
     }
 
     public init() {
@@ -90,7 +92,7 @@ extension RouterMethods {
     @discardableResult public func ws(
         _ path: RouterPath = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketContextFromRouter<Context>>
+        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
     ) -> Self where Context: WebSocketRequestContext {
         return on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
@@ -111,7 +113,7 @@ extension RouterMethods {
 /// with ``Hummingbird/Router`` if you add a route immediately after it.
 public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: RouterMiddleware {
     let shouldUpgrade: @Sendable (Request, Context) async throws -> RouterShouldUpgrade
-    let handler: WebSocketDataHandler<WebSocketContextFromRouter<Context>>
+    let handler: WebSocketDataHandler<WebSocketRouterContext<Context>>
 
     /// Initialize WebSocketUpgradeMiddleare
     /// - Parameters:
@@ -119,7 +121,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     ///   - handle: WebSocket handler
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
-        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketContextFromRouter<Context>>
+        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
     ) {
         self.shouldUpgrade = shouldUpgrade
         self.handler = handler
@@ -177,7 +179,7 @@ extension HTTP1WebSocketUpgradeChannel {
                                         autoPing: configuration.autoPing
                                     ),
                                     asyncChannel: asyncChannel,
-                                    context: WebSocketContextFromRouter(request: request, context: webSocketHandler.context),
+                                    context: WebSocketRouterContext(request: request, context: webSocketHandler.context),
                                     handler: webSocketHandler.handler
                                 )
                             } catch {

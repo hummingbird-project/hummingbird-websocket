@@ -28,7 +28,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
         serverChannel: HTTPServerBuilder,
         clientExtensions: [WebSocketExtensionFactory] = [],
-        client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -89,8 +89,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
         serverExtensions: [WebSocketExtensionFactory] = [],
         clientExtensions: [WebSocketExtensionFactory] = [],
-        server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
-        client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        server serverHandler: @escaping WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>,
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws {
         try await self.testClientAndServer(
             serverChannel: .http1WebSocketUpgrade(configuration: .init(extensions: serverExtensions)) { _, _, _ in
