@@ -179,7 +179,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             try self.decompressor.startStream()
         }
 
-        func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: some WebSocketContext) throws -> WebSocketFrame {
+        func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
             if self.state == .idle {
                 if frame.rsv1 {
                     self.state = .decompressingMessage
@@ -231,7 +231,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             try self.compressor.startStream()
         }
 
-        func compress(_ frame: WebSocketFrame, resetStream: Bool, context: some WebSocketContext) throws -> WebSocketFrame {
+        func compress(_ frame: WebSocketFrame, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
             // if the frame is larger than `minFrameSizeToCompress` bytes, we haven't received a final frame
             // or we are in the process of sending a message compress the data
             let shouldWeCompress = frame.data.readableBytes >= self.minFrameSizeToCompress || !frame.fin || self.sendState != .idle
@@ -292,7 +292,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         try? await self.compressor.shutdown()
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame {
         return try await self.decompressor.decompress(
             frame,
             maxSize: self.configuration.maxDecompressedFrameSize,
@@ -301,7 +301,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         )
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame {
         let isCorrectType = frame.opcode == .text || frame.opcode == .binary || frame.opcode == .continuation
         if isCorrectType {
             return try await self.compressor.compress(frame, resetStream: self.configuration.sendNoContextTakeover, context: context)

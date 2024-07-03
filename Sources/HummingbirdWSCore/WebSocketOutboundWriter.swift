@@ -40,7 +40,7 @@ public struct WebSocketOutboundWriter: Sendable {
             try await self.handler.write(frame: .init(fin: true, opcode: .binary, data: buffer))
         case .text(let string):
             // send text based data
-            let buffer = self.handler.context.allocator.buffer(string: string)
+            let buffer = self.handler.allocator.buffer(string: string)
             try await self.handler.write(frame: .init(fin: true, opcode: .text, data: buffer))
         case .pong:
             // send unexplained pong as a heartbeat
@@ -73,7 +73,7 @@ public struct WebSocketOutboundWriter: Sendable {
 
         /// Write string to WebSocket frame
         public mutating func callAsFunction(_ text: String) async throws {
-            let buffer = self.handler.context.allocator.buffer(string: text)
+            let buffer = self.handler.allocator.buffer(string: text)
             try await self.write(buffer, opcode: self.opcode)
         }
 

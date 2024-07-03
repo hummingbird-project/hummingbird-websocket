@@ -14,16 +14,29 @@
 
 import Foundation
 import HTTPTypes
+import Logging
+import NIOCore
 import NIOWebSocket
+
+/// Basic context implementation of ``WebSocketContext``.
+public struct WebSocketExtensionContext {
+    public let allocator: ByteBufferAllocator
+    public let logger: Logger
+
+    init(allocator: ByteBufferAllocator, logger: Logger) {
+        self.allocator = allocator
+        self.logger = logger
+    }
+}
 
 /// Protocol for WebSocket extension
 public protocol WebSocketExtension: Sendable {
     /// Extension name
     var name: String { get }
     /// Process frame received from websocket
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame
+    func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame
     /// Process frame about to be sent to websocket
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) async throws -> WebSocketFrame
+    func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame
     /// shutdown extension
     func shutdown() async
 }

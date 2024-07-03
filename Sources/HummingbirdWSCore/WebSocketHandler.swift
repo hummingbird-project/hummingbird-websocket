@@ -54,17 +54,6 @@ public struct WebSocketCloseFrame {
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
 package actor WebSocketHandler {
-    /// Basic context implementation of ``WebSocketContext``.
-    public struct Context: WebSocketContext {
-        public let allocator: ByteBufferAllocator
-        public let logger: Logger
-
-        package init(allocator: ByteBufferAllocator, logger: Logger) {
-            self.allocator = allocator
-            self.logger = logger
-        }
-    }
-
     enum InternalError: Error {
         case close(WebSocketErrorCode)
     }
@@ -89,7 +78,8 @@ package actor WebSocketHandler {
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let configuration: Configuration
-    let context: Context
+    let logger: Logger
+    let allocator: ByteBufferAllocator
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closeState: CloseState
@@ -103,7 +93,8 @@ package actor WebSocketHandler {
         self.outbound = outbound
         self.type = type
         self.configuration = configuration
-        self.context = .init(allocator: context.allocator, logger: context.logger)
+        self.logger = context.logger
+        self.allocator = context.allocator
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
         self.closeState = .open
     }
@@ -212,10 +203,13 @@ package actor WebSocketHandler {
         var frame = frame
         do {
             for ext in self.configuration.extensions {
-                frame = try await ext.processFrameToSend(frame, context: self.context)
+                frame = try await ext.processFrameToSend(
+                    frame,
+                    context: WebSocketExtensionContext(allocator: self.allocator, logger: self.logger)
+                )
             }
         } catch {
-            self.context.logger.debug("Closing as we failed to generate valid frame data")
+            self.logger.debug("Closing as we failed to generate valid frame data")
             throw WebSocketHandler.InternalError.close(.unexpectedServerError)
         }
         // Set mask key if client
@@ -224,7 +218,7 @@ package actor WebSocketHandler {
         }
         try await self.outbound.write(frame)
 
-        self.context.logger.trace("Sent \(frame.traceDescription)")
+        self.logger.trace("Sent \(frame.traceDescription)")
     }
 
     func finish() {
@@ -284,7 +278,7 @@ package actor WebSocketHandler {
     ) async throws {
         switch self.closeState {
         case .open:
-            var buffer = self.context.allocator.buffer(capacity: 2 + (reason?.utf8.count ?? 0))
+            var buffer = self.allocator.buffer(capacity: 2 + (reason?.utf8.count ?? 0))
             buffer.write(webSocketErrorCode: code)
             if let reason {
                 buffer.writeString(reason)
@@ -329,7 +323,7 @@ package actor WebSocketHandler {
                 .protocolError
             }
 
-            var buffer = self.context.allocator.buffer(capacity: 2)
+            var buffer = self.allocator.buffer(capacity: 2)
             buffer.write(webSocketErrorCode: code)
 
             try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))

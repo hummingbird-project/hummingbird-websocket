@@ -57,7 +57,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
             // parse messages coming from inbound
             while let frame = try await self.iterator.next() {
                 do {
-                    self.handler.context.logger.trace("Received \(frame.traceDescription)")
+                    self.handler.logger.trace("Received \(frame.traceDescription)")
                     switch frame.opcode {
                     case .connectionClose:
                         try await self.handler.receivedClose(frame)
@@ -70,16 +70,19 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         // apply extensions
                         var frame = frame
                         for ext in self.handler.configuration.extensions.reversed() {
-                            frame = try await ext.processReceivedFrame(frame, context: self.handler.context)
+                            frame = try await ext.processReceivedFrame(
+                                frame,
+                                context: WebSocketExtensionContext(allocator: self.handler.allocator, logger: self.handler.logger)
+                            )
                         }
                         return .init(from: frame)
                     default:
                         // if we receive a reserved opcode we should fail the connection
-                        self.handler.context.logger.trace("Received reserved opcode", metadata: ["opcode": .stringConvertible(frame.opcode)])
+                        self.handler.logger.trace("Received reserved opcode", metadata: ["opcode": .stringConvertible(frame.opcode)])
                         throw WebSocketHandler.InternalError.close(.protocolError)
                     }
                 } catch {
-                    self.handler.context.logger.trace("Error: \(error)")
+                    self.handler.logger.trace("Error: \(error)")
                     // catch errors while processing websocket frames so responding close message
                     // can be dealt with
                     let errorCode = WebSocketErrorCode(error)
