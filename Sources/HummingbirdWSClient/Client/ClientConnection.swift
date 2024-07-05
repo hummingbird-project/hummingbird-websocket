@@ -145,7 +145,8 @@ public struct ClientConnection<ClientChannel: ClientConnectionChannel>: Sendable
     /// create a NIOTransportServices bootstrap using Network.framework
     private func createTSBootstrap() -> NIOTSConnectionBootstrap? {
         guard let bootstrap = NIOTSConnectionBootstrap(validatingGroup: self.eventLoopGroup)
-            .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true) else {
+            .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+        else {
             return nil
         }
         if let tlsOptions {

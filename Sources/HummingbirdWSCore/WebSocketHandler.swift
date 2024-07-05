@@ -188,7 +188,7 @@ package actor WebSocketHandler {
                         }
                     }
                 }
-            // don't propagate error if channel is already closed
+                // don't propagate error if channel is already closed
             } catch ChannelError.ioOnClosedChannel {}
         } onGracefulShutdown: {
             Task {
