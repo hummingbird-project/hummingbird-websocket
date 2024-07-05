@@ -86,7 +86,10 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                     // catch errors while processing websocket frames so responding close message
                     // can be dealt with
                     let errorCode = WebSocketErrorCode(error)
-                    try await self.handler.close(code: errorCode)
+                    do {
+                        try await self.handler.close(code: errorCode)
+                    // don't propagate error if channel is already closed
+                    } catch ChannelError.ioOnClosedChannel {}
                 }
             }
 
