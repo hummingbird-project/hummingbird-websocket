@@ -39,6 +39,18 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         public let channel: Channel
     }
 
+    /// Basic context implementation of ``WebSocketContext``.
+    /// Used by non-router web socket handle function
+    public struct Context: WebSocketContext {
+        public let allocator: ByteBufferAllocator
+        public let logger: Logger
+
+        package init(allocator: ByteBufferAllocator, logger: Logger) {
+            self.allocator = allocator
+            self.logger = logger
+        }
+    }
+
     ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
     /// - Parameters:
     ///   - additionalChannelHandlers: Additional channel handlers to add
@@ -50,7 +62,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
@@ -65,7 +77,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
+                            let context = Context(allocator: channel.allocator, logger: logger)
                             do {
                                 _ = try await WebSocketHandler.handle(
                                     type: .server,
@@ -98,7 +110,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<BasicWebSocketContext>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self.additionalChannelHandlers = additionalChannelHandlers
         self.configuration = configuration
@@ -114,7 +126,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let context = BasicWebSocketContext(allocator: channel.allocator, logger: logger)
+                            let context = Context(allocator: channel.allocator, logger: logger)
                             do {
                                 _ = try await WebSocketHandler.handle(
                                     type: .server,

@@ -28,7 +28,7 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
         serverChannel: HTTPServerBuilder,
         clientExtensions: [WebSocketExtensionFactory] = [],
-        client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
@@ -89,8 +89,8 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
     func testClientAndServer(
         serverExtensions: [WebSocketExtensionFactory] = [],
         clientExtensions: [WebSocketExtensionFactory] = [],
-        server serverHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>,
-        client clientHandler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        server serverHandler: @escaping WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>,
+        client clientHandler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws {
         try await self.testClientAndServer(
             serverChannel: .http1WebSocketUpgrade(configuration: .init(extensions: serverExtensions)) { _, _, _ in
@@ -310,7 +310,7 @@ struct XorWebSocketExtension: WebSocketExtension {
     let name = "xor"
     func shutdown() {}
 
-    func xorFrame(_ frame: WebSocketFrame, context: some WebSocketContext) -> WebSocketFrame {
+    func xorFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) -> WebSocketFrame {
         var newBuffer = context.allocator.buffer(capacity: frame.data.readableBytes)
         for byte in frame.unmaskedData.readableBytesView {
             newBuffer.writeInteger(byte ^ self.value)
@@ -321,11 +321,11 @@ struct XorWebSocketExtension: WebSocketExtension {
         return frame
     }
 
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) -> WebSocketFrame {
         return self.xorFrame(frame, context: context)
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) throws -> WebSocketFrame {
         return self.xorFrame(frame, context: context)
     }
 
@@ -377,12 +377,12 @@ struct CheckDeflateWebSocketExtension: WebSocketExtension {
     let name = "check-deflate"
     func shutdown() {}
 
-    func processReceivedFrame(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
+    func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) throws -> WebSocketFrame {
         guard frame.rsv1 else { throw NoDeflateError() }
         return frame
     }
 
-    func processFrameToSend(_ frame: WebSocketFrame, context: some WebSocketContext) throws -> WebSocketFrame {
+    func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) throws -> WebSocketFrame {
         return frame
     }
 }

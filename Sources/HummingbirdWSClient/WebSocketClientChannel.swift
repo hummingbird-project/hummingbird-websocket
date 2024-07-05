@@ -30,10 +30,10 @@ struct WebSocketClientChannel: ClientConnectionChannel {
 
     let urlPath: String
     let hostHeader: String
-    let handler: WebSocketDataHandler<BasicWebSocketContext>
+    let handler: WebSocketDataHandler<WebSocketClient.Context>
     let configuration: WebSocketClientConfiguration
 
-    init(handler: @escaping WebSocketDataHandler<BasicWebSocketContext>, url: URI, configuration: WebSocketClientConfiguration) throws {
+    init(handler: @escaping WebSocketDataHandler<WebSocketClient.Context>, url: URI, configuration: WebSocketClientConfiguration) throws {
         guard let hostHeader = Self.urlHostHeader(for: url) else { throw WebSocketClientError.invalidURL }
         self.hostHeader = hostHeader
         self.urlPath = Self.urlPath(for: url)
@@ -104,7 +104,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                     autoPing: self.configuration.autoPing
                 ),
                 asyncChannel: webSocketChannel,
-                context: BasicWebSocketContext(allocator: webSocketChannel.channel.allocator, logger: logger),
+                context: WebSocketClient.Context(allocator: webSocketChannel.channel.allocator, logger: logger),
                 handler: self.handler
             )
         case .notUpgraded:

@@ -15,21 +15,8 @@
 import Logging
 import NIOCore
 
-/// Context for WebSocket
+/// Protocol for WebSocket Data handling functions context parameter
 public protocol WebSocketContext: Sendable {
     var allocator: ByteBufferAllocator { get }
     var logger: Logger { get }
-}
-
-/// Basic context implementation of ``WebSocketContext``.
-///
-/// Used by non-router and client WebSocket connections
-public struct BasicWebSocketContext: WebSocketContext {
-    public let allocator: ByteBufferAllocator
-    public let logger: Logger
-
-    package init(allocator: ByteBufferAllocator, logger: Logger) {
-        self.allocator = allocator
-        self.logger = logger
-    }
 }

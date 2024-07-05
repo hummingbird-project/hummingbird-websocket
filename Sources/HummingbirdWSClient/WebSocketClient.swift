@@ -40,6 +40,18 @@ import NIOWebSocket
 /// }
 /// ```
 public struct WebSocketClient {
+    /// Basic context implementation of ``WebSocketContext``.
+    /// Used by non-router web socket handle function
+    public struct Context: WebSocketContext {
+        public let allocator: ByteBufferAllocator
+        public let logger: Logger
+
+        package init(allocator: ByteBufferAllocator, logger: Logger) {
+            self.allocator = allocator
+            self.logger = logger
+        }
+    }
+
     enum MultiPlatformTLSConfiguration: Sendable {
         case niossl(TLSConfiguration)
         #if canImport(Network)
@@ -50,7 +62,7 @@ public struct WebSocketClient {
     /// WebSocket URL
     let url: URI
     /// WebSocket data handler
-    let handler: WebSocketDataHandler<BasicWebSocketContext>
+    let handler: WebSocketDataHandler<Context>
     /// configuration
     let configuration: WebSocketClientConfiguration
     /// EventLoopGroup to use
@@ -75,7 +87,7 @@ public struct WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        handler: @escaping WebSocketDataHandler<Context>
     ) {
         self.url = .init(url)
         self.handler = handler
@@ -101,7 +113,7 @@ public struct WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        handler: @escaping WebSocketDataHandler<Context>
     ) {
         self.url = .init(url)
         self.handler = handler
@@ -195,7 +207,7 @@ extension WebSocketClient {
         tlsConfiguration: TLSConfiguration? = nil,
         eventLoopGroup: EventLoopGroup = MultiThreadedEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        handler: @escaping WebSocketDataHandler<Context>
     ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,
@@ -225,7 +237,7 @@ extension WebSocketClient {
         transportServicesTLSOptions: TSTLSOptions,
         eventLoopGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup.singleton,
         logger: Logger,
-        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        handler: @escaping WebSocketDataHandler<Context>
     ) async throws -> WebSocketCloseFrame? {
         let ws = self.init(
             url: url,

@@ -138,12 +138,15 @@ public struct ClientConnection<ClientChannel: ClientConnectionChannel>: Sendable
     /// create a BSD sockets based bootstrap
     private func createSocketsBootstrap() -> ClientBootstrap {
         return ClientBootstrap(group: self.eventLoopGroup)
+            .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
     }
 
     #if canImport(Network)
     /// create a NIOTransportServices bootstrap using Network.framework
     private func createTSBootstrap() -> NIOTSConnectionBootstrap? {
-        guard let bootstrap = NIOTSConnectionBootstrap(validatingGroup: self.eventLoopGroup) else {
+        guard let bootstrap = NIOTSConnectionBootstrap(validatingGroup: self.eventLoopGroup)
+            .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+        else {
             return nil
         }
         if let tlsOptions {
