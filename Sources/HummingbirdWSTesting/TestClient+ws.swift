@@ -18,6 +18,13 @@ import Logging
 import NIOSSL
 
 extension TestClientProtocol {
+    ///  Test WebSocket endpoint
+    /// - Parameters:
+    ///   - path: Endpoint path
+    ///   - configuration: WebSocket client configuration
+    ///   - logger: Logger
+    ///   - handler: WebSocket handler
+    /// - Returns: WebSocket close frame
     @discardableResult public func ws(
         _ path: String,
         configuration: WebSocketClientConfiguration = .init(),
