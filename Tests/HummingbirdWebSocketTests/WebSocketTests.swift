@@ -658,6 +658,51 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(rt?.closeCode, .protocolError)
         }
     }
+
+    // test WebSocket channel graceful shutdown
+    func testGracefulShutdown() async throws {
+        await withThrowingTaskGroup(of: Void.self) { group in
+            let promise = Promise<Int>()
+            let logger = {
+                var logger = Logger(label: "WebSocketTest")
+                logger.logLevel = .debug
+                return logger
+            }()
+            let router = Router()
+            let serviceGroup: ServiceGroup
+            let app = Application(
+                router: router,
+                server: .http1WebSocketUpgrade { _, _, _ in
+                    return .upgrade { inbound, outbound, _ in
+                        try await outbound.write(.text("Hello"))
+                        for try await _ in inbound {}
+                    }
+                },
+                configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+                onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
+                logger: logger
+            )
+            serviceGroup = ServiceGroup(
+                configuration: .init(
+                    services: [app],
+                    gracefulShutdownSignals: [.sigterm, .sigint],
+                    logger: app.logger
+                )
+            )
+            group.addTask {
+                try await serviceGroup.run()
+            }
+            let connectPromise = Promise<Void>()
+            group.addTask {
+                try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
+                    await connectPromise.complete(())
+                    for try await _ in inbound {}
+                }
+            }
+            _ = await connectPromise.wait()
+            await serviceGroup.triggerGracefulShutdown()
+        }
+    }
 }
 
 extension Logger {
