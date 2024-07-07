@@ -18,11 +18,11 @@ import Logging
 import NIOSSL
 
 extension TestClientProtocol {
-    public func ws(
+    @discardableResult public func ws(
         _ path: String,
         configuration: WebSocketClientConfiguration = .init(),
         logger: Logger = Logger(label: "TestClient"),
-        handler: @escaping WebSocketDataHandler<BasicWebSocketContext>
+        handler: @escaping WebSocketDataHandler<WebSocketClient.Context>
     ) async throws -> WebSocketCloseFrame? {
         guard let port else {
             preconditionFailure("Cannot test WebSockets without a live server. Use `.live` or `.ahc` to test WebSockets")
