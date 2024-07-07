@@ -28,7 +28,7 @@ extension TestClientProtocol {
             preconditionFailure("Cannot test WebSockets without a live server. Use `.live` or `.ahc` to test WebSockets")
         }
         return try await WebSocketClient.connect(
-            url: "http://localhost:\(port)\(path)",
+            url: "ws://localhost:\(port)\(path)",
             configuration: configuration,
             logger: logger,
             handler: handler

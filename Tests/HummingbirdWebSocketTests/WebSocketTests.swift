@@ -377,16 +377,6 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     func testTLS() async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
-            let serverLogger = {
-                var logger = Logger(label: "WebSocketServer")
-                logger.logLevel = .trace
-                return logger
-            }()
-            let clientLogger = {
-                var logger = Logger(label: "WebSocketClient")
-                logger.logLevel = .trace
-                return logger
-            }()
             let promise = Promise<Int>()
             let app = try Application(
                 router: Router(),
@@ -400,7 +390,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 ),
                 configuration: .init(address: .hostname("127.0.0.1", port: 0)),
                 onServerRunning: { channel in await promise.complete(channel.localAddress!.port!) },
-                logger: serverLogger
+                logger: Logger(label: "server")
             )
             let serviceGroup = ServiceGroup(
                 configuration: .init(
@@ -413,10 +403,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await serviceGroup.run()
             }
             do {
+                var clientTLSConfiguration = try getClientTLSConfiguration()
+                clientTLSConfiguration.certificateVerification = .none
                 try await WebSocketClient.connect(
                     url: "wss://localhost:\(promise.wait())/",
-                    tlsConfiguration: getClientTLSConfiguration(),
-                    logger: clientLogger
+                    tlsConfiguration: clientTLSConfiguration,
+                    logger: Logger(label: "client")
                 ) { inbound, _, _ in
                     var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let msg = try await inboundIterator.next()
