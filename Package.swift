@@ -10,9 +10,10 @@ let package = Package(
         .library(name: "HummingbirdWebSocket", targets: ["HummingbirdWebSocket"]),
         .library(name: "HummingbirdWSClient", targets: ["HummingbirdWSClient"]),
         .library(name: "HummingbirdWSCompression", targets: ["HummingbirdWSCompression"]),
+        .library(name: "HummingbirdWSTesting", targets: ["HummingbirdWSTesting"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-rc.1"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-rc.2"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.62.0"),
@@ -50,10 +51,15 @@ let package = Package(
             .byName(name: "HummingbirdWSCore"),
             .product(name: "CompressNIO", package: "compress-nio"),
         ]),
+        .target(name: "HummingbirdWSTesting", dependencies: [
+            .byName(name: "HummingbirdWSClient"),
+            .product(name: "HummingbirdTesting", package: "hummingbird"),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
             .byName(name: "HummingbirdWSClient"),
             .byName(name: "HummingbirdWSCompression"),
+            .byName(name: "HummingbirdWSTesting"),
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),
             .product(name: "HummingbirdTLS", package: "hummingbird"),
