@@ -675,7 +675,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 server: .http1WebSocketUpgrade { _, _, _ in
                     return .upgrade { inbound, outbound, _ in
                         try await outbound.write(.text("Hello"))
-                        for try await _ in inbound {}
+                        for try await _ in inbound {
+                            XCTFail("Shouldn't receive anything")
+                        }
                     }
                 },
                 configuration: .init(address: .hostname("127.0.0.1", port: 0)),
@@ -696,7 +698,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
             group.addTask {
                 try await WebSocketClient.connect(url: .init("ws://localhost:\(promise.wait())/ws"), logger: logger) { inbound, _, _ in
                     await connectPromise.complete(())
-                    for try await _ in inbound {}
+                    var iterator = inbound.makeAsyncIterator()
+                    let firstMessage = try await iterator.nextMessage(maxSize: .max)
+                    XCTAssertEqual(firstMessage, .text("Hello"))
+                    while try await iterator.next() != nil {}
                 }
             }
             _ = await connectPromise.wait()
