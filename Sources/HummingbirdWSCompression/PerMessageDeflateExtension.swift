@@ -197,8 +197,8 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     self.state = .idle
                 }
                 frame.data = try unmaskedData.decompressStream(
-                    with: self.decompressor, 
-                    maxSize: maxSize, 
+                    with: self.decompressor,
+                    maxSize: maxSize,
                     allocator: ByteBufferAllocator()
                 )
                 frame.maskKey = nil
