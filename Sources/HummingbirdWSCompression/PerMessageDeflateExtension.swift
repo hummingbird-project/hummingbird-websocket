@@ -196,7 +196,11 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     unmaskedData.writeBytes([0, 0, 255, 255])
                     self.state = .idle
                 }
-                frame.data = try unmaskedData.decompressStream(with: self.decompressor, maxSize: maxSize, allocator: context.allocator)
+                frame.data = try unmaskedData.decompressStream(
+                    with: self.decompressor, 
+                    maxSize: maxSize, 
+                    allocator: ByteBufferAllocator()
+                )
                 frame.maskKey = nil
                 if resetStream, frame.fin {
                     try self.decompressor.resetStream()
@@ -241,7 +245,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     newFrame.rsv1 = true
                     self.sendState = .sendingMessage
                 }
-                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: context.allocator)
+                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ByteBufferAllocator())
                 // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
                 // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
                 if newFrame.fin {

@@ -104,7 +104,7 @@ struct WebSocketClientChannel: ClientConnectionChannel {
                     autoPing: self.configuration.autoPing
                 ),
                 asyncChannel: webSocketChannel,
-                context: WebSocketClient.Context(allocator: webSocketChannel.channel.allocator, logger: logger),
+                context: WebSocketClient.Context(logger: logger),
                 handler: self.handler
             )
         case .notUpgraded:

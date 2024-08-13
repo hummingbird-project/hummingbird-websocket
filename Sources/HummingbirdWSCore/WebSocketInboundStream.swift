@@ -72,7 +72,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         for ext in self.handler.configuration.extensions.reversed() {
                             frame = try await ext.processReceivedFrame(
                                 frame,
-                                context: WebSocketExtensionContext(allocator: self.handler.allocator, logger: self.handler.logger)
+                                context: WebSocketExtensionContext(logger: self.handler.logger)
                             )
                         }
                         return .init(from: frame)

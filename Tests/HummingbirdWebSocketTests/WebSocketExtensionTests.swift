@@ -300,7 +300,7 @@ struct XorWebSocketExtension: WebSocketExtension {
     func shutdown() {}
 
     func xorFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) -> WebSocketFrame {
-        var newBuffer = context.allocator.buffer(capacity: frame.data.readableBytes)
+        var newBuffer = ByteBufferAllocator().buffer(capacity: frame.data.readableBytes)
         for byte in frame.unmaskedData.readableBytesView {
             newBuffer.writeInteger(byte ^ self.value)
         }

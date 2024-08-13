@@ -20,11 +20,9 @@ import NIOWebSocket
 
 /// Basic context implementation of ``WebSocketContext``.
 public struct WebSocketExtensionContext {
-    public let allocator: ByteBufferAllocator
     public let logger: Logger
 
-    init(allocator: ByteBufferAllocator, logger: Logger) {
-        self.allocator = allocator
+    init(logger: Logger) {
         self.logger = logger
     }
 }
