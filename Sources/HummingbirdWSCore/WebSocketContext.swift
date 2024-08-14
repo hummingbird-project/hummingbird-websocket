@@ -17,6 +17,5 @@ import NIOCore
 
 /// Protocol for WebSocket Data handling functions context parameter
 public protocol WebSocketContext: Sendable {
-    var allocator: ByteBufferAllocator { get }
     var logger: Logger { get }
 }

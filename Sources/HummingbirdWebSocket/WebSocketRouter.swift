@@ -37,9 +37,6 @@ public struct WebSocketRouterContext<Context: WebSocketContext>: WebSocketContex
     /// Logger attached to request context
     @inlinable
     public var logger: Logger { self.requestContext.logger }
-    /// ByteBuffer allocator attached to request context
-    @inlinable
-    public var allocator: ByteBufferAllocator { self.requestContext.allocator }
 }
 
 /// Reference to a WebSocket handler

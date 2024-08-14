@@ -42,11 +42,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     /// Basic context implementation of ``WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
-        public let allocator: ByteBufferAllocator
         public let logger: Logger
 
-        package init(allocator: ByteBufferAllocator, logger: Logger) {
-            self.allocator = allocator
+        package init(logger: Logger) {
             self.logger = logger
         }
     }
@@ -77,7 +75,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let context = Context(allocator: channel.allocator, logger: logger)
+                            let context = Context(logger: logger)
                             do {
                                 _ = try await WebSocketHandler.handle(
                                     type: .server,
@@ -126,7 +124,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             logger: logger
                         )
                         return (headers, { asyncChannel, logger in
-                            let context = Context(allocator: channel.allocator, logger: logger)
+                            let context = Context(logger: logger)
                             do {
                                 _ = try await WebSocketHandler.handle(
                                     type: .server,

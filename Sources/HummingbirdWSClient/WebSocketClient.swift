@@ -43,11 +43,9 @@ public struct WebSocketClient {
     /// Basic context implementation of ``WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
-        public let allocator: ByteBufferAllocator
         public let logger: Logger
 
-        package init(allocator: ByteBufferAllocator, logger: Logger) {
-            self.allocator = allocator
+        package init(logger: Logger) {
             self.logger = logger
         }
     }

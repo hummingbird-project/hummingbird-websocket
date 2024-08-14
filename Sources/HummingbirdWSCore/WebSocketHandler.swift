@@ -79,7 +79,6 @@ package actor WebSocketHandler {
     let type: WebSocketType
     let configuration: Configuration
     let logger: Logger
-    let allocator: ByteBufferAllocator
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
     var closeState: CloseState
@@ -94,7 +93,6 @@ package actor WebSocketHandler {
         self.type = type
         self.configuration = configuration
         self.logger = context.logger
-        self.allocator = context.allocator
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
         self.closeState = .open
     }
@@ -208,7 +206,7 @@ package actor WebSocketHandler {
             for ext in self.configuration.extensions {
                 frame = try await ext.processFrameToSend(
                     frame,
-                    context: WebSocketExtensionContext(allocator: self.allocator, logger: self.logger)
+                    context: WebSocketExtensionContext(logger: self.logger)
                 )
             }
         } catch {
@@ -281,7 +279,7 @@ package actor WebSocketHandler {
     ) async throws {
         switch self.closeState {
         case .open:
-            var buffer = self.allocator.buffer(capacity: 2 + (reason?.utf8.count ?? 0))
+            var buffer = ByteBufferAllocator().buffer(capacity: 2 + (reason?.utf8.count ?? 0))
             buffer.write(webSocketErrorCode: code)
             if let reason {
                 buffer.writeString(reason)
@@ -326,7 +324,7 @@ package actor WebSocketHandler {
                 .protocolError
             }
 
-            var buffer = self.allocator.buffer(capacity: 2)
+            var buffer = ByteBufferAllocator().buffer(capacity: 2)
             buffer.write(webSocketErrorCode: code)
 
             try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
