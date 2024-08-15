@@ -42,7 +42,7 @@ public struct AutoPingSetup: Sendable {
 }
 
 /// Close frame that caused WebSocket close
-public struct WebSocketCloseFrame {
+public struct WebSocketCloseFrame: Sendable {
     // status code indicating a reason for closure
     public let closeCode: WebSocketErrorCode
     // close reason
@@ -179,12 +179,21 @@ package actor WebSocketHandler {
                 try await self.close(code: closeCode)
                 if case .closing = self.closeState {
                     // Close handshake. Wait for responding close or until inbound ends
+                    #if compiler(>=6.0)
+                    while let frame = try await inboundIterator.next(isolation: self) {
+                        if case .connectionClose = frame.opcode {
+                            try await self.receivedClose(frame)
+                            break
+                        }
+                    }
+                    #else
                     while let frame = try await inboundIterator.next() {
                         if case .connectionClose = frame.opcode {
                             try await self.receivedClose(frame)
                             break
                         }
                     }
+                    #endif
                 }
                 // don't propagate error if channel is already closed
             } catch ChannelError.ioOnClosedChannel {}

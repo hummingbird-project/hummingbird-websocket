@@ -1,9 +1,7 @@
-// swift-tools-version:5.10
+// swift-tools-version:6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
-
-let swiftSettings: [SwiftSetting] = [.enableExperimentalFeature("StrictConcurrency=complete")]
 
 let package = Package(
     name: "hummingbird-websocket",
@@ -31,7 +29,7 @@ let package = Package(
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "NIOHTTPTypes", package: "swift-nio-extras"),
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
-        ], swiftSettings: swiftSettings),
+        ]),
         .target(name: "HummingbirdWSClient", dependencies: [
             .byName(name: "HummingbirdWSCore"),
             .product(name: "HTTPTypes", package: "swift-http-types"),
@@ -42,7 +40,7 @@ let package = Package(
             .product(name: "NIOSSL", package: "swift-nio-ssl"),
             .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
-        ], swiftSettings: swiftSettings),
+        ]),
         .target(name: "HummingbirdWSCore", dependencies: [
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "NIOCore", package: "swift-nio"),
@@ -52,11 +50,11 @@ let package = Package(
         .target(name: "HummingbirdWSCompression", dependencies: [
             .byName(name: "HummingbirdWSCore"),
             .product(name: "CompressNIO", package: "compress-nio"),
-        ], swiftSettings: swiftSettings),
+        ]),
         .target(name: "HummingbirdWSTesting", dependencies: [
             .byName(name: "HummingbirdWSClient"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),
-        ], swiftSettings: swiftSettings),
+        ]),
         .testTarget(name: "HummingbirdWebSocketTests", dependencies: [
             .byName(name: "HummingbirdWebSocket"),
             .byName(name: "HummingbirdWSClient"),

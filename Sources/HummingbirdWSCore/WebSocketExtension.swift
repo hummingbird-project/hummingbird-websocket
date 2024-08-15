@@ -19,7 +19,7 @@ import NIOCore
 import NIOWebSocket
 
 /// Basic context implementation of ``WebSocketContext``.
-public struct WebSocketExtensionContext {
+public struct WebSocketExtensionContext: Sendable {
     public let logger: Logger
 
     init(logger: Logger) {
