@@ -19,7 +19,7 @@ import NIOWebSocket
 
 /// PerMessageDeflate Websocket extension builder
 struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
-    static var name = "permessage-deflate"
+    static let name = "permessage-deflate"
 
     let clientMaxWindow: Int?
     let clientNoContextTakeover: Bool
@@ -173,9 +173,9 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         fileprivate let decompressor: any NIODecompressor
         var state: ReceiveState
 
-        init(_ decompressor: any NIODecompressor) throws {
+        init(_ algorithm: CompressionAlgorithm) throws {
             self.state = .idle
-            self.decompressor = decompressor
+            self.decompressor = algorithm.decompressor
             try self.decompressor.startStream()
         }
 
@@ -228,8 +228,8 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         var sendState: SendState
         let minFrameSizeToCompress: Int
 
-        init(_ compressor: any NIOCompressor, minFrameSizeToCompress: Int) throws {
-            self.compressor = compressor
+        init(_ algorithm: CompressionAlgorithm, minFrameSizeToCompress: Int) throws {
+            self.compressor = algorithm.compressor
             self.minFrameSizeToCompress = minFrameSizeToCompress
             self.sendState = .idle
             try self.compressor.startStream()
@@ -277,7 +277,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                 configuration: .init(
                     windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
                 )
-            ).decompressor
+            )
         )
         self.compressor = try .init(
             CompressionAlgorithm.deflate(
@@ -286,7 +286,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
                     memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
                 )
-            ).compressor,
+            ),
             minFrameSizeToCompress: self.configuration.minFrameSizeToCompress
         )
     }

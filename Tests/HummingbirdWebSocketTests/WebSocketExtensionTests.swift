@@ -322,7 +322,7 @@ struct XorWebSocketExtension: WebSocketExtension {
 }
 
 struct XorWebSocketExtensionBuilder: WebSocketExtensionBuilder {
-    static var name = "permessage-xor"
+    static let name = "permessage-xor"
     let value: UInt8?
 
     init(value: UInt8? = nil) {
@@ -377,7 +377,7 @@ struct CheckDeflateWebSocketExtension: WebSocketExtension {
 }
 
 struct CheckDeflateWebSocketExtensionBuilder: WebSocketExtensionBuilder {
-    static var name = "check-deflate"
+    static let name = "check-deflate"
 
     func clientRequestHeader() -> String {
         return Self.name
