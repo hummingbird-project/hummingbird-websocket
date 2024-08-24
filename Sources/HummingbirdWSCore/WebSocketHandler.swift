@@ -158,13 +158,13 @@ package actor WebSocketHandler {
         handler: @escaping WebSocketDataHandler<Context>,
         context: Context
     ) async throws -> WebSocketCloseFrame? {
-        let webSocketOutbound = WebSocketOutboundWriter(handler: self)
-        var inboundIterator = inbound.makeAsyncIterator()
-        let webSocketInbound = WebSocketInboundStream(
-            iterator: inboundIterator,
-            handler: self
-        )
         try await withGracefulShutdownHandler {
+            let webSocketOutbound = WebSocketOutboundWriter(handler: self)
+            var inboundIterator = inbound.makeAsyncIterator()
+            let webSocketInbound = WebSocketInboundStream(
+                iterator: inboundIterator,
+                handler: self
+            )
             let closeCode: WebSocketErrorCode
             do {
                 // handle websocket data and text
@@ -179,21 +179,12 @@ package actor WebSocketHandler {
                 try await self.close(code: closeCode)
                 if case .closing = self.closeState {
                     // Close handshake. Wait for responding close or until inbound ends
-                    #if compiler(>=6.0)
-                    while let frame = try await inboundIterator.next(isolation: self) {
-                        if case .connectionClose = frame.opcode {
-                            try await self.receivedClose(frame)
-                            break
-                        }
-                    }
-                    #else
                     while let frame = try await inboundIterator.next() {
                         if case .connectionClose = frame.opcode {
                             try await self.receivedClose(frame)
                             break
                         }
                     }
-                    #endif
                 }
                 // don't propagate error if channel is already closed
             } catch ChannelError.ioOnClosedChannel {}
