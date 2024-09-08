@@ -180,7 +180,7 @@ extension HTTP1WebSocketUpgradeChannel {
                                     handler: webSocketHandler.handler
                                 )
                             } catch {
-                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                                logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
                             }
                         }
                     } else {
