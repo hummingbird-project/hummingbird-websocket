@@ -218,7 +218,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 await handler(asyncChannel, logger)
             }
         } catch {
-            logger.error("Error handling upgrade result: \(error)")
+            logger.error("Error handling upgrade result", metadata: ["error.type": .string("\(error)")])
         }
     }
 
