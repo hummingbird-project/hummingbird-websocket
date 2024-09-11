@@ -88,7 +88,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     handler: handler
                                 )
                             } catch {
-                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                                logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
                             }
                         })
                     }
@@ -137,7 +137,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     handler: handler
                                 )
                             } catch {
-                                logger.debug("WebSocket handler error", metadata: ["error": "\(error)"])
+                                logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
                             }
                         })
                     }
@@ -218,7 +218,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 await handler(asyncChannel, logger)
             }
         } catch {
-            logger.error("Error handling upgrade result: \(error)")
+            logger.error("Error handling upgrade result", metadata: ["error.type": .string("\(error)")])
         }
     }
 
@@ -265,7 +265,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         if clientHeaders.count > 0 {
             logger.trace(
                 "Extensions requested",
-                metadata: ["hb_extensions": .string(clientHeaders.map(\.name).joined(separator: ","))]
+                metadata: ["hb.ws.extensions": .string(clientHeaders.map(\.name).joined(separator: ","))]
             )
         }
         let extensionResponseHeaders = extensionBuilders.compactMap { $0.serverResponseHeader(to: clientHeaders) }
@@ -276,7 +276,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         if extensions.count > 0 {
             logger.debug(
                 "Enabled extensions",
-                metadata: ["hb_extensions": .string(extensions.map(\.name).joined(separator: ","))]
+                metadata: ["hb.ws.extensions": .string(extensions.map(\.name).joined(separator: ","))]
             )
         }
         return (responseHeaders, extensions)
