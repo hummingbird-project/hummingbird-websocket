@@ -78,7 +78,7 @@ public final class WebSocketInboundStream: AsyncSequence, Sendable {
                         return .init(from: frame)
                     default:
                         // if we receive a reserved opcode we should fail the connection
-                        self.handler.logger.debug("Received reserved opcode", metadata: ["hb.opcode": .stringConvertible(frame.opcode)])
+                        self.handler.logger.trace("Received reserved opcode", metadata: ["hb.ws.opcode": .stringConvertible(frame.opcode)])
                         throw WebSocketHandler.InternalError.close(.protocolError)
                     }
                 } catch {
