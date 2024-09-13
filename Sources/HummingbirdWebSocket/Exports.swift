@@ -12,4 +12,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import HummingbirdWSCore
+@_exported @_documentation(visibility: internal) import HummingbirdWSCore

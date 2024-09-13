@@ -85,7 +85,7 @@ extension RouterMethods {
     /// - Parameters:
     ///   - path: Path to match
     ///   - shouldUpgrade: Should request be upgraded
-    ///   - handler: WebSocket channel handler
+    ///   - handler: WebSocket channel handler function
     @discardableResult public func ws(
         _ path: RouterPath = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
@@ -115,7 +115,7 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
     /// Initialize WebSocketUpgradeMiddleare
     /// - Parameters:
     ///   - shouldUpgrade: Return whether the WebSocket upgrade should occur
-    ///   - handle: WebSocket handler
+    ///   - handler: WebSocket handler function
     public init(
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
         onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
@@ -140,11 +140,10 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
 extension HTTP1WebSocketUpgradeChannel {
     ///  Initialize HTTP1WebSocketUpgradeChannel with async `shouldUpgrade` function
     /// - Parameters:
-    ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - responder: HTTP responder
-    ///   - maxFrameSize: Max frame size WebSocket will allow
-    ///   - webSocketRouter: WebSocket router
-    /// - Returns: Upgrade result future
+    ///   - webSocketResponder: WebSocket initial request responder
+    ///   - configuration: WebSocket configuration
+    ///   - additionalChannelHandlers: Additional channel handlers to add
     public init<WSResponder: HTTPResponder>(
         responder: @escaping HTTPChannelHandler.Responder,
         webSocketResponder: WSResponder,
@@ -207,7 +206,7 @@ extension HTTPServerBuilder {
     ///   - webSocketRouter: Router used for testing whether a WebSocket upgrade should occur
     ///   - configuration: WebSocket server configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
-    /// - Returns:
+    /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
     public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder>(
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
