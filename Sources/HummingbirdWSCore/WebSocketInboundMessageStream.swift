@@ -43,7 +43,7 @@ extension WebSocketInboundStream {
     /// converts the inbound stream of WebSocket data frames into a sequence of WebSocket
     /// messages.
     ///
-    /// - Parameter maxMessageSize: The maximum size of message we are allowed to create
+    /// - Parameter maxSize: The maximum size of message we are allowed to read
     public func messages(maxSize: Int) -> WebSocketInboundMessageStream {
         .init(inboundStream: self, maxSize: maxSize)
     }

@@ -40,7 +40,7 @@ import NIOWebSocket
 /// }
 /// ```
 public struct WebSocketClient {
-    /// Basic context implementation of ``WebSocketContext``.
+    /// Basic context implementation of ``/HummingbirdWSCore/WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
         public let logger: Logger

@@ -39,7 +39,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         public let channel: Channel
     }
 
-    /// Basic context implementation of ``WebSocketContext``.
+    /// Basic context implementation of ``/HummingbirdWSCore/WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
         public let logger: Logger
@@ -51,11 +51,10 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
 
     ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
     /// - Parameters:
-    ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - responder: HTTP responder
-    ///   - maxFrameSize: Max frame size WebSocket will allow
+    ///   - configuration: WebSocket configuration
+    ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
-    /// - Returns: Upgrade result future
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
@@ -97,13 +96,23 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         self.responder = responder
     }
 
+    @available(*, deprecated, renamed: "init(responder:configuration:additionalChannelHandlers:shouldUpgrade:)")
+    @_documentation(visibility: internal)
+    public init(
+        responder: @escaping HTTPChannelHandler.Responder,
+        additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
+        configuration: WebSocketServerConfiguration,
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+    ) {
+        self.init(responder: responder, configuration: configuration, additionalChannelHandlers: additionalChannelHandlers, shouldUpgrade: shouldUpgrade)
+    }
+
     ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
     /// - Parameters:
-    ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - responder: HTTP responder
-    ///   - maxFrameSize: Max frame size WebSocket will allow
+    ///   - additionalChannelHandlers: Additional channel handlers to add
+    ///   - configuration: WebSocket configuration
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
-    /// - Returns: Upgrade result future
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,

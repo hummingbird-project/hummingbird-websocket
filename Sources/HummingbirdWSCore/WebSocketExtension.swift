@@ -157,7 +157,6 @@ public struct WebSocketExtensionHTTPParameters: Sendable, Equatable {
     /// Parse all `Sec-WebSocket-Extensions` header values
     /// - Parameters:
     ///   - headers: headers coming from other
-    ///   - type: client or server
     /// - Returns: Array of extensions
     public static func parseHeaders(_ headers: HTTPFields) -> [WebSocketExtensionHTTPParameters] {
         let extHeaders = headers[values: .secWebSocketExtensions]
