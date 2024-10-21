@@ -277,8 +277,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         )
     }
 
-    func shutdown() async {
-    }
+    func shutdown() async {}
 
     func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame {
         return try await self.decompressor.decompress(
