@@ -175,8 +175,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
 
         init(algorithm: ZlibAlgorithm, windowSize: Int32) throws {
             self.state = .idle
-            self.decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: windowSize)
-            try self.decompressor.startStream()
+            self.decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: windowSize)
         }
 
         func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
@@ -197,13 +196,13 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     self.state = .idle
                 }
                 frame.data = try unmaskedData.decompressStream(
-                    with: &self.decompressor,
+                    with: self.decompressor,
                     maxSize: maxSize,
                     allocator: ByteBufferAllocator()
                 )
                 frame.maskKey = nil
                 if resetStream, frame.fin {
-                    try self.decompressor.resetStream()
+                    try self.decompressor.reset()
                 }
                 return frame
             }
@@ -211,10 +210,6 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                 self.state = .idle
             }
             return frame
-        }
-
-        func shutdown() throws {
-            try self.decompressor.finishStream()
         }
     }
 
@@ -229,10 +224,9 @@ struct PerMessageDeflateExtension: WebSocketExtension {
         let minFrameSizeToCompress: Int
 
         init(algorithm: ZlibAlgorithm, configuration: ZlibConfiguration, minFrameSizeToCompress: Int) throws {
-            self.compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
+            self.compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
             self.minFrameSizeToCompress = minFrameSizeToCompress
             self.sendState = .idle
-            try self.compressor.startStream()
         }
 
         func compress(_ frame: WebSocketFrame, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
@@ -245,23 +239,19 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     newFrame.rsv1 = true
                     self.sendState = .sendingMessage
                 }
-                newFrame.data = try newFrame.data.compressStream(with: &self.compressor, flush: .sync, allocator: ByteBufferAllocator())
+                newFrame.data = try newFrame.data.compressStream(with: self.compressor, flush: .sync, allocator: ByteBufferAllocator())
                 // if final frame then remove last four bytes 0x00 0x00 0xff 0xff
                 // (see  https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.1)
                 if newFrame.fin {
                     newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
                     self.sendState = .idle
                     if resetStream {
-                        try self.compressor.resetStream()
+                        try self.compressor.reset()
                     }
                 }
                 return newFrame
             }
             return frame
-        }
-
-        func shutdown() throws {
-            try self.compressor.finishStream()
         }
     }
 
@@ -288,8 +278,6 @@ struct PerMessageDeflateExtension: WebSocketExtension {
     }
 
     func shutdown() async {
-        try? await self.decompressor.shutdown()
-        try? await self.compressor.shutdown()
     }
 
     func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame {
