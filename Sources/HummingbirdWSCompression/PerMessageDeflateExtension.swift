@@ -170,13 +170,12 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             case decompressingMessage
         }
 
-        fileprivate let decompressor: any NIODecompressor
+        fileprivate var decompressor: ZlibDecompressor
         var state: ReceiveState
 
-        init(_ algorithm: CompressionAlgorithm) throws {
+        init(algorithm: ZlibAlgorithm, windowSize: Int32) throws {
             self.state = .idle
-            self.decompressor = algorithm.decompressor
-            try self.decompressor.startStream()
+            self.decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: windowSize)
         }
 
         func decompress(_ frame: WebSocketFrame, maxSize: Int, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
@@ -203,7 +202,7 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                 )
                 frame.maskKey = nil
                 if resetStream, frame.fin {
-                    try self.decompressor.resetStream()
+                    try self.decompressor.reset()
                 }
                 return frame
             }
@@ -211,10 +210,6 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                 self.state = .idle
             }
             return frame
-        }
-
-        func shutdown() throws {
-            try self.decompressor.finishStream()
         }
     }
 
@@ -224,15 +219,14 @@ struct PerMessageDeflateExtension: WebSocketExtension {
             case sendingMessage
         }
 
-        fileprivate let compressor: any NIOCompressor
+        fileprivate var compressor: ZlibCompressor
         var sendState: SendState
         let minFrameSizeToCompress: Int
 
-        init(_ algorithm: CompressionAlgorithm, minFrameSizeToCompress: Int) throws {
-            self.compressor = algorithm.compressor
+        init(algorithm: ZlibAlgorithm, configuration: ZlibConfiguration, minFrameSizeToCompress: Int) throws {
+            self.compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
             self.minFrameSizeToCompress = minFrameSizeToCompress
             self.sendState = .idle
-            try self.compressor.startStream()
         }
 
         func compress(_ frame: WebSocketFrame, resetStream: Bool, context: WebSocketExtensionContext) throws -> WebSocketFrame {
@@ -252,16 +246,12 @@ struct PerMessageDeflateExtension: WebSocketExtension {
                     newFrame.data = newFrame.data.getSlice(at: newFrame.data.readerIndex, length: newFrame.data.readableBytes - 4) ?? newFrame.data
                     self.sendState = .idle
                     if resetStream {
-                        try self.compressor.resetStream()
+                        try self.compressor.reset()
                     }
                 }
                 return newFrame
             }
             return frame
-        }
-
-        func shutdown() throws {
-            try self.compressor.finishStream()
         }
     }
 
@@ -273,28 +263,21 @@ struct PerMessageDeflateExtension: WebSocketExtension {
     init(configuration: Configuration) throws {
         self.configuration = configuration
         self.decompressor = try .init(
-            CompressionAlgorithm.deflate(
-                configuration: .init(
-                    windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
-                )
-            )
+            algorithm: .deflate,
+            windowSize: numericCast(configuration.receiveMaxWindow ?? 15)
         )
         self.compressor = try .init(
-            CompressionAlgorithm.deflate(
-                configuration: .init(
-                    windowSize: numericCast(configuration.sendMaxWindow ?? 15),
-                    compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
-                    memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
-                )
+            algorithm: .deflate,
+            configuration: .init(
+                windowSize: numericCast(configuration.sendMaxWindow ?? 15),
+                compressionLevel: configuration.compressionLevel.map { numericCast($0) } ?? -1,
+                memoryLevel: configuration.memoryLevel.map { numericCast($0) } ?? 8
             ),
             minFrameSizeToCompress: self.configuration.minFrameSizeToCompress
         )
     }
 
-    func shutdown() async {
-        try? await self.decompressor.shutdown()
-        try? await self.compressor.shutdown()
-    }
+    func shutdown() async {}
 
     func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) async throws -> WebSocketFrame {
         return try await self.decompressor.decompress(
