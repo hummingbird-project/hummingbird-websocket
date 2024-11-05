@@ -74,7 +74,6 @@ package actor WebSocketHandler {
         }
     }
 
-    static let pingDataSize = 16
     let channel: Channel
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
@@ -241,7 +240,7 @@ package actor WebSocketHandler {
         }
         switch self.stateMachine.receivedPing(frameData: frame.unmaskedData) {
         case .pong(let frameData):
-            try await self.pong(data: frameData)
+            try await self.write(frame: .init(fin: true, opcode: .pong, data: frameData))
 
         case .doNothing:
             break
@@ -251,12 +250,6 @@ package actor WebSocketHandler {
     /// Respond to pong
     func onPong(_ frame: WebSocketFrame) throws {
         self.stateMachine.receivedPong(frameData: frame.unmaskedData)
-    }
-
-    /// Send pong
-    func pong(data: ByteBuffer?) async throws {
-        guard case .open = self.stateMachine.state else { return }
-        try await self.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
 
     /// Send close
