@@ -524,11 +524,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
             configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await application.test(.live) { client in
-            try await client.ws("/ws") { inbound, _, _ in
+            let frame = try await client.ws("/ws") { inbound, _, _ in
                 // don't handle any inbound data for a period much longer than the auto ping period
                 try await Task.sleep(for: .milliseconds(500))
                 for try await _ in inbound {}
             }
+            XCTAssertEqual(frame?.closeCode, .goingAway)
+            XCTAssertEqual(frame?.reason, "Ping timeout")
         }
     }
 

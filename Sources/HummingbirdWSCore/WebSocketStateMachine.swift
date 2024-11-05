@@ -121,6 +121,24 @@ struct WebSocketStateMachine {
         }
     }
 
+    enum ReceivedPingResult {
+        case pong(ByteBuffer)
+        case doNothing
+    }
+
+    mutating func receivedPing(frameData: ByteBuffer) -> ReceivedPingResult {
+        switch self.state {
+        case .open:
+            return .pong(frameData)
+
+        case .closing:
+            return .pong(frameData)
+
+        case .closed:
+            return .doNothing
+        }
+    }
+
     mutating func receivedPong(frameData: ByteBuffer) {
         switch self.state {
         case .open(var state):

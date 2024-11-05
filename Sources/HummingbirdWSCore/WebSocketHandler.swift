@@ -115,7 +115,7 @@ package actor WebSocketHandler {
                         if case .enabled = configuration.autoPing.value {
                             /// Add task sending ping frames every so often and verifying a pong frame was sent back
                             group.addTask {
-                                try await webSocketHandler.runPingLoop()
+                                try await webSocketHandler.runAutoPingLoop()
                                 return .init(closeCode: .goingAway, reason: "Ping timeout")
                             }
                         }
@@ -184,7 +184,7 @@ package actor WebSocketHandler {
         }
     }
 
-    func runPingLoop() async throws {
+    func runAutoPingLoop() async throws {
         let period = self.stateMachine.pingTimePeriod
         try await Task.sleep(for: period)
         loop: while true {
@@ -235,10 +235,16 @@ package actor WebSocketHandler {
 
     /// Respond to ping
     func onPing(_ frame: WebSocketFrame) async throws {
-        if frame.fin {
-            try await self.pong(data: frame.unmaskedData)
-        } else {
+        guard frame.fin else {
             try await self.close(code: .protocolError)
+            return
+        }
+        switch self.stateMachine.receivedPing(frameData: frame.unmaskedData) {
+        case .pong(let frameData):
+            try await self.pong(data: frameData)
+
+        case .doNothing:
+            break
         }
     }
 
