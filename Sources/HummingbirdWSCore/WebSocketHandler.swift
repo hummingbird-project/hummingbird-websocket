@@ -134,7 +134,7 @@ package actor WebSocketHandler {
                                 }
                             }
                         }
-                        let rt = try await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
+                        let rt = try await webSocketHandler.handle(type: type, inbound: inbound, outbound: outbound, handler: handler, context: context)
                         group.cancelAll()
                         return rt
                     }
@@ -153,6 +153,7 @@ package actor WebSocketHandler {
     }
 
     func handle<Context: WebSocketContext>(
+        type: WebSocketType,
         inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         handler: @escaping WebSocketDataHandler<Context>,
@@ -166,6 +167,7 @@ package actor WebSocketHandler {
                 handler: self
             )
             let closeCode: WebSocketErrorCode
+            var clientError: Error?
             do {
                 // handle websocket data and text
                 try await handler(webSocketInbound, webSocketOutbound, context)
@@ -173,6 +175,7 @@ package actor WebSocketHandler {
             } catch InternalError.close(let code) {
                 closeCode = code
             } catch {
+                clientError = error
                 closeCode = .unexpectedServerError
             }
             do {
@@ -188,6 +191,9 @@ package actor WebSocketHandler {
                 }
                 // don't propagate error if channel is already closed
             } catch ChannelError.ioOnClosedChannel {}
+            if type == .client, let clientError {
+                throw clientError
+            }
         } onGracefulShutdown: {
             Task {
                 try? await self.close(code: .normalClosure)

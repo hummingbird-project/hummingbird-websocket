@@ -708,17 +708,45 @@ final class HummingbirdWebSocketTests: XCTestCase {
             await serviceGroup.triggerGracefulShutdown()
         }
     }
-}
 
-extension Logger {
-    /// Create new Logger with additional metadata value
-    /// - Parameters:
-    ///   - metadataKey: Metadata key
-    ///   - value: Metadata value
-    /// - Returns: Logger
-    func with(metadataKey: String, value: MetadataValue) -> Logger {
-        var logger = self
-        logger[metadataKey: metadataKey] = value
-        return logger
+    func testClientErrorHandling() async throws {
+        struct ClientError: Error {}
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade { _, _, _ in
+                .upgrade([:]) { inbound, _, _ in
+                    for try await _ in inbound {}
+                }
+            }
+        )
+        try await app.test(.live) { client in
+            do {
+                _ = try await client.ws("/") { _, _, _ in
+                    throw ClientError()
+                }
+                XCTFail("Shouldnt reach here")
+            } catch is ClientError {
+            } catch {
+                XCTFail("Throwing wrong error")
+            }
+        }
+    }
+
+    func testServerErrorHandling() async throws {
+        struct ServerError: Error {}
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade { _, _, _ in
+                .upgrade([:]) { _, _, _ in
+                    throw ServerError()
+                }
+            }
+        )
+        try await app.test(.live) { client in
+            let closeFrame = try await client.ws("/") { inbound, _, _ in
+                for try await _ in inbound {}
+            }
+            XCTAssertEqual(closeFrame?.closeCode, .unexpectedServerError)
+        }
     }
 }
