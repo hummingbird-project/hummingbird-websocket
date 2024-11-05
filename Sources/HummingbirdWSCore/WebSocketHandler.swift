@@ -75,26 +75,26 @@ package actor WebSocketHandler {
     }
 
     static let pingDataSize = 16
+    let channel: Channel
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     let type: WebSocketType
     let configuration: Configuration
     let logger: Logger
-    var pingData: ByteBuffer
-    var pingTime: ContinuousClock.Instant = .now
     var stateMachine: WebSocketStateMachine
 
     private init(
+        channel: Channel,
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
         type: WebSocketType,
         configuration: Configuration,
         context: some WebSocketContext
     ) {
+        self.channel = channel
         self.outbound = outbound
         self.type = type
         self.configuration = configuration
         self.logger = context.logger
-        self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
-        self.stateMachine = .init()
+        self.stateMachine = .init(autoPingSetup: configuration.autoPing)
     }
 
     package static func handle<Context: WebSocketContext>(
@@ -111,27 +111,12 @@ package actor WebSocketHandler {
             let rt = try await asyncChannel.executeThenClose { inbound, outbound in
                 try await withTaskCancellationHandler {
                     try await withThrowingTaskGroup(of: WebSocketCloseFrame.self) { group in
-                        let webSocketHandler = Self(outbound: outbound, type: type, configuration: configuration, context: context)
-                        if case .enabled(let period) = configuration.autoPing.value {
+                        let webSocketHandler = Self(channel: asyncChannel.channel, outbound: outbound, type: type, configuration: configuration, context: context)
+                        if case .enabled = configuration.autoPing.value {
                             /// Add task sending ping frames every so often and verifying a pong frame was sent back
                             group.addTask {
-                                var waitTime = period
-                                while true {
-                                    try await Task.sleep(for: waitTime)
-                                    if let timeSinceLastPing = await webSocketHandler.getTimeSinceLastWaitingPing() {
-                                        // if time is less than timeout value, set wait time to when it would timeout
-                                        // and re-run loop
-                                        if timeSinceLastPing < period {
-                                            waitTime = period - timeSinceLastPing
-                                            continue
-                                        } else {
-                                            try await asyncChannel.channel.close(mode: .input)
-                                            return .init(closeCode: .goingAway, reason: "No response to ping")
-                                        }
-                                    }
-                                    try await webSocketHandler.ping()
-                                    waitTime = period
-                                }
+                                try await webSocketHandler.runPingLoop()
+                                return .init(closeCode: .goingAway, reason: "Ping timeout")
                             }
                         }
                         let rt = try await webSocketHandler.handle(inbound: inbound, outbound: outbound, handler: handler, context: context)
@@ -199,6 +184,28 @@ package actor WebSocketHandler {
         }
     }
 
+    func runPingLoop() async throws {
+        let period = self.stateMachine.pingTimePeriod
+        try await Task.sleep(for: period)
+        loop: while true {
+            switch self.stateMachine.sendPing() {
+            case .sendPing(let buffer):
+                try await self.write(frame: .init(fin: true, opcode: .ping, data: buffer))
+
+            case .wait(let time):
+                try await Task.sleep(for: time)
+
+            case .closeConnection(let errorCode):
+                try await self.sendClose(code: errorCode, reason: "Ping timeout")
+                try await self.channel.close(mode: .input)
+                break loop
+
+            case .stop:
+                break loop
+            }
+        }
+    }
+
     /// Send WebSocket frame
     func write(frame: WebSocketFrame) async throws {
         var frame = frame
@@ -227,9 +234,7 @@ package actor WebSocketHandler {
     }
 
     /// Respond to ping
-    func onPing(
-        _ frame: WebSocketFrame
-    ) async throws {
+    func onPing(_ frame: WebSocketFrame) async throws {
         if frame.fin {
             try await self.pong(data: frame.unmaskedData)
         } else {
@@ -238,26 +243,8 @@ package actor WebSocketHandler {
     }
 
     /// Respond to pong
-    func onPong(
-        _ frame: WebSocketFrame
-    ) throws {
-        let frameData = frame.unmaskedData
-        // ignore pong frames with frame data not the same as the last ping
-        guard frameData == self.pingData else { return }
-        // clear ping data
-        self.pingData.clear()
-    }
-
-    /// Send ping
-    func ping() async throws {
-        guard case .open = self.stateMachine.state else { return }
-        if self.pingData.readableBytes == 0 {
-            // creating random payload
-            let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
-            self.pingData.writeBytes(random)
-        }
-        self.pingTime = .now
-        try await self.write(frame: .init(fin: true, opcode: .ping, data: self.pingData))
+    func onPong(_ frame: WebSocketFrame) throws {
+        self.stateMachine.receivedPong(frameData: frame.unmaskedData)
     }
 
     /// Send pong
@@ -266,26 +253,11 @@ package actor WebSocketHandler {
         try await self.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
 
-    /// Return time ping occurred if it is still waiting for a pong
-    func getTimeSinceLastWaitingPing() -> Duration? {
-        guard self.pingData.readableBytes > 0 else { return nil }
-        return .now - self.pingTime
-    }
-
     /// Send close
-    func close(
-        code: WebSocketErrorCode = .normalClosure,
-        reason: String? = nil
-    ) async throws {
+    func close(code: WebSocketErrorCode = .normalClosure, reason: String? = nil) async throws {
         switch self.stateMachine.close() {
         case .sendClose:
-            var buffer = ByteBufferAllocator().buffer(capacity: 2 + (reason?.utf8.count ?? 0))
-            buffer.write(webSocketErrorCode: code)
-            if let reason {
-                buffer.writeString(reason)
-            }
-
-            try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
+            try await self.sendClose(code: code, reason: reason)
             // Only server should initiate a connection close. Clients should wait for the
             // server to close the connection when it receives the WebSocket close packet
             // See https://www.rfc-editor.org/rfc/rfc6455#section-7.1.1
@@ -298,12 +270,9 @@ package actor WebSocketHandler {
     }
 
     func receivedClose(_ frame: WebSocketFrame) async throws {
-        switch self.stateMachine.receivedClose(frame: frame) {
+        switch self.stateMachine.receivedClose(frameData: frame.unmaskedData) {
         case .sendClose(let errorCode):
-            var buffer = ByteBufferAllocator().buffer(capacity: 2)
-            buffer.write(webSocketErrorCode: errorCode)
-
-            try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
+            try await self.sendClose(code: errorCode, reason: nil)
             // Only server should initiate a connection close. Clients should wait for the
             // server to close the connection when it receives the WebSocket close packet
             // See https://www.rfc-editor.org/rfc/rfc6455#section-7.1.1
@@ -313,6 +282,16 @@ package actor WebSocketHandler {
         case .doNothing:
             break
         }
+    }
+
+    private func sendClose(code: WebSocketErrorCode = .normalClosure, reason: String? = nil) async throws {
+        var buffer = ByteBufferAllocator().buffer(capacity: 2 + (reason?.utf8.count ?? 0))
+        buffer.write(webSocketErrorCode: code)
+        if let reason {
+            buffer.writeString(reason)
+        }
+
+        try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
     }
 
     /// Make mask key to be used in WebSocket frame

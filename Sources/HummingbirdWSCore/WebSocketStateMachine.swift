@@ -16,15 +16,23 @@ import NIOCore
 import NIOWebSocket
 
 struct WebSocketStateMachine {
+    static let pingDataSize = 16
+    let pingTimePeriod: Duration
     var state: State
+
+    init(autoPingSetup: AutoPingSetup) {
+        switch autoPingSetup.value {
+        case .enabled(let timePeriod):
+            self.pingTimePeriod = timePeriod
+        case .disabled:
+            self.pingTimePeriod = .nanoseconds(0)
+        }
+        self.state = .open(.init())
+    }
 
     enum CloseResult {
         case sendClose
         case doNothing
-    }
-
-    init() {
-        self.state = .open
     }
 
     mutating func close() -> CloseResult {
@@ -44,15 +52,15 @@ struct WebSocketStateMachine {
         case doNothing
     }
 
-    mutating func receivedClose(frame: WebSocketFrame) -> ReceivedCloseResult {
-        // we received a connection close.
-        // send a close back if it hasn't already been send and exit
-        var data = frame.unmaskedData
-        let dataSize = data.readableBytes
+    // we received a connection close.
+    // send a close back if it hasn't already been send and exit
+    mutating func receivedClose(frameData: ByteBuffer) -> ReceivedCloseResult {
+        var frameData = frameData
+        let dataSize = frameData.readableBytes
         // read close code and close reason
-        let closeCode = data.readWebSocketErrorCode()
-        let reason = data.readableBytes > 0
-            ? data.readString(length: data.readableBytes)
+        let closeCode = frameData.readWebSocketErrorCode()
+        let reason = frameData.readableBytes > 0
+            ? frameData.readString(length: frameData.readableBytes)
             : nil
 
         switch self.state {
@@ -77,11 +85,74 @@ struct WebSocketStateMachine {
             return .doNothing
         }
     }
+
+    enum SendPingResult {
+        case sendPing(ByteBuffer)
+        case wait(Duration)
+        case closeConnection(WebSocketErrorCode)
+        case stop
+    }
+
+    mutating func sendPing() -> SendPingResult {
+        switch self.state {
+        case .open(var state):
+            if let lastPingTime = state.lastPingTime {
+                let timeSinceLastPing = .now - lastPingTime
+                // if time is less than timeout value, set wait time to when it would timeout
+                // and re-run loop
+                if timeSinceLastPing < self.pingTimePeriod {
+                    return .wait(self.pingTimePeriod - timeSinceLastPing)
+                } else {
+                    return .closeConnection(.goingAway)
+                }
+            }
+            // creating random payload
+            let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
+            state.pingData.writeBytes(random)
+            state.lastPingTime = .now
+            self.state = .open(state)
+            return .sendPing(state.pingData)
+
+        case .closing:
+            return .stop
+
+        case .closed:
+            return .stop
+        }
+    }
+
+    mutating func receivedPong(frameData: ByteBuffer) {
+        switch self.state {
+        case .open(var state):
+            let frameData = frameData
+            // ignore pong frames with frame data not the same as the last ping
+            guard frameData == state.pingData else { return }
+            // clear ping data
+            state.lastPingTime = nil
+            self.state = .open(state)
+
+        case .closing:
+            break
+
+        case .closed:
+            break
+        }
+    }
 }
 
 extension WebSocketStateMachine {
+    struct OpenState {
+        var pingData: ByteBuffer
+        var lastPingTime: ContinuousClock.Instant?
+
+        init() {
+            self.pingData = ByteBufferAllocator().buffer(capacity: WebSocketStateMachine.pingDataSize)
+            self.lastPingTime = nil
+        }
+    }
+
     enum State {
-        case open
+        case open(OpenState)
         case closing
         case closed(WebSocketCloseFrame?)
     }
