@@ -81,7 +81,7 @@ package actor WebSocketHandler {
     let logger: Logger
     var pingData: ByteBuffer
     var pingTime: ContinuousClock.Instant = .now
-    var closeState: CloseState
+    var stateMachine: WebSocketStateMachine
 
     private init(
         outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
@@ -94,7 +94,7 @@ package actor WebSocketHandler {
         self.configuration = configuration
         self.logger = context.logger
         self.pingData = ByteBufferAllocator().buffer(capacity: Self.pingDataSize)
-        self.closeState = .open
+        self.stateMachine = .init()
     }
 
     package static func handle<Context: WebSocketContext>(
@@ -177,7 +177,7 @@ package actor WebSocketHandler {
             }
             do {
                 try await self.close(code: closeCode)
-                if case .closing = self.closeState {
+                if case .closing = self.stateMachine.state {
                     // Close handshake. Wait for responding close or until inbound ends
                     while let frame = try await inboundIterator.next() {
                         if case .connectionClose = frame.opcode {
@@ -193,7 +193,7 @@ package actor WebSocketHandler {
                 try? await self.close(code: .normalClosure)
             }
         }
-        return switch self.closeState {
+        return switch self.stateMachine.state {
         case .closed(let code): code
         default: nil
         }
@@ -250,7 +250,7 @@ package actor WebSocketHandler {
 
     /// Send ping
     func ping() async throws {
-        guard case .open = self.closeState else { return }
+        guard case .open = self.stateMachine.state else { return }
         if self.pingData.readableBytes == 0 {
             // creating random payload
             let random = (0..<Self.pingDataSize).map { _ in UInt8.random(in: 0...255) }
@@ -262,7 +262,7 @@ package actor WebSocketHandler {
 
     /// Send pong
     func pong(data: ByteBuffer?) async throws {
-        guard case .open = self.closeState else { return }
+        guard case .open = self.stateMachine.state else { return }
         try await self.write(frame: .init(fin: true, opcode: .pong, data: data ?? .init()))
     }
 
@@ -277,8 +277,8 @@ package actor WebSocketHandler {
         code: WebSocketErrorCode = .normalClosure,
         reason: String? = nil
     ) async throws {
-        switch self.closeState {
-        case .open:
+        switch self.stateMachine.close() {
+        case .sendClose:
             var buffer = ByteBufferAllocator().buffer(capacity: 2 + (reason?.utf8.count ?? 0))
             buffer.write(webSocketErrorCode: code)
             if let reason {
@@ -292,40 +292,16 @@ package actor WebSocketHandler {
             if self.type == .server {
                 self.outbound.finish()
             }
-            self.closeState = .closing
-        default:
+        case .doNothing:
             break
         }
     }
 
     func receivedClose(_ frame: WebSocketFrame) async throws {
-        // we received a connection close.
-        // send a close back if it hasn't already been send and exit
-        var data = frame.unmaskedData
-        let dataSize = data.readableBytes
-        // read close code and close reason
-        let closeCode = data.readWebSocketErrorCode()
-        let reason = data.readableBytes > 0
-            ? data.readString(length: data.readableBytes)
-            : nil
-
-        switch self.closeState {
-        case .open:
-            self.closeState = .closed(closeCode.map { .init(closeCode: $0, reason: reason) })
-            let code: WebSocketErrorCode = if dataSize == 0 || closeCode != nil {
-                // codes 3000 - 3999 are reserved for use by libraries, frameworks, and applications
-                // so are considered valid
-                if case .unknown(let code) = closeCode, code < 3000 || code > 3999 {
-                    .protocolError
-                } else {
-                    .normalClosure
-                }
-            } else {
-                .protocolError
-            }
-
+        switch self.stateMachine.receivedClose(frame: frame) {
+        case .sendClose(let errorCode):
             var buffer = ByteBufferAllocator().buffer(capacity: 2)
-            buffer.write(webSocketErrorCode: code)
+            buffer.write(webSocketErrorCode: errorCode)
 
             try await self.write(frame: .init(fin: true, opcode: .connectionClose, data: buffer))
             // Only server should initiate a connection close. Clients should wait for the
@@ -334,11 +310,7 @@ package actor WebSocketHandler {
             if self.type == .server {
                 self.outbound.finish()
             }
-
-        case .closing:
-            self.closeState = .closed(closeCode.map { .init(closeCode: $0, reason: reason) })
-
-        default:
+        case .doNothing:
             break
         }
     }

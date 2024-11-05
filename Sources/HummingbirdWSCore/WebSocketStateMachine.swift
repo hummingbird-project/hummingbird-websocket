@@ -23,6 +23,10 @@ struct WebSocketStateMachine {
         case doNothing
     }
 
+    init() {
+        self.state = .open
+    }
+
     mutating func close() -> CloseResult {
         switch self.state {
         case .open:
