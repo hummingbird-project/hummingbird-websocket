@@ -235,12 +235,15 @@ package actor WebSocketHandler {
     /// Respond to ping
     func onPing(_ frame: WebSocketFrame) async throws {
         guard frame.fin else {
-            try await self.close(code: .protocolError)
+            self.channel.close(promise: nil)
             return
         }
         switch self.stateMachine.receivedPing(frameData: frame.unmaskedData) {
         case .pong(let frameData):
             try await self.write(frame: .init(fin: true, opcode: .pong, data: frameData))
+
+        case .protocolError:
+            try await self.close(code: .protocolError)
 
         case .doNothing:
             break
@@ -248,7 +251,11 @@ package actor WebSocketHandler {
     }
 
     /// Respond to pong
-    func onPong(_ frame: WebSocketFrame) throws {
+    func onPong(_ frame: WebSocketFrame) async throws {
+        guard frame.fin else {
+            self.channel.close(promise: nil)
+            return
+        }
         self.stateMachine.receivedPong(frameData: frame.unmaskedData)
     }
 

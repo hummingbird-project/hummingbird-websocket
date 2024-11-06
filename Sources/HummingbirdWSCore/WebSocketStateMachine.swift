@@ -69,7 +69,7 @@ struct WebSocketStateMachine {
             let code: WebSocketErrorCode = if dataSize == 0 || closeCode != nil {
                 // codes 3000 - 3999 are reserved for use by libraries, frameworks, and applications
                 // so are considered valid
-                if case .unknown(let code) = closeCode, code < 3000 || code > 3999 {
+                if case .unknown(let code) = closeCode, code < 3000 {
                     .protocolError
                 } else {
                     .normalClosure
@@ -123,12 +123,14 @@ struct WebSocketStateMachine {
 
     enum ReceivedPingResult {
         case pong(ByteBuffer)
+        case protocolError
         case doNothing
     }
 
     mutating func receivedPing(frameData: ByteBuffer) -> ReceivedPingResult {
         switch self.state {
         case .open:
+            guard frameData.readableBytes < 126 else { return .protocolError }
             return .pong(frameData)
 
         case .closing:
