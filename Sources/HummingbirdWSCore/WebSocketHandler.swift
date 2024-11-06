@@ -186,7 +186,7 @@ package actor WebSocketHandler {
     func runAutoPingLoop() async throws {
         let period = self.stateMachine.pingTimePeriod
         try await Task.sleep(for: period)
-        loop: while true {
+        while true {
             switch self.stateMachine.sendPing() {
             case .sendPing(let buffer):
                 try await self.write(frame: .init(fin: true, opcode: .ping, data: buffer))
@@ -197,10 +197,10 @@ package actor WebSocketHandler {
             case .closeConnection(let errorCode):
                 try await self.sendClose(code: errorCode, reason: "Ping timeout")
                 try await self.channel.close(mode: .input)
-                break loop
+                return
 
             case .stop:
-                break loop
+                return
             }
         }
     }
