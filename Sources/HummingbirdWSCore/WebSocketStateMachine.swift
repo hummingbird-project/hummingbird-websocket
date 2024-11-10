@@ -67,7 +67,7 @@ struct WebSocketStateMachine {
         case .open:
             self.state = .closed(closeCode.map { .init(closeCode: $0, reason: reason) })
             let code: WebSocketErrorCode = if dataSize == 0 || closeCode != nil {
-                // codes 3000 - 3999 are reserved for use by libraries, frameworks 
+                // codes 3000 - 3999 are reserved for use by libraries, frameworks
                 // codes 4000 - 4999 are reserved for private use
                 // both of these are considered valid.
                 if case .unknown(let code) = closeCode, code < 3000 || code > 4999 {
