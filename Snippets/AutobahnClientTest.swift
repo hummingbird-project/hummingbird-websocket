@@ -2,20 +2,24 @@ import HummingbirdWSClient
 import HummingbirdWSCompression
 import Logging
 
-// Autobahn tests
-// 1. Framing
-// 2. Pings/Pongs
-// 3. Reserved bits
-// 4. Opcodes
-// 5. Fragmentation
-// 6. UTF8 handling
-// 7. Close handling
-// 9. Limits/performance
-// 10. Misc
-// 12. WebSocket compression (different payloads)
-// 13. WebSocket compression (different parameters)
+// Autobahn tests (https://github.com/crossbario/autobahn-testsuite)
+// run
+// ```
+// .scripts/autobahn.sh
+// ```
+// 1. Framing                                       (passed)
+// 2. Pings/Pongs                                   (passed)
+// 3. Reserved bits                                 (reserved bit checking not supported)
+// 4. Opcodes                                       (passed)
+// 5. Fragmentation                                 (passed. 5.1/5.2 non-strict)
+// 6. UTF8 handling                                 (utf8 validation not supported)
+// 7. Close handling                                (passed, except 7.5.1)
+// 9. Limits/performance                            (passed)
+// 10. Misc                                         (passed)
+// 12. WebSocket compression (different payloads)   (passed)
+// 13. WebSocket compression (different parameters) (passed)
 
-let cases = 1...102
+let cases = 1...1000
 
 var logger = Logger(label: "TestClient")
 logger.logLevel = .trace
@@ -24,7 +28,7 @@ do {
         logger.info("Case \(c)")
         try await WebSocketClient.connect(
             url: .init("ws://127.0.0.1:9001/runCase?case=\(c)&agent=HB"),
-            configuration: .init(maxFrameSize: 1 << 16, extensions: [.perMessageDeflate(maxDecompressedFrameSize: 65536)]),
+            configuration: .init(maxFrameSize: 16_777_216, extensions: [.perMessageDeflate(maxDecompressedFrameSize: 16_777_216)]),
             logger: logger
         ) { inbound, outbound, _ in
             for try await msg in inbound.messages(maxSize: .max) {
@@ -37,9 +41,10 @@ do {
             }
         }
     }
-    try await WebSocketClient.connect(url: .init("ws://127.0.0.1:9001/updateReports?agent=HB"), logger: logger) { inbound, _, _ in
-        for try await _ in inbound {}
-    }
 } catch {
     logger.error("Error: \(error)")
+}
+
+try await WebSocketClient.connect(url: .init("ws://127.0.0.1:9001/updateReports?agent=HB"), logger: logger) { inbound, _, _ in
+    for try await _ in inbound {}
 }
