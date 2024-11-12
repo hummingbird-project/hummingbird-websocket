@@ -18,7 +18,7 @@ import NIOWebSocket
 import ServiceLifecycle
 
 /// WebSocket type
-@_spi(WSInternal) public enum WebSocketType: Sendable {
+public enum WebSocketType: Sendable {
     case client
     case server
 }
@@ -49,7 +49,7 @@ public struct WebSocketCloseFrame: Sendable {
     public let reason: String?
 }
 
-/// Handler processing raw WebSocket packets.
+/// Handler processing raw WebSocket packets. Used by WebSocket transports
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
@@ -243,6 +243,7 @@ public struct WebSocketCloseFrame: Sendable {
 
     /// Respond to ping
     func onPing(_ frame: WebSocketFrame) async throws {
+        // a ping frame without the FIN flag is illegal
         guard frame.fin else {
             self.channel.close(promise: nil)
             return
@@ -261,6 +262,7 @@ public struct WebSocketCloseFrame: Sendable {
 
     /// Respond to pong
     func onPong(_ frame: WebSocketFrame) async throws {
+        // a pong frame without the FIN flag is illegal
         guard frame.fin else {
             self.channel.close(promise: nil)
             return
