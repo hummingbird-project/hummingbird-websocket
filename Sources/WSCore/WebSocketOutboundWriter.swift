@@ -29,7 +29,7 @@ public struct WebSocketOutboundWriter: Sendable {
         case custom(WebSocketFrame)
     }
 
-    package let handler: WebSocketHandler
+    @_spi(WSInternal) public let handler: WebSocketHandler
 
     /// Write WebSocket frame
     public func write(_ frame: OutboundFrame) async throws {

@@ -13,13 +13,13 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOPosix
 import NIOSSL
 import NIOTransportServices
 import NIOWebSocket
+import WSCore
 
 /// WebSocket client
 ///

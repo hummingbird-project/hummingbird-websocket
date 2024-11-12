@@ -12,9 +12,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@testable import HummingbirdWSCore
 import NIOCore
 import NIOWebSocket
+@testable import WSCore
 import XCTest
 
 final class WebSocketStateMachineTests: XCTestCase {

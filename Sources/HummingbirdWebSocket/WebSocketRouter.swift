@@ -15,10 +15,10 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdWSCore
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore
+@_spi(WSInternal) import WSCore
 
 /// WebSocket Context for upgrades initiated via a router
 ///

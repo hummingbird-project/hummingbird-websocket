@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdWSCore
+import WSCore
 
 /// Configuration for a client connecting to a WebSocket
 public struct WebSocketClientConfiguration: Sendable {

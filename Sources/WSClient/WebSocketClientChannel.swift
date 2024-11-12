@@ -13,12 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 import HTTPTypes
-import HummingbirdWSCore
 import Logging
 import NIOCore
 import NIOHTTP1
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
+@_spi(WSInternal) import WSCore
 
 struct WebSocketClientChannel: ClientConnectionChannel {
     enum UpgradeResult {

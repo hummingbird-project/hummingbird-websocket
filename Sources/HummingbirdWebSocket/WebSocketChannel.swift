@@ -15,7 +15,6 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdWSCore
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore
@@ -23,6 +22,7 @@ import NIOHTTP1
 import NIOHTTPTypes
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
+@_spi(WSInternal) import WSCore
 
 /// Child channel supporting a web socket upgrade from HTTP1
 public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandler {
@@ -44,7 +44,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     public struct Context: WebSocketContext {
         public let logger: Logger
 
-        package init(logger: Logger) {
+        internal init(logger: Logger) {
             self.logger = logger
         }
     }

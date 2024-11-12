@@ -18,7 +18,7 @@ import NIOWebSocket
 import ServiceLifecycle
 
 /// WebSocket type
-package enum WebSocketType: Sendable {
+@_spi(WSInternal) public enum WebSocketType: Sendable {
     case client
     case server
 }
@@ -53,7 +53,10 @@ public struct WebSocketCloseFrame: Sendable {
 ///
 /// Manages ping, pong and close messages. Collates data and text messages into final frame
 /// and passes them onto the ``WebSocketDataHandler`` data handler setup by the user.
-package actor WebSocketHandler {
+///
+/// SPI WSInternal is used to make the WebSocket Handler available to both client and server
+/// implementations
+@_spi(WSInternal) public actor WebSocketHandler {
     enum InternalError: Error {
         case close(WebSocketErrorCode)
     }
@@ -64,11 +67,11 @@ package actor WebSocketHandler {
         case closed(WebSocketCloseFrame?)
     }
 
-    package struct Configuration {
+    @_spi(WSInternal) public struct Configuration: Sendable {
         let extensions: [any WebSocketExtension]
         let autoPing: AutoPingSetup
 
-        package init(extensions: [any WebSocketExtension], autoPing: AutoPingSetup) {
+        @_spi(WSInternal) public init(extensions: [any WebSocketExtension], autoPing: AutoPingSetup) {
             self.extensions = extensions
             self.autoPing = autoPing
         }
@@ -96,7 +99,7 @@ package actor WebSocketHandler {
         self.stateMachine = .init(autoPingSetup: configuration.autoPing)
     }
 
-    package static func handle<Context: WebSocketContext>(
+    @_spi(WSInternal) public static func handle<Context: WebSocketContext>(
         type: WebSocketType,
         configuration: Configuration,
         asyncChannel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,

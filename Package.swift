@@ -32,8 +32,9 @@ let package = Package(
             .product(name: "NIOHTTPTypes", package: "swift-nio-extras"),
             .product(name: "NIOHTTPTypesHTTP1", package: "swift-nio-extras"),
         ], swiftSettings: swiftSettings),
-        .target(name: "HummingbirdWSClient", dependencies: [
-            .byName(name: "HummingbirdWSCore"),
+        .target(name: "HummingbirdWSClient", dependencies: ["WSClient"], swiftSettings: swiftSettings),
+        .target(name: "WSClient", dependencies: [
+            .byName(name: "WSCore"),
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "Logging", package: "swift-log"),
             .product(name: "NIOCore", package: "swift-nio"),
@@ -43,14 +44,16 @@ let package = Package(
             .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
         ], swiftSettings: swiftSettings),
-        .target(name: "HummingbirdWSCore", dependencies: [
+        .target(name: "HummingbirdWSCore", dependencies: ["WSCore"]),
+        .target(name: "WSCore", dependencies: [
             .product(name: "HTTPTypes", package: "swift-http-types"),
             .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
             .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
         ]),
-        .target(name: "HummingbirdWSCompression", dependencies: [
-            .byName(name: "HummingbirdWSCore"),
+        .target(name: "HummingbirdWSCompression", dependencies: ["WSCompression"], swiftSettings: swiftSettings),
+        .target(name: "WSCompression", dependencies: [
+            .byName(name: "WSCore"),
             .product(name: "CompressNIO", package: "compress-nio"),
         ], swiftSettings: swiftSettings),
         .target(name: "HummingbirdWSTesting", dependencies: [
@@ -65,6 +68,10 @@ let package = Package(
             .product(name: "Hummingbird", package: "hummingbird"),
             .product(name: "HummingbirdTesting", package: "hummingbird"),
             .product(name: "HummingbirdTLS", package: "hummingbird"),
+        ]),
+        .testTarget(name: "WebSocketTests", dependencies: [
+            .byName(name: "WSClient"),
+            .byName(name: "WSCompression"),
         ]),
     ],
     swiftLanguageVersions: [.v5, .version("6")]

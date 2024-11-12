@@ -13,9 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 import CompressNIO
-import HummingbirdWSCore
 import NIOCore
 import NIOWebSocket
+import WSCore
 
 /// PerMessageDeflate Websocket extension builder
 struct PerMessageDeflateExtensionBuilder: WebSocketExtensionBuilder {
