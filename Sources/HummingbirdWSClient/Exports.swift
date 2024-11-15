@@ -12,4 +12,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import WSClient
+@_exported @_documentation(visibility: internal) import WSClient

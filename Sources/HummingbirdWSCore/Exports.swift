@@ -12,4 +12,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import WSCore
+@_exported @_documentation(visibility: internal) import WSCore

@@ -12,4 +12,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import WSCompression
+@_exported @_documentation(visibility: internal) import WSCompression

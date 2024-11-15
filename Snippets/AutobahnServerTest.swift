@@ -1,7 +1,7 @@
 import Hummingbird
 import HummingbirdWebSocket
-import HummingbirdWSCompression
 import Logging
+import WSCompression
 
 // Autobahn tests (https://github.com/crossbario/autobahn-testsuite)
 // run
