@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import cWSCore
+import WSCore
 
 /// Configuration for a WebSocket server
 public struct WebSocketServerConfiguration: Sendable {
