@@ -661,6 +661,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    #if compiler(>=6)
     func testInvalidUTF8Frame() async throws {
         let app = Application(
             router: Router(),
@@ -679,6 +680,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(rt?.closeCode, .dataInconsistentWithMessage)
         }
     }
+    #endif
 
     // test WebSocket channel graceful shutdown
     func testGracefulShutdown() async throws {
