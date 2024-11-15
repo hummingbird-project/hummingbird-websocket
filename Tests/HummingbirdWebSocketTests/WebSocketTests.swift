@@ -18,13 +18,13 @@ import HummingbirdCore
 import HummingbirdTesting
 import HummingbirdTLS
 import HummingbirdWebSocket
-import HummingbirdWSClient
 import HummingbirdWSTesting
 import Logging
 import NIOCore
 import NIOPosix
 import NIOWebSocket
 import ServiceLifecycle
+import WSClient
 import XCTest
 
 /// Promise type.

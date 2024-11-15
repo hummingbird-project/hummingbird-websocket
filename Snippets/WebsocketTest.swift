@@ -1,9 +1,9 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdWebSocket
-import HummingbirdWSCompression
 import Logging
 import NIOWebSocket
+import WSCompression
 
 var logger = Logger(label: "Echo")
 logger.logLevel = .trace
