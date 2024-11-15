@@ -80,7 +80,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: context,
@@ -139,7 +140,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: context,

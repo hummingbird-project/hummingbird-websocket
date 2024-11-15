@@ -20,21 +20,26 @@ public struct WebSocketServerConfiguration: Sendable {
     public var maxFrameSize: Int
     /// WebSocket extensions
     public var extensions: [any WebSocketExtensionBuilder]
-    /// Autoping
+    /// Auto ping
     public var autoPing: AutoPingSetup
+    /// Should we check text messages are valid UTF8
+    public var validateUTF8: Bool
 
     /// Initialize WebSocketClient configuration
     ///   - Paramters
     ///     - maxFrameSize: Max websocket frame size that can be sent/received
     ///     - additionalHeaders: Additional headers to be sent with the initial HTTP request
     ///     - autoPing: Whether we should enable an automatic ping at a fixed period
+    ///     - validateUTF8: Should we check text messages are valid UTF8
     public init(
         maxFrameSize: Int = (1 << 14),
         extensions: [WebSocketExtensionFactory] = [],
-        autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30))
+        autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30)),
+        validateUTF8: Bool = false
     ) {
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions.map { $0.build() }
         self.autoPing = autoPing
+        self.validateUTF8 = validateUTF8
     }
 }

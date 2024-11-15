@@ -661,6 +661,25 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    func testInvalidUTF8Frame() async throws {
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade(configuration: .init(validateUTF8: true)) { _, _, _ in
+                .upgrade([:]) { inbound, _, _ in
+                    for try await _ in inbound.messages(maxSize: .max) {}
+                }
+            }
+        )
+        try await app.test(.live) { client in
+            let rt = try await client.ws("/") { inbound, outbound, _ in
+                let buffer = ByteBuffer(repeating: 0xFF, count: 16)
+                try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer)))
+                for try await _ in inbound {}
+            }
+            XCTAssertEqual(rt?.closeCode, .dataInconsistentWithMessage)
+        }
+    }
+
     // test WebSocket channel graceful shutdown
     func testGracefulShutdown() async throws {
         await withThrowingTaskGroup(of: Void.self) { group in

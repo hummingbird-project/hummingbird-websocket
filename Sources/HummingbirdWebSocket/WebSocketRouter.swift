@@ -172,7 +172,8 @@ extension HTTP1WebSocketUpgradeChannel {
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: WebSocketRouterContext(request: request, context: webSocketHandler.context),
