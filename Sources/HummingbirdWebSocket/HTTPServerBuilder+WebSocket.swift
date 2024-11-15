@@ -15,9 +15,9 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdWSCore
 import Logging
 import NIOCore
+import WSCore
 
 extension HTTPServerBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade

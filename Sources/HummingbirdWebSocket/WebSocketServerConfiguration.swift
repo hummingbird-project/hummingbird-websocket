@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import HummingbirdWSCore
+import cWSCore
 
 /// Configuration for a WebSocket server
 public struct WebSocketServerConfiguration: Sendable {
