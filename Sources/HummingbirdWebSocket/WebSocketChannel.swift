@@ -39,7 +39,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         public let channel: Channel
     }
 
-    /// Basic context implementation of ``/HummingbirdWSCore/WebSocketContext``.
+    /// Basic context implementation of ``/WSCore/WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
         public let logger: Logger
