@@ -228,6 +228,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 logger.debug("Websocket upgrade")
                 await handler(asyncChannel, logger)
             }
+        } catch let error as ChannelError where error == .inputClosed {
+            logger.trace("Upgrade failed as input was closed")
         } catch {
             logger.error("Error handling upgrade result", metadata: ["error.type": .string("\(error)")])
         }
