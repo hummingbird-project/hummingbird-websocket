@@ -13,9 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 import HummingbirdTesting
-import HummingbirdWSClient
 import Logging
 import NIOSSL
+import WSClient
 
 extension TestClientProtocol {
     ///  Test WebSocket endpoint

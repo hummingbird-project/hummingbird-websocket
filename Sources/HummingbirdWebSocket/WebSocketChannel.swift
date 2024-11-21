@@ -15,7 +15,6 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdWSCore
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore
@@ -23,6 +22,7 @@ import NIOHTTP1
 import NIOHTTPTypes
 import NIOHTTPTypesHTTP1
 import NIOWebSocket
+@_spi(WSInternal) import WSCore
 
 /// Child channel supporting a web socket upgrade from HTTP1
 public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandler {
@@ -39,12 +39,12 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         public let channel: Channel
     }
 
-    /// Basic context implementation of ``/HummingbirdWSCore/WebSocketContext``.
+    /// Basic context implementation of ``/WSCore/WebSocketContext``.
     /// Used by non-router web socket handle function
     public struct Context: WebSocketContext {
         public let logger: Logger
 
-        package init(logger: Logger) {
+        internal init(logger: Logger) {
             self.logger = logger
         }
     }
@@ -80,7 +80,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: context,
@@ -139,7 +140,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: context,
@@ -226,6 +228,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 logger.debug("Websocket upgrade")
                 await handler(asyncChannel, logger)
             }
+        } catch let error as ChannelError where error == .inputClosed {
+            logger.trace("Upgrade failed as input was closed")
         } catch {
             logger.error("Error handling upgrade result", metadata: ["error.type": .string("\(error)")])
         }

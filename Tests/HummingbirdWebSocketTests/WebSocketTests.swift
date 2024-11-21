@@ -18,13 +18,13 @@ import HummingbirdCore
 import HummingbirdTesting
 import HummingbirdTLS
 import HummingbirdWebSocket
-import HummingbirdWSClient
 import HummingbirdWSTesting
 import Logging
 import NIOCore
 import NIOPosix
 import NIOWebSocket
 import ServiceLifecycle
+import WSClient
 import XCTest
 
 /// Promise type.
@@ -660,6 +660,27 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(rt?.closeCode, .protocolError)
         }
     }
+
+    #if compiler(>=6)
+    func testInvalidUTF8Frame() async throws {
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade(configuration: .init(validateUTF8: true)) { _, _, _ in
+                .upgrade([:]) { inbound, _, _ in
+                    for try await _ in inbound.messages(maxSize: .max) {}
+                }
+            }
+        )
+        try await app.test(.live) { client in
+            let rt = try await client.ws("/") { inbound, outbound, _ in
+                let buffer = ByteBuffer(repeating: 0xFF, count: 16)
+                try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer)))
+                for try await _ in inbound {}
+            }
+            XCTAssertEqual(rt?.closeCode, .dataInconsistentWithMessage)
+        }
+    }
+    #endif
 
     // test WebSocket channel graceful shutdown
     func testGracefulShutdown() async throws {

@@ -15,10 +15,10 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdWSCore
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore
+@_spi(WSInternal) import WSCore
 
 /// WebSocket Context for upgrades initiated via a router
 ///
@@ -172,7 +172,8 @@ extension HTTP1WebSocketUpgradeChannel {
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing
+                                        autoPing: configuration.autoPing,
+                                        validateUTF8: configuration.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: WebSocketRouterContext(request: request, context: webSocketHandler.context),
