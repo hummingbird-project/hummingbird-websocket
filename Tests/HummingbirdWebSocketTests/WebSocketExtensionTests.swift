@@ -20,9 +20,10 @@ import NIOCore
 import NIOWebSocket
 import ServiceLifecycle
 import WSClient
-@testable import WSCompression
 @_spi(WSInternal) @testable import WSCore
 import XCTest
+
+@testable import WSCompression
 
 final class HummingbirdWebSocketExtensionTests: XCTestCase {
     /// Create random buffer
@@ -253,11 +254,11 @@ struct XorWebSocketExtension: WebSocketExtension {
     }
 
     func processReceivedFrame(_ frame: WebSocketFrame, context: WebSocketExtensionContext) -> WebSocketFrame {
-        return self.xorFrame(frame, context: context)
+        self.xorFrame(frame, context: context)
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) throws -> WebSocketFrame {
-        return self.xorFrame(frame, context: context)
+        self.xorFrame(frame, context: context)
     }
 
     let value: UInt8
@@ -314,7 +315,7 @@ struct CheckDeflateWebSocketExtension: WebSocketExtension {
     }
 
     func processFrameToSend(_ frame: WebSocketFrame, context: WebSocketExtensionContext) throws -> WebSocketFrame {
-        return frame
+        frame
     }
 }
 
@@ -322,11 +323,11 @@ struct CheckDeflateWebSocketExtensionBuilder: WebSocketExtensionBuilder {
     static let name = "check-deflate"
 
     func clientRequestHeader() -> String {
-        return Self.name
+        Self.name
     }
 
     func serverReponseHeader(to request: WebSocketExtensionHTTPParameters) -> String? {
-        return Self.name
+        Self.name
     }
 
     func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {

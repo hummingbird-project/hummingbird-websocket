@@ -15,10 +15,10 @@
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
-import HummingbirdTesting
 import HummingbirdTLS
-import HummingbirdWebSocket
+import HummingbirdTesting
 import HummingbirdWSTesting
+import HummingbirdWebSocket
 import Logging
 import NIOCore
 import NIOPosix
@@ -357,12 +357,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testRouteSelection() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
-            return .upgrade()
+            .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
         router.ws("/ws2") { _, _ in
-            return .upgrade()
+            .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Two"))
         }
@@ -413,13 +413,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testWebSocketMiddleware() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.group("/middleware")
-            .add(middleware: WebSocketUpgradeMiddleware { _, _ in
-                return .upgrade()
-            } onUpgrade: { _, outbound, _ in
-                try await outbound.write(.text("One"))
-            })
+            .add(
+                middleware: WebSocketUpgradeMiddleware { _, _ in
+                    .upgrade()
+                } onUpgrade: { _, outbound, _ in
+                    try await outbound.write(.text("One"))
+                }
+            )
             // need to add router to ensure middleware runs
-            .get { _, _ -> Response in return .init(status: .ok) }
+            .get { _, _ -> Response in .init(status: .ok) }
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(webSocketRouter: router)
@@ -432,7 +434,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testRouteSelectionFail() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
-            return .upgrade()
+            .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("One"))
         }
@@ -462,7 +464,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
         }
         struct MyMiddleware: RouterMiddleware {
-            func handle(_ request: Request, context: MyRequestContext, next: (Request, MyRequestContext) async throws -> Response) async throws -> Response {
+            func handle(
+                _ request: Request,
+                context: MyRequestContext,
+                next: (Request, MyRequestContext) async throws -> Response
+            ) async throws -> Response {
                 var context = context
                 context.name = "Roger Moore"
                 return try await next(request, context)
@@ -471,7 +477,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         let router = Router(context: MyRequestContext.self)
         router.middlewares.add(MyMiddleware())
         router.ws("/ws") { _, _ in
-            return .upgrade()
+            .upgrade()
         } onUpgrade: { _, outbound, context in
             try await outbound.write(.text(context.requestContext.name))
         }
@@ -490,12 +496,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
     func testHTTPRequest() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
-            return .upgrade()
+            .upgrade()
         } onUpgrade: { _, outbound, _ in
             try await outbound.write(.text("Hello"))
         }
         router.get("/http") { _, _ in
-            return "Hello"
+            "Hello"
         }
         let application = Application(
             router: router,

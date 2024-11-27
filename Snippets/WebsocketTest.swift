@@ -19,11 +19,12 @@ router.ws("/ws") { inbound, outbound, _ in
         if frame.opcode == .text, String(buffer: frame.data) == "disconnect", frame.fin == true {
             break
         }
-        let opcode: WebSocketOpcode = switch frame.opcode {
-        case .text: .text
-        case .binary: .binary
-        case .continuation: .continuation
-        }
+        let opcode: WebSocketOpcode =
+            switch frame.opcode {
+            case .text: .text
+            case .binary: .binary
+            case .continuation: .continuation
+            }
         let frame = WebSocketFrame(
             fin: frame.fin,
             opcode: opcode,
