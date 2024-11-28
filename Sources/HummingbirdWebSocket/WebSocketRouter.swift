@@ -91,7 +91,7 @@ extension RouterMethods {
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
         onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
     ) -> Self where Context: WebSocketRequestContext {
-        return on(path, method: .get) { request, context -> Response in
+        on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
             switch result {
             case .dontUpgrade:
@@ -215,7 +215,7 @@ extension HTTPServerBuilder {
     ) -> HTTPServerBuilder where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
         let webSocketReponder = webSocketRouter.buildResponder()
         return .init { responder in
-            return HTTP1WebSocketUpgradeChannel(
+            HTTP1WebSocketUpgradeChannel(
                 responder: responder,
                 webSocketResponder: webSocketReponder,
                 configuration: configuration,

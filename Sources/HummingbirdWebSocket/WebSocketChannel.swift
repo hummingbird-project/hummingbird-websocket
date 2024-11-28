@@ -73,24 +73,27 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             responseHeaders: headers,
                             logger: logger
                         )
-                        return (headers, { asyncChannel, logger in
-                            let context = Context(logger: logger)
-                            do {
-                                _ = try await WebSocketHandler.handle(
-                                    type: .server,
-                                    configuration: .init(
-                                        extensions: extensions,
-                                        autoPing: configuration.autoPing,
-                                        validateUTF8: configuration.validateUTF8
-                                    ),
-                                    asyncChannel: asyncChannel,
-                                    context: context,
-                                    handler: handler
-                                )
-                            } catch {
-                                logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
+                        return (
+                            headers,
+                            { asyncChannel, logger in
+                                let context = Context(logger: logger)
+                                do {
+                                    _ = try await WebSocketHandler.handle(
+                                        type: .server,
+                                        configuration: .init(
+                                            extensions: extensions,
+                                            autoPing: configuration.autoPing,
+                                            validateUTF8: configuration.validateUTF8
+                                        ),
+                                        asyncChannel: asyncChannel,
+                                        context: context,
+                                        handler: handler
+                                    )
+                                } catch {
+                                    logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
+                                }
                             }
-                        })
+                        )
                     }
             }
         }
@@ -105,7 +108,12 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         configuration: WebSocketServerConfiguration,
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
-        self.init(responder: responder, configuration: configuration, additionalChannelHandlers: additionalChannelHandlers, shouldUpgrade: shouldUpgrade)
+        self.init(
+            responder: responder,
+            configuration: configuration,
+            additionalChannelHandlers: additionalChannelHandlers,
+            shouldUpgrade: shouldUpgrade
+        )
     }
 
     ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
@@ -133,24 +141,27 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                             responseHeaders: headers,
                             logger: logger
                         )
-                        return (headers, { asyncChannel, logger in
-                            let context = Context(logger: logger)
-                            do {
-                                _ = try await WebSocketHandler.handle(
-                                    type: .server,
-                                    configuration: .init(
-                                        extensions: extensions,
-                                        autoPing: configuration.autoPing,
-                                        validateUTF8: configuration.validateUTF8
-                                    ),
-                                    asyncChannel: asyncChannel,
-                                    context: context,
-                                    handler: handler
-                                )
-                            } catch {
-                                logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
+                        return (
+                            headers,
+                            { asyncChannel, logger in
+                                let context = Context(logger: logger)
+                                do {
+                                    _ = try await WebSocketHandler.handle(
+                                        type: .server,
+                                        configuration: .init(
+                                            extensions: extensions,
+                                            autoPing: configuration.autoPing,
+                                            validateUTF8: configuration.validateUTF8
+                                        ),
+                                        asyncChannel: asyncChannel,
+                                        context: context,
+                                        handler: handler
+                                    )
+                                } catch {
+                                    logger.debug("WebSocket handler error", metadata: ["error.type": "\(error)"])
+                                }
                             }
-                        })
+                        )
                     }
             }
             return promise.futureResult
@@ -165,7 +176,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - logger: Logger used by upgrade
     /// - Returns: Negotiated result future
     public func setup(channel: Channel, logger: Logger) -> EventLoopFuture<Value> {
-        return channel.eventLoop.makeCompletedFuture {
+        channel.eventLoop.makeCompletedFuture {
             let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
             let logger = logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID()))
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
@@ -186,9 +197,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 upgraders: [upgrader],
                 notUpgradingCompletionHandler: { channel in
                     let childChannelHandlers: [any ChannelHandler] =
-                        [HTTP1ToHTTPServerCodec(secure: false)] +
-                        self.additionalChannelHandlers() +
-                        [HTTPUserEventHandler(logger: logger)]
+                        [HTTP1ToHTTPServerCodec(secure: false)] + self.additionalChannelHandlers() + [HTTPUserEventHandler(logger: logger)]
                     return channel.eventLoop.makeCompletedFuture {
                         try channel.pipeline.syncOperations.addHandlers(childChannelHandlers)
                         let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(wrappingChannelSynchronously: channel)

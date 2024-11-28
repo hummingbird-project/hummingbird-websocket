@@ -27,7 +27,9 @@ logger.logLevel = .trace
 
 let app = Application(
     router: Router(),
-    server: .http1WebSocketUpgrade(configuration: .init(maxFrameSize: 16_777_216, extensions: [.perMessageDeflate(maxDecompressedFrameSize: 16_777_216)])) { _, _, _ in
+    server: .http1WebSocketUpgrade(
+        configuration: .init(maxFrameSize: 16_777_216, extensions: [.perMessageDeflate(maxDecompressedFrameSize: 16_777_216)])
+    ) { _, _, _ in
         return .upgrade([:]) { inbound, outbound, _ in
             for try await msg in inbound.messages(maxSize: .max) {
                 switch msg {
