@@ -22,6 +22,8 @@ public struct WebSocketServerConfiguration: Sendable {
     public var extensions: [any WebSocketExtensionBuilder]
     /// Auto ping
     public var autoPing: AutoPingSetup
+    /// How long server should wait for close frame from client before timing out
+    public var closeTimeout: Duration
     /// Should we check text messages are valid UTF8
     public var validateUTF8: Bool
 
@@ -35,11 +37,13 @@ public struct WebSocketServerConfiguration: Sendable {
         maxFrameSize: Int = (1 << 14),
         extensions: [WebSocketExtensionFactory] = [],
         autoPing: AutoPingSetup = .enabled(timePeriod: .seconds(30)),
+        closeTimeout: Duration = .seconds(15),
         validateUTF8: Bool = false
     ) {
         self.maxFrameSize = maxFrameSize
         self.extensions = extensions.map { $0.build() }
         self.autoPing = autoPing
+        self.closeTimeout = closeTimeout
         self.validateUTF8 = validateUTF8
     }
 }

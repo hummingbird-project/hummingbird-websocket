@@ -83,6 +83,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                         configuration: .init(
                                             extensions: extensions,
                                             autoPing: configuration.autoPing,
+                                            closeTimeout: configuration.closeTimeout,
                                             validateUTF8: configuration.validateUTF8
                                         ),
                                         asyncChannel: asyncChannel,
