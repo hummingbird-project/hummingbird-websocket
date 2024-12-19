@@ -573,6 +573,25 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    func testCloseTimeout() async throws {
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade { _, _, _ in
+                .upgrade([:]) { _, _, _ in
+                    try await cancelWhenGracefulShutdown {
+                        try await Task.sleep(for: .seconds(15))
+                        XCTFail("Should not reach here")
+                    }
+                }
+            }
+        )
+        try await app.test(.live) { client in
+            _ = try await client.ws("/", configuration: .init(closeTimeout: .seconds(1))) { _, outbound, _ in
+                try await outbound.write(.text("Hello"))
+            }
+        }
+    }
+
     func testUnrecognisedOpcode() async throws {
         let app = Application(
             router: Router(),
