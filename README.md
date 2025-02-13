@@ -27,8 +27,8 @@ Setup WebSocket upgrades with a closure that either returns `.upgrade` with resp
 let app = Application(
     router: router,
     server: .http1WebSocketUpgrade { request, channel, logger in
-        // upgrade if request URI is "/ws"
-        guard request.uri == "/ws" else { return .dontUpgrade }
+        // upgrade if request path is "/ws"
+        guard request.path == "/ws" else { return .dontUpgrade }
         // The upgrade response includes the headers to include in the response and 
         // the WebSocket handler
         return .upgrade([:]) { inbound, outbound, context in
