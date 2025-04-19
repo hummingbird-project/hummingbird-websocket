@@ -210,9 +210,11 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                     }
                 }
             )
-
+            var upgradeConfiguration = NIOUpgradableHTTPServerPipelineConfiguration<UpgradeResult>(upgradeConfiguration: serverUpgradeConfiguration)
+            upgradeConfiguration.enablePipelining = false  // HTTP is pipelined by NIOAsyncChannel
+            upgradeConfiguration.enableResponseHeaderValidation = false  // Swift HTTP Types are already doing this validation
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPServerPipeline(
-                configuration: .init(upgradeConfiguration: serverUpgradeConfiguration)
+                configuration: upgradeConfiguration
             )
 
             return .init(upgradeResult: negotiationResultFuture, channel: channel)
