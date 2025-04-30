@@ -188,7 +188,10 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 },
                 upgradePipelineHandler: { channel, handler in
                     channel.eventLoop.makeCompletedFuture {
-                        let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
+                        let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(
+                            wrappingChannelSynchronously: channel,
+                            configuration: .init(isOutboundHalfClosureEnabled: true)
+                        )
                         return UpgradeResult.websocket(asyncChannel, handler, logger)
                     }
                 }
@@ -201,7 +204,10 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                         [HTTP1ToHTTPServerCodec(secure: false)] + self.additionalChannelHandlers() + [HTTPUserEventHandler(logger: logger)]
                     return channel.eventLoop.makeCompletedFuture {
                         try channel.pipeline.syncOperations.addHandlers(childChannelHandlers)
-                        let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(wrappingChannelSynchronously: channel)
+                        let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(
+                            wrappingChannelSynchronously: channel,
+                            configuration: .init(isOutboundHalfClosureEnabled: true)
+                        )
                         if upgradeAttempted.value {
                             return UpgradeResult.failedUpgrade(asyncChannel, logger)
                         } else {
