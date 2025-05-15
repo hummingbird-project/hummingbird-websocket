@@ -12,6 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AsyncHTTPClient
+import Atomics
 import HTTPTypes
 import Hummingbird
 import HummingbirdCore
@@ -286,9 +288,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
             }
             do {
                 var clientTLSConfiguration = try getClientTLSConfiguration()
-                clientTLSConfiguration.certificateVerification = .none
+                clientTLSConfiguration.certificateVerification = .fullVerification
                 try await WebSocketClient.connect(
                     url: "wss://localhost:\(promise.wait())/",
+                    configuration: .init(sniHostname: testServerName),
                     tlsConfiguration: clientTLSConfiguration,
                     logger: Logger(label: "client")
                 ) { inbound, _, _ in
@@ -797,4 +800,67 @@ final class HummingbirdWebSocketTests: XCTestCase {
             XCTAssertEqual(closeFrame?.closeCode, .unexpectedServerError)
         }
     }
+
+    func testCancelledRequest() async throws {
+        let httpClient = HTTPClient()
+        let (stream, cont) = AsyncStream.makeStream(of: Int.self)
+
+        let router = Router()
+        router.post("/") { request, context in
+            let b = try await request.body.collect(upTo: .max)
+            return Response(status: .ok, body: .init(byteBuffer: b))
+        }
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade { request, channel, logger in
+                .dontUpgrade
+            },
+            onServerRunning: { cont.yield($0.localAddress!.port!) }
+        )
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                let serviceGroup = ServiceGroup(
+                    configuration: .init(
+                        services: [app],
+                        gracefulShutdownSignals: [.sigterm, .sigint],
+                        logger: Logger(label: "SG")
+                    )
+                )
+
+                group.addTask {
+                    try await serviceGroup.run()
+                }
+
+                let port = await stream.first { _ in true }!
+                // setup task making request to server that should take longer than a second
+                let task = Task {
+                    let count = ManagedAtomic(0)
+                    let stream = AsyncStream {
+                        let value = count.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
+                        if value < 16 {
+                            try? await Task.sleep(for: .milliseconds(200))
+                            return ByteBuffer(repeating: 0, count: 256)
+                        } else {
+                            return nil
+                        }
+                    }
+                    var request = HTTPClientRequest(url: "http://localhost:\(port)")
+                    request.method = .POST
+                    request.body = .stream(stream, length: .known(Int64(4096)))
+                    let response = try await httpClient.execute(request, deadline: .now() + .minutes(30))
+                    _ = try await response.body.collect(upTo: .max)
+                }
+
+                // wait for a second and then cancel HTTP request task
+                try await Task.sleep(for: .seconds(1))
+                task.cancel()
+                await serviceGroup.triggerGracefulShutdown()
+            }
+        } catch {
+            try await httpClient.shutdown()
+            throw error
+        }
+        try await httpClient.shutdown()
+    }
+
 }
