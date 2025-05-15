@@ -832,12 +832,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 }
 
                 let port = await stream.first { _ in true }!
+                // setup task making request to server that should take longer than a second
                 let task = Task {
                     let count = ManagedAtomic(0)
                     let stream = AsyncStream {
                         let value = count.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
                         if value < 16 {
-                            try? await Task.sleep(for: .milliseconds(100))
+                            try? await Task.sleep(for: .milliseconds(200))
                             return ByteBuffer(repeating: 0, count: 256)
                         } else {
                             return nil
@@ -847,10 +848,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     request.method = .POST
                     request.body = .stream(stream, length: .known(Int64(4096)))
                     let response = try await httpClient.execute(request, deadline: .now() + .minutes(30))
-                    let result = try await response.body.collect(upTo: .max)
-                    print("Result size: \(result.readableBytes)")
+                    _ = try await response.body.collect(upTo: .max)
                 }
 
+                // wait for a second and then cancel HTTP request task
                 try await Task.sleep(for: .seconds(1))
                 task.cancel()
                 await serviceGroup.triggerGracefulShutdown()
