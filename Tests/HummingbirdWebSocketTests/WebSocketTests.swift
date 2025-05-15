@@ -291,8 +291,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 clientTLSConfiguration.certificateVerification = .fullVerification
                 try await WebSocketClient.connect(
                     url: "wss://localhost:\(promise.wait())/",
+                    configuration: .init(sniHostname: testServerName),
                     tlsConfiguration: clientTLSConfiguration,
-                    serverName: testServerName,
                     logger: Logger(label: "client")
                 ) { inbound, _, _ in
                     var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
