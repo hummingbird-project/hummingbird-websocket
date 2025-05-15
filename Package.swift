@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.14.0"),
-        .package(url: "https://github.com/hummingbird-project/swift-websocket.git", from: "1.3.0"),
+        .package(url: "https://github.com/hummingbird-project/swift-websocket.git", from: "1.3.1"),
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
     ],
