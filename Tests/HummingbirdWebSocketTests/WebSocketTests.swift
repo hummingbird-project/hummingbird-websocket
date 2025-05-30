@@ -941,4 +941,162 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
+    func testSocketIOPOSTRequestsWithCurrentImplementation() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        
+        // Current implementation - only handles GET requests
+        router.ws("/socket.io") { request, _ in
+            let transport = request.uri.queryParameters["transport"] ?? "polling"
+            
+            if transport == "websocket" {
+                return .upgrade([:])
+            } else {
+                // Handle HTTP polling in the same route
+                return .httpResponse(Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "HTTP polling response"))))
+            }
+        } onUpgrade: { _, outbound, _ in
+            try await outbound.write(.text("WebSocket connected"))
+        }
+        
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+        
+        try await app.test(.live) { client in
+            // Test GET request (should work)
+            try await client.execute(uri: "/socket.io?transport=polling", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "HTTP polling response")
+            }
+            
+            // Test POST request (should fail with current implementation)
+            try await client.execute(uri: "/socket.io?transport=polling", method: .post) { response in
+                // Current implementation returns 404 for POST requests because router.ws() only handles GET
+                XCTAssertEqual(response.status, .notFound)
+            }
+        }
+    }
+
+    func testSocketIOPOSTRequestsWithMiddleware() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        
+        // Use middleware for WebSocket upgrade detection that can handle multiple HTTP methods
+        router.group("/socket.io")
+            .add(middleware: WebSocketUpgradeMiddleware { request, _ in
+                let transport = request.uri.queryParameters["transport"] ?? "polling"
+                if transport == "websocket" {
+                    return .upgrade([:])
+                } else {
+                    return .continueToHTTP  // Pass to the next handler
+                }
+            } onUpgrade: { _, outbound, _ in
+                try await outbound.write(.text("WebSocket via middleware"))
+            })
+            .get { _, _ in
+                "HTTP polling GET response"
+            }
+            .post { request, _ in
+                // Handle Socket.IO POST requests for sending data
+                _ = try await request.body.collect(upTo: .max)
+                return Response(
+                    status: .ok,
+                    headers: [.contentType: "text/plain"],
+                    body: .init(byteBuffer: ByteBuffer(string: "ok"))
+                )
+            }
+        
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+        
+        try await app.test(.live) { client in
+            // Test GET request for HTTP polling
+            try await client.execute(uri: "/socket.io?transport=polling", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "HTTP polling GET response")
+            }
+            
+            // Test POST request for sending data
+            try await client.execute(uri: "/socket.io?transport=polling", method: .post, body: ByteBuffer(string: "test data")) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "ok")
+            }
+            
+            // Test WebSocket upgrade (should get WebSocket connection)
+            try await client.ws("/socket.io?transport=websocket") { inbound, _, _ in
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                let msg = try await inboundIterator.next()
+                XCTAssertEqual(msg, .text("WebSocket via middleware"))
+            }
+        }
+    }
+
+    func testSocketIOWithMultiMethodRouter() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        
+        // Use the new multi-method ws() function that handles both GET and POST
+        router.ws("/socket.io", methods: [.get, .post]) { request, _ in
+            let transport = request.uri.queryParameters["transport"] ?? "polling"
+            
+            if transport == "websocket" {
+                return .upgrade([:])
+            } else {
+                // Handle both GET and POST for Socket.IO polling
+                if request.method == .get {
+                    // GET requests for receiving data (long-polling)
+                    let response = """
+                    {"sid":"test-session-id","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000}
+                    """
+                    return .httpResponse(Response(
+                        status: .ok,
+                        headers: [.contentType: "application/json"],
+                        body: .init(byteBuffer: ByteBuffer(string: response))
+                    ))
+                } else if request.method == .post {
+                    // POST requests for sending data
+                    return .httpResponse(Response(
+                        status: .ok,
+                        headers: [.contentType: "text/plain"],
+                        body: .init(byteBuffer: ByteBuffer(string: "ok"))
+                    ))
+                } else {
+                    return .dontUpgrade
+                }
+            }
+        } onUpgrade: { _, outbound, _ in
+            try await outbound.write(.text("WebSocket connected"))
+        }
+        
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+        
+        try await app.test(.live) { client in
+            // Test GET request for receiving data (Socket.IO handshake)
+            try await client.execute(uri: "/socket.io?transport=polling", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(response.headers[.contentType], "application/json")
+                let responseString = String(buffer: response.body)
+                XCTAssertTrue(responseString.contains("test-session-id"))
+                XCTAssertTrue(responseString.contains("websocket"))
+            }
+            
+            // Test POST request for sending data
+            try await client.execute(uri: "/socket.io?transport=polling", method: .post, body: ByteBuffer(string: "4test message")) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "ok")
+            }
+            
+            // Test WebSocket upgrade
+            try await client.ws("/socket.io?transport=websocket") { inbound, _, _ in
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                let msg = try await inboundIterator.next()
+                XCTAssertEqual(msg, .text("WebSocket connected"))
+            }
+        }
+    }
+
 }

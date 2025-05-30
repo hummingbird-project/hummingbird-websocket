@@ -108,6 +108,37 @@ extension RouterMethods {
             }
         }
     }
+
+    /// Add path to router that support WebSocket upgrade with custom HTTP methods
+    /// - Parameters:
+    ///   - path: Path to match
+    ///   - methods: HTTP methods to handle (defaults to [.get, .post] for Socket.IO compatibility)
+    ///   - shouldUpgrade: Should request be upgraded
+    ///   - handler: WebSocket channel handler function
+    @discardableResult public func ws(
+        _ path: RouterPath = "",
+        methods: [HTTPRequest.Method] = [.get, .post],
+        shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
+        onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
+    ) -> Self where Context: WebSocketRequestContext {
+        for method in methods {
+            on(path, method: method) { request, context -> Response in
+                let result = try await shouldUpgrade(request, context)
+                switch result {
+                case .dontUpgrade:
+                    return .init(status: .methodNotAllowed)
+                case .upgrade(let headers):
+                    context.webSocket.handler.withLockedValue { $0 = WebSocketHandlerReference.Value(context: context, handler: handler) }
+                    return .init(status: .ok, headers: headers)
+                case .continueToHTTP:
+                    throw HTTPError(.internalServerError, message: "continueToHTTP is not supported in router.ws(). Use .httpResponse(Response) instead or use WebSocketUpgradeMiddleware.")
+                case .httpResponse(let response):
+                    return response
+                }
+            }
+        }
+        return self
+    }
 }
 
 /// An alternative way to add a WebSocket upgrade to a router via Middleware

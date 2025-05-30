@@ -64,13 +64,19 @@ app.runService()
 
 ## Socket.IO-style Dual Transport
 
-You can implement Socket.IO-style servers that handle both HTTP polling and WebSocket connections at the same endpoint using `.httpResponse()`:
+You can implement Socket.IO-style servers that handle both HTTP polling and WebSocket connections at the same endpoint. Socket.IO uses **both GET and POST requests** for its HTTP long-polling transport:
+- **GET requests** for receiving data from the server (long-polling)
+- **POST requests** for sending data to the server
+
+### Multi-Method Router Approach
+
+Use the multi-method `router.ws()` to handle both GET and POST requests in a single route:
 
 ```swift
 let router = Router(context: BasicWebSocketRequestContext.self)
 
-// Single route handles both HTTP polling and WebSocket upgrade
-router.ws("/socket.io") { request, context in
+// Handle both GET and POST requests for Socket.IO compatibility
+router.ws("/socket.io", methods: [.get, .post]) { request, context in
     let transport = request.uri.queryParameters["transport"] ?? "polling"
     
     if transport == "websocket" {
@@ -78,11 +84,31 @@ router.ws("/socket.io") { request, context in
         return .upgrade([:])
     } else {
         // Handle HTTP polling
-        let pollingResponse = handleSocketIOPolling(request, context)
-        return .httpResponse(pollingResponse)
+        if request.method == .get {
+            // GET: receiving data (handshake/long-polling)
+            let sessionId = UUID().uuidString
+            let response = """
+            {"sid":"\(sessionId)","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000}
+            """
+            return .httpResponse(Response(
+                status: .ok,
+                headers: [.contentType: "application/json"],
+                body: .init(byteBuffer: ByteBuffer(string: response))
+            ))
+        } else if request.method == .post {
+            // POST: sending data to server
+            return .httpResponse(Response(
+                status: .ok,
+                headers: [.contentType: "text/plain"],
+                body: .init(byteBuffer: ByteBuffer(string: "ok"))
+            ))
+        } else {
+            return .dontUpgrade
+        }
     }
 } onUpgrade: { inbound, outbound, context in
     // Handle WebSocket connection
+    try await outbound.write(.text("WebSocket connected"))
     for try await packet in inbound {
         // Echo messages back to client
         try await outbound.write(packet)
@@ -94,19 +120,6 @@ let app = Application(
     server: .http1WebSocketUpgrade(webSocketRouter: router)
 )
 app.runService()
-
-func handleSocketIOPolling(_ request: Request, _ context: BasicWebSocketRequestContext) -> Response {
-    // Implement Socket.IO polling logic
-    let sessionId = UUID().uuidString
-    let response = """
-    {"sid":"\(sessionId)","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000}
-    """
-    return Response(
-        status: .ok,
-        headers: [.contentType: "application/json"],
-        body: .init(byteBuffer: ByteBuffer(string: response))
-    )
-}
 ```
 
 ### Alternative: Middleware Pattern
@@ -123,15 +136,62 @@ router.group("/socket.io")
     } onUpgrade: { inbound, outbound, context in
         // Handle WebSocket connection
         try await outbound.write(.text("WebSocket connected"))
+        for try await packet in inbound {
+            try await outbound.write(packet)
+        }
     })
     .get { request, context in
-        // Handle HTTP polling requests
-        return handleSocketIOPolling(request, context)
+        // Handle GET requests for receiving data (handshake/long-polling)
+        let sessionId = UUID().uuidString
+        let response = """
+        {"sid":"\(sessionId)","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000}
+        """
+        return Response(
+            status: .ok,
+            headers: [.contentType: "application/json"],
+            body: .init(byteBuffer: ByteBuffer(string: response))
+        )
+    }
+    .post { request, context in
+        // Handle POST requests for sending data to server
+        let body = try await request.body.collect(upTo: .max)
+        // Process the Socket.IO packet data...
+        return Response(
+            status: .ok,
+            headers: [.contentType: "text/plain"],
+            body: .init(byteBuffer: ByteBuffer(string: "ok"))
+        )
     }
 ```
 
+### Single-Method Fallback
+
+For simple cases that only need GET requests (legacy or WebSocket-only scenarios):
+
+```swift
+let router = Router(context: BasicWebSocketRequestContext.self)
+
+// Traditional WebSocket-only route (GET requests only)
+router.ws("/socket.io") { request, context in
+    let transport = request.uri.queryParameters["transport"] ?? "polling"
+    
+    if transport == "websocket" {
+        return .upgrade([:])
+    } else {
+        // Handle HTTP polling (GET only)
+        let pollingResponse = handleSocketIOPolling(request, context)
+        return .httpResponse(pollingResponse)
+    }
+} onUpgrade: { inbound, outbound, context in
+    // Handle WebSocket connection
+    for try await packet in inbound {
+        try await outbound.write(packet)
+    }
+}
+```
+
 This enables:
-- ✅ Socket.IO server implementation
+- ✅ **Full Socket.IO server implementation** with GET/POST support
 - ✅ Server-Sent Events with WebSocket fallback  
 - ✅ GraphQL subscriptions with transport negotiation
 - ✅ Any dual-transport real-time protocol
