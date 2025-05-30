@@ -78,6 +78,8 @@ public struct BasicWebSocketRequestContext: RequestContext, WebSocketRequestCont
 public enum RouterShouldUpgrade: Sendable {
     case dontUpgrade
     case upgrade(HTTPFields = [:])
+    case continueToHTTP
+    case httpResponse(Response)
 }
 
 extension RouterMethods {
@@ -99,6 +101,10 @@ extension RouterMethods {
             case .upgrade(let headers):
                 context.webSocket.handler.withLockedValue { $0 = WebSocketHandlerReference.Value(context: context, handler: handler) }
                 return .init(status: .ok, headers: headers)
+            case .continueToHTTP:
+                throw HTTPError(.internalServerError, message: "continueToHTTP is not supported in router.ws(). Use .httpResponse(Response) instead or use WebSocketUpgradeMiddleware.")
+            case .httpResponse(let response):
+                return response
             }
         }
     }
@@ -133,6 +139,10 @@ public struct WebSocketUpgradeMiddleware<Context: WebSocketRequestContext>: Rout
         case .upgrade(let headers):
             context.webSocket.handler.withLockedValue { $0 = .init(context: context, handler: self.handler) }
             return .init(status: .ok, headers: headers)
+        case .continueToHTTP:
+            return try await next(request, context)
+        case .httpResponse(let response):
+            return response
         }
     }
 }

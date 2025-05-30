@@ -863,4 +863,82 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
+    func testContinueToHTTP() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        
+        // Socket.IO-style route that handles both HTTP polling and WebSocket upgrade
+        router.ws("/socket.io") { request, _ in
+            let transport = request.uri.queryParameters["transport"] ?? "polling"
+            
+            if transport == "websocket" {
+                return .upgrade([:])
+            } else {
+                // Handle HTTP polling in the same route
+                return .httpResponse(Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "HTTP polling response"))))
+            }
+        } onUpgrade: { _, outbound, _ in
+            try await outbound.write(.text("WebSocket connected"))
+        }
+        
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+        
+        try await app.test(.live) { client in
+            // Test HTTP polling (should get HTTP response)
+            try await client.execute(uri: "/socket.io?transport=polling", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "HTTP polling response")
+            }
+            
+            // Test WebSocket upgrade (should get WebSocket connection)
+            try await client.ws("/socket.io?transport=websocket") { inbound, _, _ in
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                let msg = try await inboundIterator.next()
+                XCTAssertEqual(msg, .text("WebSocket connected"))
+            }
+        }
+    }
+
+    func testContinueToHTTPWithMiddleware() async throws {
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        
+        // Use middleware for WebSocket upgrade detection
+        router.group("/socket.io")
+            .add(middleware: WebSocketUpgradeMiddleware { request, _ in
+                let transport = request.uri.queryParameters["transport"] ?? "polling"
+                if transport == "websocket" {
+                    return .upgrade([:])
+                } else {
+                    return .continueToHTTP  // Pass to the next handler
+                }
+            } onUpgrade: { _, outbound, _ in
+                try await outbound.write(.text("WebSocket via middleware"))
+            })
+            .get { _, _ in
+                "HTTP polling via route"
+            }
+        
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+        
+        try await app.test(.live) { client in
+            // Test HTTP polling (should get HTTP response from route)
+            try await client.execute(uri: "/socket.io?transport=polling", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "HTTP polling via route")
+            }
+            
+            // Test WebSocket upgrade (should get WebSocket connection)
+            try await client.ws("/socket.io?transport=websocket") { inbound, _, _ in
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                let msg = try await inboundIterator.next()
+                XCTAssertEqual(msg, .text("WebSocket via middleware"))
+            }
+        }
+    }
+
 }

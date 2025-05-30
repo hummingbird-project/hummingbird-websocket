@@ -23,12 +23,15 @@ import NIOWebSocket
 public enum ShouldUpgradeResult<Value: Sendable>: Sendable {
     case dontUpgrade
     case upgrade(HTTPFields = [:], Value)
+    case continueToHTTP
 
     /// Map upgrade result to difference type
     func map<Result>(_ map: (HTTPFields, Value) throws -> (HTTPFields, Result)) rethrows -> ShouldUpgradeResult<Result> {
         switch self {
         case .dontUpgrade:
             return .dontUpgrade
+        case .continueToHTTP:
+            return .continueToHTTP
         case .upgrade(let headers, let value):
             let result = try map(headers, value)
             return .upgrade(result.0, result.1)
@@ -82,6 +85,8 @@ extension NIOTypedWebSocketServerUpgrader {
                     case .upgrade(let headers, let value):
                         shouldUpgradeResult.withLockedValue { $0 = value }
                         return .init(headers)
+                    case .continueToHTTP:
+                        return nil
                     }
                 }
             },
