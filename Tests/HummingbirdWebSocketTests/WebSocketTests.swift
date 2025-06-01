@@ -815,7 +815,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
             server: .http1WebSocketUpgrade { request, channel, logger in
                 .dontUpgrade
             },
-            onServerRunning: { cont.yield($0.localAddress!.port!) }
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            onServerRunning: {
+                cont.yield($0.localAddress!.port!)
+            }
         )
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
