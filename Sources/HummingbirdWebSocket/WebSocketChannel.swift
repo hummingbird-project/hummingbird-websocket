@@ -241,7 +241,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
 
             case .failedUpgrade(let http1, let logger):
                 logger.debug("Websocket upgrade failed")
-                await self.write405(asyncChannel: http1, logger: logger)
+                await self.writeFailedUpgrade(asyncChannel: http1, logger: logger)
 
             case .websocket(let asyncChannel, let handler, let logger):
                 logger.debug("Websocket upgrade")
@@ -254,8 +254,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         }
     }
 
-    /// Upgrade failed we should write a 405
-    private func write405(asyncChannel: NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, logger: Logger) async {
+    /// Write empty HTTP response for failed upgrade
+    private func writeFailedUpgrade(asyncChannel: NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, logger: Logger) async {
         do {
             try await asyncChannel.executeThenClose { _, outbound in
                 let headers: HTTPFields = [
@@ -263,7 +263,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                     .contentLength: "0",
                 ]
                 let head = HTTPResponse(
-                    status: .methodNotAllowed,
+                    status: .ok,
                     headerFields: headers
                 )
 
