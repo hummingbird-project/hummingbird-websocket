@@ -263,7 +263,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                     .contentLength: "0",
                 ]
                 let head = HTTPResponse(
-                    status: .ok,
+                    status: .badRequest,
                     headerFields: headers
                 )
 
