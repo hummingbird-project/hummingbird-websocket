@@ -173,9 +173,11 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     static func getUpgradeResponder(_ responder: @escaping HTTPChannelHandler.Responder) -> HTTPChannelHandler.Responder {
         struct RedirectCloseError: Error {}
         return {
-            request,
-            responseWriter,
-            context in
+            (
+                request: Request,
+                responseWriter: consuming ResponseWriter,
+                channel: Channel
+            ) in
             if request.headers[.upgrade] == "websocket" {
                 var path = request.uri.path
                 if let query = request.uri.query {
@@ -189,7 +191,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 try await responseWriter.writeResponse(response)
                 throw RedirectCloseError()
             } else {
-                try await responder(request, responseWriter, context)
+                try await responder(request, responseWriter, channel)
             }
         }
     }
