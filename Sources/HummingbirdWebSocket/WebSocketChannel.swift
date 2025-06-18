@@ -177,9 +177,13 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             responseWriter,
             context in
             if request.headers[.upgrade] == "websocket" {
+                var path = request.uri.path
+                if let query = request.uri.query {
+                    path += "?\(query)"
+                }
                 let headers: HTTPFields = [
                     .connection: "close",
-                    .location: request.uri.path,
+                    .location: path,
                 ]
                 let response = HTTPResponse(status: .temporaryRedirect, headerFields: headers)
                 try await responseWriter.writeResponse(response)
