@@ -192,7 +192,7 @@ extension HTTP1WebSocketUpgradeChannel {
             }
             return promise.futureResult
         }
-        self.responder = responder
+        self.responder = Self.getUpgradeResponder(responder)
     }
 }
 

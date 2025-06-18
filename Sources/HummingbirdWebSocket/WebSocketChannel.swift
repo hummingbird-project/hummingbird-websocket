@@ -98,7 +98,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                     }
             }
         }
-        self.responder = responder
+        self.responder = Self.getUpgradeResponder(responder)
     }
 
     @available(*, deprecated, renamed: "init(responder:configuration:additionalChannelHandlers:shouldUpgrade:)")
@@ -167,7 +167,27 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             }
             return promise.futureResult
         }
-        self.responder = responder
+        self.responder = Self.getUpgradeResponder(responder)
+    }
+
+    static func getUpgradeResponder(_ responder: @escaping HTTPChannelHandler.Responder) -> HTTPChannelHandler.Responder {
+        struct RedirectCloseError: Error {}
+        return {
+            request,
+            responseWriter,
+            context in
+            if request.headers[.upgrade] == "websocket" {
+                let headers: HTTPFields = [
+                    .connection: "close",
+                    .location: request.uri.path,
+                ]
+                let response = HTTPResponse(status: .temporaryRedirect, headerFields: headers)
+                try await responseWriter.writeResponse(response)
+                throw RedirectCloseError()
+            } else {
+                try await responder(request, responseWriter, context)
+            }
+        }
     }
 
     ///  Setup channel to accept HTTP1 with a WebSocket upgrade
