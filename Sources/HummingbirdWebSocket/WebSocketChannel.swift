@@ -170,6 +170,19 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         self.responder = Self.getUpgradeResponder(responder)
     }
 
+    /// Return HTTP responder that responds with a redirect and connection closure on receiving an
+    /// upgrade header set to websocket
+    ///
+    /// The responder passed in as a parameter is called from the resultant responder if no upgrade
+    /// header is found.
+    ///
+    /// This is a temporary solution to the fact that the NIO upgrade code does not support parsing
+    /// upgrade headers after having received a normal HTTP request. By returning a redirect to the
+    /// same URI and closing the connection we are forcing the client to open a new connection
+    /// where the upgrade code path will run.
+    ///
+    /// - Parameter responder: HTTP responder to call
+    /// - Returns: Result of HTTP responder or redirect
     static func getUpgradeResponder(_ responder: @escaping HTTPChannelHandler.Responder) -> HTTPChannelHandler.Responder {
         struct RedirectCloseError: Error {}
         return {
