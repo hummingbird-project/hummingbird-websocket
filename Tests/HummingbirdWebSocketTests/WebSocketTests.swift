@@ -866,4 +866,31 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
+    func testUpgradeAfterNotUpgraded() async throws {
+        let router = Router()
+        router.get("/") { _, _ in
+            "Helllo"
+        }
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade { _, _, _ in
+                .dontUpgrade
+            }
+        )
+        try await app.test(.live) { client in
+            try await client.execute(uri: "/", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+            }
+            // perform upgrade
+            try await client.execute(uri: "/test?this=that", method: .get, headers: [.upgrade: "websocket"]) { response in
+                XCTAssertEqual(response.status, .temporaryRedirect)
+                XCTAssertEqual(response.headers[.location], "/test?this=that")
+            }
+            // check channel has been closed
+            do {
+                try await client.execute(uri: "/", method: .get)
+            } catch let error as ChannelError where error == .ioOnClosedChannel {
+            }
+        }
+    }
 }
