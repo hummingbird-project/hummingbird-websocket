@@ -86,11 +86,12 @@ extension RouterMethods {
     ///   - path: Path to match
     ///   - shouldUpgrade: Should request be upgraded
     ///   - handler: WebSocket channel handler function
+    @preconcurrency
     @discardableResult public func ws(
         _ path: RouterPath = "",
         shouldUpgrade: @Sendable @escaping (Request, Context) async throws -> RouterShouldUpgrade = { _, _ in .upgrade([:]) },
         onUpgrade handler: @escaping WebSocketDataHandler<WebSocketRouterContext<Context>>
-    ) -> Self where Context: WebSocketRequestContext {
+    ) -> Self where Context: WebSocketRequestContext, Self: _HB_SendableMetatype {
         on(path, method: .get) { request, context -> Response in
             let result = try await shouldUpgrade(request, context)
             switch result {
@@ -208,7 +209,8 @@ extension HTTPServerBuilder {
     ///   - configuration: WebSocket server configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
     /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
-    public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder>(
+    @preconcurrency
+    public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder & _HB_SendableMetatype>(
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = []
