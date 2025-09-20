@@ -19,13 +19,14 @@ import Logging
 import NIOCore
 import NIOWebSocket
 import ServiceLifecycle
+import Testing
 import WSClient
 @_spi(WSInternal) @testable import WSCore
-import XCTest
 
 @testable import WSCompression
 
-final class HummingbirdWebSocketExtensionTests: XCTestCase {
+@Suite(.serialized)
+struct HummingbirdWebSocketExtensionTests {
     /// Create random buffer
     /// - Parameters:
     ///   - size: size of buffer
@@ -44,20 +45,21 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         return buffer
     }
 
-    func testPerMessageDeflate() async throws {
+    @Test func testPerMessageDeflate() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let firstMessage = try await iterator.next()
-                    XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+                    #expect(firstMessage == .text("Hello, testing this is compressed"))
                     let secondMessage = try await iterator.next()
-                    XCTAssertEqual(secondMessage, .text("Hello"))
+                    #expect(secondMessage == .text("Hello"))
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -71,21 +73,22 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         }
     }
 
-    func testPerMessageDeflateMaxWindow() async throws {
+    @Test func testPerMessageDeflateMaxWindow() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, outbound, _ in
+                .upgrade([:]) { inbound, outbound, _ in
                     let extensions = await outbound.handler.configuration.extensions
-                    XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow, 10)
+                    #expect((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveMaxWindow == 10)
                     for try await data in inbound.messages(maxSize: .max) {
-                        XCTAssertEqual(data, .binary(buffer))
+                        #expect(data == .binary(buffer))
                     }
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -93,27 +96,28 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 configuration: .init(extensions: [.perMessageDeflate(maxWindow: 10, minFrameSizeToCompress: 16)])
             ) { _, outbound, _ in
                 let extensions = await outbound.handler.configuration.extensions
-                XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow, 10)
+                #expect((extensions.first as? PerMessageDeflateExtension)?.configuration.sendMaxWindow == 10)
                 try await outbound.write(.binary(buffer))
             }
         }
     }
 
-    func testPerMessageDeflateNoContextTakeover() async throws {
+    @Test func testPerMessageDeflateNoContextTakeover() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, outbound, _ in
+                .upgrade([:]) { inbound, outbound, _ in
                     let extensions = await outbound.handler.configuration.extensions
-                    XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover, true)
+                    #expect((extensions.first as? PerMessageDeflateExtension)?.configuration.receiveNoContextTakeover == true)
                     for try await data in inbound.messages(maxSize: .max) {
-                        XCTAssertEqual(data, .binary(buffer))
+                        #expect(data == .binary(buffer))
                     }
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -121,26 +125,27 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
                 configuration: .init(extensions: [.perMessageDeflate(clientNoContextTakeover: true, minFrameSizeToCompress: 16)])
             ) { _, outbound, _ in
                 let extensions = await outbound.handler.configuration.extensions
-                XCTAssertEqual((extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover, true)
+                #expect((extensions.first as? PerMessageDeflateExtension)?.configuration.sendNoContextTakeover == true)
 
                 try await outbound.write(.binary(buffer))
             }
         }
     }
 
-    func testPerMessageExtensionOrdering() async throws {
+    @Test func testPerMessageExtensionOrdering() async throws {
         let buffer = self.createRandomBuffer(size: 4096, randomness: 10)
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true, minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     for try await data in inbound.messages(maxSize: .max) {
-                        XCTAssertEqual(data, .binary(buffer))
+                        #expect(data == .binary(buffer))
                     }
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -152,21 +157,22 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         }
     }
 
-    func testPerMessageDeflateWithRouter() async throws {
+    @Test func testPerMessageDeflateWithRouter() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/test") { inbound, _, _ in
             var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
             let firstMessage = try await iterator.next()
-            XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+            #expect(firstMessage == .text("Hello, testing this is compressed"))
             let secondMessage = try await iterator.next()
-            XCTAssertEqual(secondMessage, .text("Hello"))
+            #expect(secondMessage == .text("Hello"))
         }
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 webSocketRouter: router,
                 configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
-            )
+            ),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -180,18 +186,19 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         }
     }
 
-    func testPerMessageDeflateMultiFrameMessage() async throws {
+    @Test func testPerMessageDeflateMultiFrameMessage() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let firstMessage = try await iterator.next()
-                    XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+                    #expect(firstMessage == .text("Hello, testing this is compressed"))
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -206,23 +213,24 @@ final class HummingbirdWebSocketExtensionTests: XCTestCase {
         }
     }
 
-    func testCheckDeflate() async throws {
+    @Test func testCheckDeflate() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
                 configuration: .init(extensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)])
             ) { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let firstMessage = try await iterator.next()
                     // The first message should be received
-                    XCTAssertEqual(firstMessage, .text("Hello, testing this is compressed"))
+                    #expect(firstMessage == .text("Hello, testing this is compressed"))
                     // The second message will not be received because the checkDeflate extension throws
                     // an error because it hasn't been compressed
                     let nextMessage = try await iterator.next()
-                    XCTAssertEqual(nextMessage, nil)
+                    #expect(nextMessage == nil)
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(

@@ -26,8 +26,8 @@ import NIOCore
 import NIOPosix
 import NIOWebSocket
 import ServiceLifecycle
+import Testing
 import WSClient
-import XCTest
 
 /// Promise type.
 actor Promise<Value: Sendable> {
@@ -69,7 +69,8 @@ actor Promise<Value: Sendable> {
     }
 }
 
-final class HummingbirdWebSocketTests: XCTestCase {
+@Suite(.serialized)
+struct HummingbirdWebSocketTests {
     func createRandomBuffer(size: Int) -> ByteBuffer {
         // create buffer
         var data = [UInt8](repeating: 0, count: size)
@@ -81,35 +82,37 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
     // MARK: Tests
 
-    func testServerToClientMessage() async throws {
+    @Test func testServerToClientMessage() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { _, outbound, context in
+                .upgrade([:]) { _, outbound, context in
                     context.logger.info("testServerToClientMessage enter")
                     try await outbound.write(.text("Hello"))
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/") { inbound, _, _ in
                 var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
-                XCTAssertEqual(msg, .text("Hello"))
+                #expect(msg == .text("Hello"))
             }
         }
     }
 
-    func testClientToServerMessage() async throws {
+    @Test func testClientToServerMessage() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let msg = try await inboundIterator.next()
-                    XCTAssertEqual(msg, .text("Hello"))
+                    #expect(msg == .text("Hello"))
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/") { _, outbound, _ in
@@ -118,11 +121,11 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testClientToServerSplitPacket() async throws {
+    @Test func testClientToServerSplitPacket() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { inbound, outbound, _ in
+                .upgrade([:]) { inbound, outbound, _ in
                     for try await packet in inbound.messages(maxSize: .max) {
                         switch packet {
                         case .binary(let buffer):
@@ -132,7 +135,8 @@ final class HummingbirdWebSocketTests: XCTestCase {
                         }
                     }
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/") { inbound, outbound, _ in
@@ -143,40 +147,45 @@ final class HummingbirdWebSocketTests: XCTestCase {
 
                 var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
-                XCTAssertEqual(msg, .text("Hello World!"))
+                #expect(msg == .text("Hello World!"))
             }
         }
     }
 
     // test connection is closed when buffer is too large
-    func testTooLargeBuffer() async throws {
+    @Test func testTooLargeBuffer() async throws {
+        var logger = Logger(label: "testTooLargeBuffer")
+        logger.logLevel = .trace
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+            server: .http1WebSocketUpgrade(configuration: .init(maxFrameSize: (1 << 13))) { _, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: logger
         )
-        let rt = try await app.test(.live) { client in
-            try await client.ws("/") { inbound, outbound, _ in
-                let buffer = ByteBuffer(repeating: 1, count: (1 << 14) + 1)
+        try await app.test(.live) { client in
+            let rt = try await client.ws("/") { inbound, outbound, _ in
+                let buffer = ByteBuffer(repeating: 1, count: (1 << 13) + 1)
                 try await outbound.write(.binary(buffer))
                 for try await _ in inbound {}
             }
+            #expect(rt?.closeCode == .messageTooLarge)
         }
-        XCTAssertEqual(rt?.closeCode, .messageTooLarge)
     }
 
     // test connection is closed when message size is too large
-    func testTooLargeMessage() async throws {
+    @Test func testTooLargeMessage() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound.messages(maxSize: 1024) {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
@@ -187,16 +196,16 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 }
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .messageTooLarge)
+            #expect(rt?.closeCode == .messageTooLarge)
         }
     }
 
     // test text message writer works
-    func testTextMessageWriter() async throws {
+    @Test func testTextMessageWriter() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .upgrade([:]) { inbound, outbound, _ in
+                .upgrade([:]) { inbound, outbound, _ in
                     try await outbound.withTextMessageWriter { writer in
                         try await writer("Merry Christmas ")
                         try await writer("and a ")
@@ -204,62 +213,62 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     }
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/") { inbound, _, _ in
                 var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let text = try await iterator.next()
-                XCTAssertEqual(.text("Merry Christmas and a Happy new year"), text)
+                #expect(.text("Merry Christmas and a Happy new year") == text)
             }
         }
     }
 
-    func testWebSocketUpgradeFailed() async throws {
+    @Test func testWebSocketUpgradeFailed() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
-                return .dontUpgrade
-            }
+                .dontUpgrade
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
-            do {
+            _ = await #expect(throws: WebSocketClientError.webSocketUpgradeFailed) {
                 try await client.ws("/") { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-                XCTFail("WebSocket connect should have failed")
-            } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+            }
         }
     }
 
-    func testNotWebSocket() async throws {
+    @Test func testNotWebSocket() async throws {
         let app = Application(
             router: Router(),
-            server: .http1()
+            server: .http1(),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
-            do {
+            _ = await #expect(throws: WebSocketClientError.webSocketUpgradeFailed) {
                 try await client.ws("/") { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-                XCTFail("WebSocket connect should have failed")
-            } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+            }
         }
     }
 
-    func testNoConnection() async throws {
+    @Test func testNoConnection() async throws {
         let client = WebSocketClient(
             url: .init("ws://localhost:10245"),
             logger: Logger(label: "TestNoConnection")
         ) { _, _, _ in
         }
-        do {
+        await #expect(throws: NIOConnectionError.self) {
             try await client.run()
-            XCTFail("testNoConnection: should not be successful")
-        } catch is NIOConnectionError {}
+        }
     }
 
-    func testTLS() async throws {
+    @Test func testTLS() async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
             let app = try Application(
@@ -297,7 +306,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 ) { inbound, _, _ in
                     var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                     let msg = try await inboundIterator.next()
-                    XCTAssertEqual(msg, .text("Hello"))
+                    #expect(msg == .text("Hello"))
                 }
                 await serviceGroup.triggerGracefulShutdown()
             } catch {
@@ -307,47 +316,50 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testURLPath() async throws {
+    @Test func testURLPath() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { head, _, _ in
-                XCTAssertEqual(head.path, "/testURLPath")
+                #expect(head.path == "/testURLPath")
                 return .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/testURLPath") { _, _, _ in }
         }
     }
 
-    func testQueryParameters() async throws {
+    @Test func testQueryParameters() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { head, _, _ in
                 let request = Request(head: head, body: .init(buffer: ByteBuffer()))
-                XCTAssertEqual(request.uri.query, "query=parameters&test=true")
+                #expect(request.uri.query == "query=parameters&test=true")
                 return .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/ws?query=parameters&test=true") { _, _, _ in }
         }
     }
 
-    func testAdditionalHeaders() async throws {
+    @Test func testAdditionalHeaders() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { head, _, _ in
                 let request = Request(head: head, body: .init(buffer: ByteBuffer()))
-                XCTAssertEqual(request.headers[.secWebSocketExtensions], "hb")
+                #expect(request.headers[.secWebSocketExtensions] == "hb")
                 return .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws(
@@ -357,7 +369,9 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testRouteSelection() async throws {
+    @Test func testRouteSelection() async throws {
+        var logger = Logger(label: "testRouteSelection")
+        logger.logLevel = .trace
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws1") { _, _ in
             .upgrade()
@@ -371,23 +385,25 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: logger
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/ws1") { inbound, _, _ in
                 var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
-                XCTAssertEqual(msg, .text("One"))
+                #expect(msg == .text("One"))
             }
             try await client.ws("/ws2") { inbound, _, _ in
                 var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
-                XCTAssertEqual(msg, .text("Two"))
+                #expect(msg == .text("Two"))
             }
         }
     }
 
-    func testAccessingRequestSelection() async throws {
+    @Test func testAccessingRequestSelection() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { request, _ in
             guard request.uri.queryParameters["test"] != nil else { return .dontUpgrade }
@@ -398,22 +414,22 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/ws?test=123") { inbound, _, _ in
                 var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
                 let msg = try await inboundIterator.next()
-                XCTAssertEqual(msg, .text("123"))
+                #expect(msg == .text("123"))
             }
-            do {
+            await #expect(throws: WebSocketClientError.webSocketUpgradeFailed) {
                 try await client.ws("/ws") { _, _, _ in }
-                XCTFail("Shouldn't get here as websocket upgrade failed")
-            } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+            }
         }
     }
 
-    func testWebSocketMiddleware() async throws {
+    @Test func testWebSocketMiddleware() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.group("/middleware")
             .add(
@@ -427,14 +443,15 @@ final class HummingbirdWebSocketTests: XCTestCase {
             .get { _, _ -> Response in .init(status: .ok) }
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
             try await client.ws("/middleware") { _, _, _ in }
         }
     }
 
-    func testRouteSelectionFail() async throws {
+    @Test func testRouteSelectionFail() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             .upgrade()
@@ -443,18 +460,20 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         _ = try await app.test(.live) { client in
-            do {
+            await #expect(throws: WebSocketClientError.webSocketUpgradeFailed) {
                 try await client.ws("/not-ws") { _, _, _ in }
-                XCTFail("Shouldn't get here as connect failed")
-            } catch let error as WebSocketClientError where error == .webSocketUpgradeFailed {}
+            }
         }
     }
 
     /// Test context from router is passed through to web socket
-    func testRouterContextUpdate() async throws {
+    @Test func testRouterContextUpdate() async throws {
+        var logger = Logger(label: "testRouterContextUpdate")
+        logger.logLevel = .trace
         struct MyRequestContext: RequestContext, WebSocketRequestContext {
             var coreContext: CoreRequestContextStorage
             var webSocket: WebSocketHandlerReference<MyRequestContext>
@@ -486,17 +505,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: logger
         )
         _ = try await app.test(.live) { client in
-            try await client.ws("/ws") { inbound, _, _ in
+            var logger = Logger(label: "testRouterContextUpdate-client")
+            logger.logLevel = .trace
+            try await client.ws("/ws", logger: logger) { inbound, _, _ in
                 let text = try await inbound.messages(maxSize: .max).first { _ in true }
-                XCTAssertEqual(text, .text("Roger Moore"))
+                #expect(text == .text("Roger Moore"))
             }
         }
     }
 
-    func testHTTPRequest() async throws {
+    @Test func testHTTPRequest() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { _, _ in
             .upgrade()
@@ -513,13 +536,13 @@ final class HummingbirdWebSocketTests: XCTestCase {
         )
         try await application.test(.live) { client in
             try await client.execute(uri: "/http", method: .get) { response in
-                XCTAssertEqual(response.status, .ok)
-                XCTAssertEqual(String(buffer: response.body), "Hello")
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body) == "Hello")
             }
         }
     }
 
-    func testAutoPing() async throws {
+    @Test func testAutoPing() async throws {
         let router = Router(context: BasicWebSocketRequestContext.self)
         router.ws("/ws") { inbound, _, _ in
             for try await _ in inbound {}
@@ -538,55 +561,61 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await Task.sleep(for: .milliseconds(500))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(frame?.closeCode, .goingAway)
-            XCTAssertEqual(frame?.reason, "Ping timeout")
+            #expect(frame?.closeCode == .goingAway)
+            #expect(frame?.reason == "Ping timeout")
         }
     }
 
-    func testCloseCode() async throws {
+    @Test func testCloseCode() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { _, _, _ in }
-            XCTAssertEqual(rt?.closeCode, .normalClosure)
+            #expect(rt?.closeCode == .normalClosure)
         }
     }
 
-    func testCloseReason() async throws {
+    @Test func testCloseReason() async throws {
+        var logger = Logger(label: "testCloseReason")
+        logger.logLevel = .trace
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { _, outbound, _ in
                     try await outbound.close(.unknown(3000), reason: "Because")
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: logger
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, _, _ in
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .unknown(3000))
-            XCTAssertEqual(rt?.reason, "Because")
+            #expect(rt?.closeCode == .unknown(3000))
+            #expect(rt?.reason == "Because")
         }
     }
 
-    func testCloseTimeout() async throws {
+    @Test func testCloseTimeout() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { _, _, _ in
                     try await cancelWhenGracefulShutdown {
                         try await Task.sleep(for: .seconds(15))
-                        XCTFail("Should not reach here")
+                        Issue.record("Should not reach here")
                     }
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             _ = try await client.ws("/", configuration: .init(closeTimeout: .seconds(1))) { _, outbound, _ in
@@ -595,32 +624,34 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testUnrecognisedOpcode() async throws {
+    @Test func testUnrecognisedOpcode() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
                 try await outbound.write(.custom(.init(fin: true, opcode: WebSocketOpcode(encodedWebSocketOpcode: 0x4)!, data: ByteBuffer())))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .protocolError)
+            #expect(rt?.closeCode == .protocolError)
         }
     }
 
-    func testInvalidPing() async throws {
+    @Test func testInvalidPing() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
@@ -628,18 +659,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await outbound.write(.custom(.init(fin: false, opcode: .ping, data: ByteBuffer())))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .protocolError)
+            #expect(rt?.closeCode == .protocolError)
         }
     }
 
-    func testUnexpectedContinuation() async throws {
+    @Test func testUnexpectedContinuation() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound.messages(maxSize: 1024) {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
@@ -647,18 +679,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await outbound.write(.custom(.init(fin: true, opcode: .continuation, data: ByteBuffer(repeating: 1, count: 16))))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .protocolError)
+            #expect(rt?.closeCode == .protocolError)
         }
     }
 
-    func testBadCloseCode() async throws {
+    @Test func testBadCloseCode() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { _, outbound, _ in
@@ -666,18 +699,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 buffer.write(webSocketErrorCode: .unknown(999))
                 try await outbound.write(.custom(.init(fin: true, opcode: .connectionClose, data: buffer)))
             }
-            XCTAssertEqual(rt?.closeCode, .protocolError)
+            #expect(rt?.closeCode == .protocolError)
         }
     }
 
-    func testBadControlFrame() async throws {
+    @Test func testBadControlFrame() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
@@ -685,19 +719,19 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await outbound.write(.custom(.init(fin: true, opcode: .ping, data: ByteBuffer(repeating: 1, count: 126))))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .protocolError)
+            #expect(rt?.closeCode == .protocolError)
         }
     }
 
-    #if compiler(>=6)
-    func testInvalidUTF8Frame() async throws {
+    @Test func testInvalidUTF8Frame() async throws {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(configuration: .init(validateUTF8: true)) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound.messages(maxSize: .max) {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
@@ -705,13 +739,12 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 try await outbound.write(.custom(.init(fin: true, opcode: .text, data: buffer)))
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(rt?.closeCode, .dataInconsistentWithMessage)
+            #expect(rt?.closeCode == .dataInconsistentWithMessage)
         }
     }
-    #endif
 
     // test WebSocket channel graceful shutdown
-    func testGracefulShutdown() async throws {
+    @Test func testGracefulShutdown() async throws {
         await withThrowingTaskGroup(of: Void.self) { group in
             let promise = Promise<Int>()
             let logger = {
@@ -724,10 +757,10 @@ final class HummingbirdWebSocketTests: XCTestCase {
             let app = Application(
                 router: router,
                 server: .http1WebSocketUpgrade { _, _, _ in
-                    return .upgrade { inbound, outbound, _ in
+                    .upgrade { inbound, outbound, _ in
                         try await outbound.write(.text("Hello"))
                         for try await _ in inbound {
-                            XCTFail("Shouldn't receive anything")
+                            Issue.record("Shouldn't receive anything")
                         }
                     }
                 },
@@ -751,7 +784,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
                     await connectPromise.complete(())
                     var iterator = inbound.makeAsyncIterator()
                     let firstMessage = try await iterator.nextMessage(maxSize: .max)
-                    XCTAssertEqual(firstMessage, .text("Hello"))
+                    #expect(firstMessage == .text("Hello"))
                     while try await iterator.next() != nil {}
                 }
             }
@@ -760,7 +793,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         }
     }
 
-    func testClientErrorHandling() async throws {
+    @Test func testClientErrorHandling() async throws {
         struct ClientError: Error {}
         let app = Application(
             router: Router(),
@@ -768,22 +801,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound {}
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
-            do {
+            _ = await #expect(throws: ClientError.self) {
                 _ = try await client.ws("/") { _, _, _ in
                     throw ClientError()
                 }
-                XCTFail("Shouldnt reach here")
-            } catch is ClientError {
-            } catch {
-                XCTFail("Throwing wrong error")
             }
         }
     }
 
-    func testServerErrorHandling() async throws {
+    @Test func testServerErrorHandling() async throws {
+        var logger = Logger(label: "testServerErrorHandling")
+        logger.logLevel = .trace
         struct ServerError: Error {}
         let app = Application(
             router: Router(),
@@ -791,17 +823,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
                 .upgrade([:]) { _, _, _ in
                     throw ServerError()
                 }
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            logger: logger
         )
         try await app.test(.live) { client in
-            let closeFrame = try await client.ws("/") { inbound, _, _ in
+            var logger = Logger(label: "testServerErrorHandling-client")
+            logger.logLevel = .trace
+            let closeFrame = try await client.ws("/", logger: logger) { inbound, _, _ in
                 for try await _ in inbound {}
             }
-            XCTAssertEqual(closeFrame?.closeCode, .unexpectedServerError)
+            #expect(closeFrame?.closeCode == .unexpectedServerError)
         }
     }
 
-    func testCancelledRequest() async throws {
+    @Test func testCancelledRequest() async throws {
         let httpClient = HTTPClient()
         let (stream, cont) = AsyncStream.makeStream(of: Int.self)
 
@@ -866,7 +902,7 @@ final class HummingbirdWebSocketTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
-    func testUpgradeAfterNotUpgraded() async throws {
+    @Test func testUpgradeAfterNotUpgraded() async throws {
         let router = Router()
         router.get("/") { _, _ in
             "Helllo"
@@ -875,21 +911,21 @@ final class HummingbirdWebSocketTests: XCTestCase {
             router: router,
             server: .http1WebSocketUpgrade { _, _, _ in
                 .dontUpgrade
-            }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
         try await app.test(.live) { client in
             try await client.execute(uri: "/", method: .get) { response in
-                XCTAssertEqual(response.status, .ok)
+                #expect(response.status == .ok)
             }
             // perform upgrade
             try await client.execute(uri: "/test?this=that", method: .get, headers: [.upgrade: "websocket"]) { response in
-                XCTAssertEqual(response.status, .temporaryRedirect)
-                XCTAssertEqual(response.headers[.location], "/test?this=that")
+                #expect(response.status == .temporaryRedirect)
+                #expect(response.headers[.location] == "/test?this=that")
             }
             // check channel has been closed
-            do {
+            await #expect(throws: ChannelError.ioOnClosedChannel) {
                 try await client.execute(uri: "/", method: .get)
-            } catch let error as ChannelError where error == .ioOnClosedChannel {
             }
         }
     }
