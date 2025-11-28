@@ -30,7 +30,7 @@ let app = Application(
     server: .http1WebSocketUpgrade(
         configuration: .init(maxFrameSize: 16_777_216, extensions: [.perMessageDeflate(maxDecompressedFrameSize: 16_777_216)])
     ) { _, _, _ in
-        return .upgrade([:]) { inbound, outbound, _ in
+        .upgrade([:]) { inbound, outbound, _ in
             for try await msg in inbound.messages(maxSize: .max) {
                 switch msg {
                 case .binary(let buffer):
