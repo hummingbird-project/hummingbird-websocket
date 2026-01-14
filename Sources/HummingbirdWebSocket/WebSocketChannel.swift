@@ -212,7 +212,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     public func setup(channel: Channel, logger: Logger) -> EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
-            let logger = logger.with(metadataKey: "hb_id", value: .stringConvertible(RequestID()))
+            let logger = logger.with(metadataKey: "hb.request.id", value: .stringConvertible(RequestID()))
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
                 maxFrameSize: self.configuration.maxFrameSize,
                 shouldUpgrade: { channel, head in
