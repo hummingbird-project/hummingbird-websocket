@@ -15,7 +15,10 @@ import WSCore
 
 extension HTTPServerBuilder {
     /// HTTP1 channel builder supporting a websocket upgrade
-    ///  - parameters
+    /// - Parameters:
+    ///     - configuration: WebSocket server configuration
+    ///     - additionalChannelHandlers: Additional channel handlers to add on HTTP channel
+    ///     - shouldUpgrade: Closure returning either `dontUpgrade` or closure processing WebSocket packets
     public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
@@ -35,6 +38,10 @@ extension HTTPServerBuilder {
     }
 
     /// HTTP1 channel builder supporting a websocket upgrade
+    /// - Parameters:
+    ///     - configuration: WebSocket server configuration
+    ///     - additionalChannelHandlers: Additional channel handlers to add on HTTP channel
+    ///     - shouldUpgrade: Closure returning either `dontUpgrade` or closure processing WebSocket packets
     public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
