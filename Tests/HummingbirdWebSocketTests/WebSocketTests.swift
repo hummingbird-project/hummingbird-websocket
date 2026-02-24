@@ -153,7 +153,9 @@ struct HummingbirdWebSocketTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(configuration: .init(maxFrameSize: (1 << 13))) { _, _, _ in
-                .upgrade([:]) { inbound, _, _ in
+                .upgrade([:]) { inbound, outbound, _ in
+                    // send Hello
+                    try await outbound.write(.text("Hello"))
                     for try await _ in inbound {}
                 }
             },
@@ -162,9 +164,15 @@ struct HummingbirdWebSocketTests {
         )
         try await app.test(.live) { client in
             let rt = try await client.ws("/") { inbound, outbound, _ in
+                var inboundIterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                // read Hello
+                let frame = try await inboundIterator.next()
+                #expect(frame == .text("Hello"))
+                // send large buffer
                 let buffer = ByteBuffer(repeating: 1, count: (1 << 13) + 1)
                 try await outbound.write(.binary(buffer))
-                for try await _ in inbound {}
+                // wait for more inbound messages
+                while try await inboundIterator.next() != nil {}
             }
             #expect(rt?.closeCode == .messageTooLarge)
         }
