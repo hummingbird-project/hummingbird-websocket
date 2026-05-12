@@ -67,6 +67,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - configuration: WebSocket configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    @available(*, deprecated, renamed: "init(responder:configuration:shouldUpgrade:)")
+    @_documentation(visibility: internal)
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
@@ -154,6 +156,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - configuration: WebSocket configuration
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    @available(*, deprecated, renamed: "init(responder:configuration:shouldUpgrade:)")
+    @_documentation(visibility: internal)
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
