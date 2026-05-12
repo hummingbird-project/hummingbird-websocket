@@ -15,9 +15,9 @@ import NIOWebSocket
 import ServiceLifecycle
 import Testing
 import WSClient
-@_spi(WSInternal) @testable import WSCore
 
 @testable import WSCompression
+@_spi(WSInternal) @testable import WSCore
 
 @Suite(.serialized)
 struct HummingbirdWebSocketExtensionTests {
