@@ -19,6 +19,8 @@ extension HTTPServerBuilder {
     ///     - configuration: WebSocket server configuration
     ///     - additionalChannelHandlers: Additional channel handlers to add on HTTP channel
     ///     - shouldUpgrade: Closure returning either `dontUpgrade` or closure processing WebSocket packets
+    @_disfavoredOverload
+    @available(*, deprecated, renamed: "HTTPServerBuilder.http1WebSocketUpgrade(configuration:shouldUpgrade:)")
     public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
@@ -42,6 +44,8 @@ extension HTTPServerBuilder {
     ///     - configuration: WebSocket server configuration
     ///     - additionalChannelHandlers: Additional channel handlers to add on HTTP channel
     ///     - shouldUpgrade: Closure returning either `dontUpgrade` or closure processing WebSocket packets
+    @_disfavoredOverload
+    @available(*, deprecated, renamed: "HTTPServerBuilder.http1WebSocketUpgrade(configuration:shouldUpgrade:)")
     public static func http1WebSocketUpgrade(
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],

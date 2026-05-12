@@ -139,6 +139,7 @@ extension HTTP1WebSocketUpgradeChannel {
     ///   - webSocketResponder: WebSocket initial request responder
     ///   - configuration: WebSocket configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add
+    @_disfavoredOverload
     public init<WSResponder: HTTPResponder>(
         responder: @escaping HTTPChannelHandler.Responder,
         webSocketResponder: WSResponder,
@@ -224,6 +225,8 @@ extension HTTPServerBuilder {
     ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
     /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
     @preconcurrency
+    @_disfavoredOverload
+    @available(*, deprecated, renamed: "HTTPServerBuilder.http1WebSocketUpgrade(webSocketRouter:configuration:)")
     public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder & _HB_SendableMetatype>(
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),

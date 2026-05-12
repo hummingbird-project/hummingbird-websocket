@@ -43,7 +43,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
@@ -72,7 +72,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, outbound, _ in
                     let extensions = await outbound.handler.configuration.extensions
@@ -101,7 +101,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, outbound, _ in
                     let extensions = await outbound.handler.configuration.extensions
@@ -131,7 +131,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true, minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.xor(), .perMessageDeflate(serverNoContextTakeover: true, minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await data in inbound.messages(maxSize: .max) {
@@ -164,7 +164,7 @@ struct HummingbirdWebSocketExtensionTests {
             router: Router(),
             server: .http1WebSocketUpgrade(
                 webSocketRouter: router,
-                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]))
             ),
             configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
@@ -184,7 +184,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.perMessageDeflate(minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
@@ -211,7 +211,7 @@ struct HummingbirdWebSocketExtensionTests {
         let app = Application(
             router: Router(),
             server: .http1WebSocketUpgrade(
-                configuration: .init(extensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)])
+                configuration: .init(ws: .init(extensions: [.checkDeflate(), .perMessageDeflate(minFrameSizeToCompress: 16)]))
             ) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
