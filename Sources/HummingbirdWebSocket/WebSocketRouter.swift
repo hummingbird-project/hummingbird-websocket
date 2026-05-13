@@ -159,8 +159,8 @@ extension HTTP1WebSocketUpgradeChannel {
     ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
     /// - Parameters:
     ///   - responder: HTTP responder
-    ///   - configuration: HTTP1WithWebSocket configuration
-    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    ///   - webSocketResponder: WebSocket initial request responder
+    ///   - configuration: WebSocket configuration
     public init<WSResponder: HTTPResponder>(
         responder: @escaping HTTPChannelHandler.Responder,
         webSocketResponder: WSResponder,
@@ -252,7 +252,6 @@ extension HTTPServerBuilder {
     /// - Parameters:
     ///   - webSocketRouter: Router used for testing whether a WebSocket upgrade should occur
     ///   - configuration: WebSocket server configuration
-    ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
     /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
     @preconcurrency
     public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder & _HB_SendableMetatype>(
