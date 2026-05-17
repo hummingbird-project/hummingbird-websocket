@@ -152,7 +152,7 @@ struct HummingbirdWebSocketTests {
         logger.logLevel = .trace
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(configuration: .init(maxFrameSize: (1 << 13))) { _, _, _ in
+            server: .http1WebSocketUpgrade(configuration: .init(ws: .init(maxFrameSize: (1 << 13)))) { _, _, _ in
                 .upgrade([:]) { inbound, outbound, _ in
                     // send Hello
                     try await outbound.write(.text("Hello"))
@@ -553,7 +553,7 @@ struct HummingbirdWebSocketTests {
             router: router,
             server: .http1WebSocketUpgrade(
                 webSocketRouter: router,
-                configuration: .init(autoPing: .enabled(timePeriod: .milliseconds(50)))
+                configuration: .init(ws: .init(autoPing: .enabled(timePeriod: .milliseconds(50))))
             ),
             configuration: .init(address: .hostname("127.0.0.1", port: 0))
         )
@@ -728,7 +728,7 @@ struct HummingbirdWebSocketTests {
     @Test func testInvalidUTF8Frame() async throws {
         let app = Application(
             router: Router(),
-            server: .http1WebSocketUpgrade(configuration: .init(validateUTF8: true)) { _, _, _ in
+            server: .http1WebSocketUpgrade(configuration: .init(ws: .init(validateUTF8: true))) { _, _, _ in
                 .upgrade([:]) { inbound, _, _ in
                     for try await _ in inbound.messages(maxSize: .max) {}
                 }

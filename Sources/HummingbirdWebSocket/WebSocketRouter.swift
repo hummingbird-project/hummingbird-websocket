@@ -139,13 +139,33 @@ extension HTTP1WebSocketUpgradeChannel {
     ///   - webSocketResponder: WebSocket initial request responder
     ///   - configuration: WebSocket configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add
+    @_disfavoredOverload
     public init<WSResponder: HTTPResponder>(
         responder: @escaping HTTPChannelHandler.Responder,
         webSocketResponder: WSResponder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] }
     ) where WSResponder.Context: WebSocketRequestContext {
-        self.additionalChannelHandlers = additionalChannelHandlers
+        self = .init(
+            responder: responder,
+            webSocketResponder: webSocketResponder,
+            configuration: .init(
+                http1: .init(additionalChannelHandlers: additionalChannelHandlers(), idleTimeout: nil),
+                ws: configuration
+            )
+        )
+    }
+
+    ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
+    /// - Parameters:
+    ///   - responder: HTTP responder
+    ///   - webSocketResponder: WebSocket initial request responder
+    ///   - configuration: WebSocket configuration
+    public init<WSResponder: HTTPResponder>(
+        responder: @escaping HTTPChannelHandler.Responder,
+        webSocketResponder: WSResponder,
+        configuration: Configuration,
+    ) where WSResponder.Context: WebSocketRequestContext {
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger in
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
@@ -156,7 +176,7 @@ extension HTTP1WebSocketUpgradeChannel {
                     let response = try await webSocketResponder.respond(to: request, context: context)
                     if response.status == .ok, let webSocketHandler = context.webSocket.handler.withLockedValue({ $0 }) {
                         let (headers, extensions) = try Self.webSocketExtensionNegotiation(
-                            extensionBuilders: configuration.extensions,
+                            extensionBuilders: configuration.ws.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: response.headers,
                             logger: logger
@@ -167,8 +187,9 @@ extension HTTP1WebSocketUpgradeChannel {
                                     type: .server,
                                     configuration: .init(
                                         extensions: extensions,
-                                        autoPing: configuration.autoPing,
-                                        validateUTF8: configuration.validateUTF8
+                                        autoPing: configuration.ws.autoPing,
+                                        closeTimeout: configuration.ws.closeTimeout,
+                                        validateUTF8: configuration.ws.validateUTF8
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: WebSocketRouterContext(request: request, context: webSocketHandler.context),
@@ -204,6 +225,8 @@ extension HTTPServerBuilder {
     ///   - additionalChannelHandlers: Additional channel handlers to add to channel pipeline
     /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
     @preconcurrency
+    @_disfavoredOverload
+    @available(*, deprecated, renamed: "HTTPServerBuilder.http1WebSocketUpgrade(webSocketRouter:configuration:)")
     public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder & _HB_SendableMetatype>(
         webSocketRouter: WSResponderBuilder,
         configuration: WebSocketServerConfiguration = .init(),
@@ -216,6 +239,31 @@ extension HTTPServerBuilder {
                 webSocketResponder: webSocketReponder,
                 configuration: configuration,
                 additionalChannelHandlers: additionalChannelHandlers
+            )
+        }
+    }
+
+    /// HTTP1 channel builder supporting a websocket upgrade
+    ///
+    /// With this function you provide a separate router from the one you have supplied
+    /// to ``Hummingbird/Application``. You can provide the same router as is used for
+    /// standard HTTP routing, but it is preferable that you supply a separate one to
+    /// avoid attempting to match against paths which will never produce a WebSocket upgrade.
+    /// - Parameters:
+    ///   - webSocketRouter: Router used for testing whether a WebSocket upgrade should occur
+    ///   - configuration: WebSocket server configuration
+    /// - Returns: HTTP server builder that builds an HTTP1 with WebSocket upgrade server
+    @preconcurrency
+    public static func http1WebSocketUpgrade<WSResponderBuilder: HTTPResponderBuilder & _HB_SendableMetatype>(
+        webSocketRouter: WSResponderBuilder,
+        configuration: HTTP1WebSocketUpgradeChannel.Configuration = .init()
+    ) -> HTTPServerBuilder where WSResponderBuilder.Responder.Context: WebSocketRequestContext {
+        let webSocketReponder = webSocketRouter.buildResponder()
+        return .init { responder in
+            HTTP1WebSocketUpgradeChannel(
+                responder: responder,
+                webSocketResponder: webSocketReponder,
+                configuration: configuration
             )
         }
     }

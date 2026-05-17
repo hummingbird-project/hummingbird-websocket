@@ -27,6 +27,24 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         case notUpgraded(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>)
         case failedUpgrade(NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>, Logger)
     }
+    public struct Configuration: Sendable {
+        /// HTTP1 channel configuration
+        public let http1: HTTP1Channel.Configuration
+        /// WebSocket channel configuration
+        public let ws: WebSocketServerConfiguration
+
+        /// Initialize HTTP1WebSocketUpgradeChannel.Configuration
+        /// - Parameters:
+        ///   - http1: HTTP1 channel configuration
+        ///   - ws: WebSocket channel configuration
+        public init(
+            http1: HTTP1Channel.Configuration = .init(),
+            ws: WebSocketServerConfiguration = .init()
+        ) {
+            self.http1 = http1
+            self.ws = ws
+        }
+    }
 
     public struct Value: ServerChildChannelValue {
         let upgradeResult: EventLoopFuture<UpgradeResult>
@@ -49,20 +67,40 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - configuration: WebSocket configuration
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    @_disfavoredOverload
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
-        self.additionalChannelHandlers = additionalChannelHandlers
+        self = .init(
+            responder: responder,
+            configuration: .init(
+                http1: .init(additionalChannelHandlers: additionalChannelHandlers(), idleTimeout: nil),
+                ws: configuration
+            ),
+            shouldUpgrade: shouldUpgrade
+        )
+    }
+
+    ///  Initialize HTTP1AndWebSocketChannel with synchronous `shouldUpgrade` function
+    /// - Parameters:
+    ///   - responder: HTTP responder
+    ///   - configuration: HTTP1WithWebSocket configuration
+    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    public init(
+        responder: @escaping HTTPChannelHandler.Responder,
+        configuration: Configuration,
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+    ) {
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
             channel.eventLoop.makeCompletedFuture { () -> ShouldUpgradeResult<WebSocketChannelHandler> in
                 try shouldUpgrade(head, channel, logger)
                     .map { headers, handler -> (HTTPFields, WebSocketChannelHandler) in
                         let (headers, extensions) = try Self.webSocketExtensionNegotiation(
-                            extensionBuilders: configuration.extensions,
+                            extensionBuilders: configuration.ws.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: headers,
                             logger: logger
@@ -76,9 +114,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                         type: .server,
                                         configuration: .init(
                                             extensions: extensions,
-                                            autoPing: configuration.autoPing,
-                                            closeTimeout: configuration.closeTimeout,
-                                            validateUTF8: configuration.validateUTF8
+                                            autoPing: configuration.ws.autoPing,
+                                            closeTimeout: configuration.ws.closeTimeout,
+                                            validateUTF8: configuration.ws.validateUTF8
                                         ),
                                         asyncChannel: asyncChannel,
                                         context: context,
@@ -117,13 +155,33 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - additionalChannelHandlers: Additional channel handlers to add
     ///   - configuration: WebSocket configuration
     ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    @_disfavoredOverload
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
-        self.additionalChannelHandlers = additionalChannelHandlers
+        self = .init(
+            responder: responder,
+            configuration: .init(
+                http1: .init(additionalChannelHandlers: additionalChannelHandlers(), idleTimeout: nil),
+                ws: configuration
+            ),
+            shouldUpgrade: shouldUpgrade
+        )
+    }
+
+    ///  Initialize HTTP1AndWebSocketChannel with async `shouldUpgrade` function
+    /// - Parameters:
+    ///   - responder: HTTP responder
+    ///   - configuration: HTTP1WithWebSocket configuration
+    ///   - shouldUpgrade: Function returning whether upgrade should be allowed
+    public init(
+        responder: @escaping HTTPChannelHandler.Responder,
+        configuration: Configuration,
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+    ) {
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
             let promise = channel.eventLoop.makePromise(of: ShouldUpgradeResult<WebSocketChannelHandler>.self)
@@ -131,7 +189,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                 try await shouldUpgrade(head, channel, logger)
                     .map { headers, handler in
                         let (headers, extensions) = try Self.webSocketExtensionNegotiation(
-                            extensionBuilders: configuration.extensions,
+                            extensionBuilders: configuration.ws.extensions,
                             requestHeaders: head.headerFields,
                             responseHeaders: headers,
                             logger: logger
@@ -145,8 +203,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                         type: .server,
                                         configuration: .init(
                                             extensions: extensions,
-                                            autoPing: configuration.autoPing,
-                                            validateUTF8: configuration.validateUTF8
+                                            autoPing: configuration.ws.autoPing,
+                                            closeTimeout: configuration.ws.closeTimeout,
+                                            validateUTF8: configuration.ws.validateUTF8
                                         ),
                                         asyncChannel: asyncChannel,
                                         context: context,
@@ -214,7 +273,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
             let logger = logger.with(metadataKey: "hb.request.id", value: .stringConvertible(RequestID()))
             let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
-                maxFrameSize: self.configuration.maxFrameSize,
+                maxFrameSize: self.configuration.ws.maxFrameSize,
                 shouldUpgrade: { channel, head in
                     upgradeAttempted.value = true
                     return self.shouldUpgrade(head, channel, logger)
@@ -233,10 +292,12 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             let serverUpgradeConfiguration = NIOTypedHTTPServerUpgradeConfiguration(
                 upgraders: [upgrader],
                 notUpgradingCompletionHandler: { channel in
-                    let childChannelHandlers: [any ChannelHandler] =
-                        [HTTP1ToHTTPServerCodec(secure: false)] + self.additionalChannelHandlers() + [HTTPUserEventHandler(logger: logger)]
-                    return channel.eventLoop.makeCompletedFuture {
-                        try channel.pipeline.syncOperations.addHandlers(childChannelHandlers)
+                    channel.eventLoop.makeCompletedFuture {
+                        try channel.pipeline.syncOperations.addHandler(HTTP1ToHTTPServerCodec(secure: false))
+                        try channel.pipeline.syncOperations.addHandlers(self.configuration.http1.additionalChannelHandlers())
+                        try channel.pipeline.syncOperations.addHandler(
+                            HTTPConnectionStateHandler(idleTimeout: self.configuration.http1.idleTimeout.map { .init($0) }, logger: logger)
+                        )
                         let asyncChannel = try NIOAsyncChannel<HTTPRequestPart, HTTPResponsePart>(
                             wrappingChannelSynchronously: channel,
                             configuration: .init(isOutboundHalfClosureEnabled: true)
@@ -349,6 +410,5 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
 
     public let responder: HTTPChannelHandler.Responder
     let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>>
-    let configuration: WebSocketServerConfiguration
-    let additionalChannelHandlers: @Sendable () -> [any RemovableChannelHandler]
+    let configuration: Configuration
 }
