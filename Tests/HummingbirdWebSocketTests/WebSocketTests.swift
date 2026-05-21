@@ -227,6 +227,59 @@ struct HummingbirdWebSocketTests {
         }
     }
 
+    // test binary buffer across multiple frames works
+    @Test func testMultiFrameBinaryMessage() async throws {
+        let buffer1 = createRandomBuffer(size: 7000)
+        let buffer2 = createRandomBuffer(size: 120)
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade(configuration: .init(ws: .init(maxFrameSize: 2048))) { _, _, _ in
+                .upgrade([:]) { inbound, outbound, _ in
+                    try await outbound.writeBinaryMessage(buffer1)
+                    try await outbound.writeBinaryMessage(buffer2)
+                    for try await _ in inbound {}
+                }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
+        )
+        try await app.test(.live) { client in
+            let closeFrame = try await client.ws("/") { inbound, _, _ in
+                var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                var message = try await iterator.next()
+                #expect(.binary(buffer1) == message)
+                message = try await iterator.next()
+                #expect(.binary(buffer2) == message)
+            }
+            #expect(closeFrame?.closeCode == .normalClosure)
+        }
+    }
+
+    // test text buffer across multiple frames works
+    @Test func testMultiFrameTextMessage() async throws {
+        let characters: [Character] = ["a", "é", "🌍"]
+        let string = String((0..<6096).map { _ in characters.randomElement()! })
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade(configuration: .init(ws: .init(maxFrameSize: 2048))) { _, _, _ in
+                .upgrade([:]) { inbound, outbound, _ in
+                    try await outbound.writeTextMessage("Hello world!")
+                    try await outbound.writeTextMessage(string)
+                    for try await _ in inbound {}
+                }
+            },
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
+        )
+        _ = try await app.test(.live) { client in
+            try await client.ws("/") { inbound, _, _ in
+                var iterator = inbound.messages(maxSize: .max).makeAsyncIterator()
+                var message = try await iterator.next()
+                #expect(.text("Hello world!") == message)
+                message = try await iterator.next()
+                #expect(.text(string) == message)
+            }
+        }
+    }
+
     @Test func testWebSocketUpgradeFailed() async throws {
         let app = Application(
             router: Router(),

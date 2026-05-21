@@ -116,7 +116,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                             extensions: extensions,
                                             autoPing: configuration.ws.autoPing,
                                             closeTimeout: configuration.ws.closeTimeout,
-                                            validateUTF8: configuration.ws.validateUTF8
+                                            validateUTF8: configuration.ws.validateUTF8,
+                                            maxFrameSize: configuration.ws.maxFrameSize
                                         ),
                                         asyncChannel: asyncChannel,
                                         context: context,
@@ -205,7 +206,8 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                                             extensions: extensions,
                                             autoPing: configuration.ws.autoPing,
                                             closeTimeout: configuration.ws.closeTimeout,
-                                            validateUTF8: configuration.ws.validateUTF8
+                                            validateUTF8: configuration.ws.validateUTF8,
+                                            maxFrameSize: configuration.ws.maxFrameSize
                                         ),
                                         asyncChannel: asyncChannel,
                                         context: context,
