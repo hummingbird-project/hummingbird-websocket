@@ -235,8 +235,8 @@ struct HummingbirdWebSocketTests {
             router: Router(),
             server: .http1WebSocketUpgrade(configuration: .init(ws: .init(maxFrameSize: 2048))) { _, _, _ in
                 .upgrade([:]) { inbound, outbound, _ in
-                    try await outbound.writeBuffer(buffer1)
-                    try await outbound.writeBuffer(buffer2)
+                    try await outbound.writeBinaryMessage(buffer1)
+                    try await outbound.writeBinaryMessage(buffer2)
                     for try await _ in inbound {}
                 }
             },
