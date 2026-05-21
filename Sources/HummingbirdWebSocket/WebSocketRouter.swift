@@ -189,7 +189,8 @@ extension HTTP1WebSocketUpgradeChannel {
                                         extensions: extensions,
                                         autoPing: configuration.ws.autoPing,
                                         closeTimeout: configuration.ws.closeTimeout,
-                                        validateUTF8: configuration.ws.validateUTF8
+                                        validateUTF8: configuration.ws.validateUTF8,
+                                        maxFrameSize: configuration.ws.maxFrameSize
                                     ),
                                     asyncChannel: asyncChannel,
                                     context: WebSocketRouterContext(request: request, context: webSocketHandler.context),
