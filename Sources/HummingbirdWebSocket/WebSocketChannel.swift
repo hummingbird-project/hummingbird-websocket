@@ -280,7 +280,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
                     upgradeAttempted.value = true
                     return self.shouldUpgrade(head, channel, logger)
                 },
-                upgradePipelineHandler: { channel, handler in
+                upgradePipelineHandler: { (channel, handler: @escaping WebSocketChannelHandler) in
                     channel.eventLoop.makeCompletedFuture {
                         let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(
                             wrappingChannelSynchronously: channel,
@@ -316,6 +316,9 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
             upgradeConfiguration.enablePipelining = false  // HTTP is pipelined by NIOAsyncChannel
             upgradeConfiguration.enableErrorHandling = false  // These are handled by Hummingbird
             upgradeConfiguration.enableResponseHeaderValidation = false  // Swift HTTP Types are already doing this validation
+            upgradeConfiguration.decoderConfiguration.maxHeaderFieldSize = self.configuration.http1.httpDecoder.maxHeaderFieldSize
+            upgradeConfiguration.decoderConfiguration.maxHeaderListSize = self.configuration.http1.httpDecoder.maxHeaderListSize
+            upgradeConfiguration.decoderConfiguration.maxHeaderFieldCount = self.configuration.http1.httpDecoder.maxHeaderFieldCount
             let negotiationResultFuture = try channel.pipeline.syncOperations.configureUpgradableHTTPServerPipeline(
                 configuration: upgradeConfiguration
             )
