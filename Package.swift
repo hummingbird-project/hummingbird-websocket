@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "HummingbirdWSTesting", targets: ["HummingbirdWSTesting"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.23.0"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
         .package(url: "https://github.com/hummingbird-project/swift-websocket.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.22.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.5.0"),
