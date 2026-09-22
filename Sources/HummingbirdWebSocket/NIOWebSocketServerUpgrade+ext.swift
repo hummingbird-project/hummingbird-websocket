@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-import HTTPTypes
+public import HTTPTypes
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
@@ -55,8 +55,8 @@ extension NIOTypedWebSocketServerUpgrader {
     convenience init<Value>(
         maxFrameSize: Int = 1 << 14,
         enableAutomaticErrorHandling: Bool = true,
-        shouldUpgrade: @escaping @Sendable (Channel, HTTPRequest) -> EventLoopFuture<ShouldUpgradeResult<Value>>,
-        upgradePipelineHandler: @escaping @Sendable (Channel, Value) -> EventLoopFuture<UpgradeResult>
+        shouldUpgrade: @escaping @Sendable (any Channel, HTTPRequest) -> EventLoopFuture<ShouldUpgradeResult<Value>>,
+        upgradePipelineHandler: @escaping @Sendable (any Channel, Value) -> EventLoopFuture<UpgradeResult>
     ) {
         let shouldUpgradeResult = NIOLockedValueBox<Value?>(nil)
         self.init(

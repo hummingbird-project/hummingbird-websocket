@@ -6,10 +6,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-import HummingbirdTesting
-import Logging
+public import HummingbirdTesting
+public import Logging
 import NIOSSL
-import WSClient
+public import WSClient
 
 extension TestClientProtocol {
     ///  Test WebSocket endpoint

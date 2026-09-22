@@ -6,11 +6,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-import HTTPTypes
+public import HTTPTypes
 import Hummingbird
-import HummingbirdCore
-import Logging
-import NIOCore
+public import HummingbirdCore
+public import Logging
+public import NIOCore
 import WSCore
 
 extension HTTPServerBuilder {
@@ -25,7 +25,7 @@ extension HTTPServerBuilder {
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade:
-            @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<
+            @escaping @Sendable (HTTPRequest, any Channel, Logger) async throws -> ShouldUpgradeResult<
                 WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>
             >
     ) -> HTTPServerBuilder {
@@ -50,7 +50,7 @@ extension HTTPServerBuilder {
         configuration: WebSocketServerConfiguration = .init(),
         additionalChannelHandlers: @autoclosure @escaping @Sendable () -> [any RemovableChannelHandler] = [],
         shouldUpgrade:
-            @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<
+            @escaping @Sendable (HTTPRequest, any Channel, Logger) throws -> ShouldUpgradeResult<
                 WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>
             >
     ) -> HTTPServerBuilder {
@@ -71,7 +71,7 @@ extension HTTPServerBuilder {
     public static func http1WebSocketUpgrade(
         configuration: HTTP1WebSocketUpgradeChannel.Configuration = .init(),
         shouldUpgrade:
-            @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<
+            @escaping @Sendable (HTTPRequest, any Channel, Logger) async throws -> ShouldUpgradeResult<
                 WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>
             >
     ) -> HTTPServerBuilder {
@@ -91,7 +91,7 @@ extension HTTPServerBuilder {
     public static func http1WebSocketUpgrade(
         configuration: HTTP1WebSocketUpgradeChannel.Configuration = .init(),
         shouldUpgrade:
-            @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<
+            @escaping @Sendable (HTTPRequest, any Channel, Logger) throws -> ShouldUpgradeResult<
                 WebSocketDataHandler<HTTP1WebSocketUpgradeChannel.Context>
             >
     ) -> HTTPServerBuilder {

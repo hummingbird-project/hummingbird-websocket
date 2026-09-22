@@ -17,10 +17,12 @@ import HummingbirdWSTesting
 import HummingbirdWebSocket
 import Logging
 import NIOCore
+import NIOHTTP1
 import NIOPosix
 import NIOWebSocket
 import ServiceLifecycle
 import Testing
+import UnixSignals
 import WSClient
 
 /// Promise type.
