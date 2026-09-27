@@ -8,6 +8,8 @@
 
 import Hummingbird
 import HummingbirdCore
+import HummingbirdTesting
+import HummingbirdWSTesting
 import HummingbirdWebSocket
 import Logging
 import NIOCore
@@ -290,11 +292,11 @@ struct XorWebSocketExtensionBuilder: WebSocketExtensionBuilder {
         return header
     }
 
-    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 
-    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)? {
         XorWebSocketExtension(value: UInt8(request.parameters["value"]?.integer ?? 255))
     }
 }
@@ -332,11 +334,11 @@ struct CheckDeflateWebSocketExtensionBuilder: WebSocketExtensionBuilder {
         Self.name
     }
 
-    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+    func serverExtension(from request: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)? {
         CheckDeflateWebSocketExtension()
     }
 
-    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (WebSocketExtension)? {
+    func clientExtension(from request: WebSocketExtensionHTTPParameters) throws -> (any WebSocketExtension)? {
         CheckDeflateWebSocketExtension()
     }
 }

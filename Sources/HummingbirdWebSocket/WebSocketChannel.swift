@@ -6,16 +6,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-import HTTPTypes
+public import HTTPTypes
 import Hummingbird
-import HummingbirdCore
-import Logging
+public import HummingbirdCore
+public import Logging
 import NIOConcurrencyHelpers
-import NIOCore
+public import NIOCore
 import NIOHTTP1
-import NIOHTTPTypes
+public import NIOHTTPTypes
 import NIOHTTPTypesHTTP1
-import NIOWebSocket
+public import NIOWebSocket
 @_spi(WSInternal) import WSCore
 
 /// Child channel supporting a web socket upgrade from HTTP1
@@ -48,7 +48,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
 
     public struct Value: ServerChildChannelValue {
         let upgradeResult: EventLoopFuture<UpgradeResult>
-        public let channel: Channel
+        public let channel: any Channel
     }
 
     /// Basic context implementation of ``/WSCore/WebSocketContext``.
@@ -72,7 +72,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, any Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self = .init(
             responder: responder,
@@ -92,7 +92,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: Configuration,
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, any Channel, Logger) throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
@@ -140,7 +140,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         responder: @escaping HTTPChannelHandler.Responder,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
         configuration: WebSocketServerConfiguration,
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, any Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self.init(
             responder: responder,
@@ -161,7 +161,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: WebSocketServerConfiguration,
         additionalChannelHandlers: @escaping @Sendable () -> [any RemovableChannelHandler] = { [] },
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, any Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self = .init(
             responder: responder,
@@ -181,7 +181,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     public init(
         responder: @escaping HTTPChannelHandler.Responder,
         configuration: Configuration,
-        shouldUpgrade: @escaping @Sendable (HTTPRequest, Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
+        shouldUpgrade: @escaping @Sendable (HTTPRequest, any Channel, Logger) async throws -> ShouldUpgradeResult<WebSocketDataHandler<Context>>
     ) {
         self.configuration = configuration
         self.shouldUpgrade = { head, channel, logger -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>> in
@@ -270,7 +270,7 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     ///   - configuration: Server configuration
     ///   - logger: Logger used by upgrade
     /// - Returns: Negotiated result future
-    public func setup(channel: Channel, logger: Logger) -> EventLoopFuture<Value> {
+    public func setup(channel: any Channel, logger: Logger) -> EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
             let upgradeAttempted = NIOLoopBoundBox(false, eventLoop: channel.eventLoop)
             let logger = logger.with(metadataKey: "hb.request.id", value: .stringConvertible(RequestID()))
@@ -414,6 +414,6 @@ public struct HTTP1WebSocketUpgradeChannel: ServerChildChannel, HTTPChannelHandl
     }
 
     public let responder: HTTPChannelHandler.Responder
-    let shouldUpgrade: @Sendable (HTTPRequest, Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>>
+    let shouldUpgrade: @Sendable (HTTPRequest, any Channel, Logger) -> EventLoopFuture<ShouldUpgradeResult<WebSocketChannelHandler>>
     let configuration: Configuration
 }

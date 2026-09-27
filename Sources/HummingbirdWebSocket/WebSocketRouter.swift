@@ -7,9 +7,9 @@
 //
 
 import HTTPTypes
-import Hummingbird
-import HummingbirdCore
-import Logging
+public import Hummingbird
+public import HummingbirdCore
+public import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 @_spi(WSInternal) import WSCore
