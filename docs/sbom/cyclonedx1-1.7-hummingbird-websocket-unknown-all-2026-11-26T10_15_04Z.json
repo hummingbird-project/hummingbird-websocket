@@ -1,0 +1,2312 @@
+{
+  "$schema" : "http://cyclonedx.org/schema/bom-1.7.schema.json",
+  "bomFormat" : "CycloneDX",
+  "components" : [
+    {
+      "bom-ref" : "async-http-client",
+      "externalReferences" : [
+
+      ],
+      "name" : "async-http-client",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "d60edb0b2dba4d9f39dce0405e109bd613c3f1e3",
+            "url" : "https://github.com/swift-server/async-http-client.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/swift-server/async-http-client@1.37.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.37.1"
+    },
+    {
+      "bom-ref" : "async-http-client:AsyncHTTPClient",
+      "externalReferences" : [
+
+      ],
+      "name" : "AsyncHTTPClient",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "d60edb0b2dba4d9f39dce0405e109bd613c3f1e3",
+            "url" : "https://github.com/swift-server/async-http-client.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/swift-server/async-http-client:AsyncHTTPClient@1.37.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.37.1"
+    },
+    {
+      "bom-ref" : "compress-nio",
+      "externalReferences" : [
+
+      ],
+      "name" : "compress-nio",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "e238631c31f06274ad75c003c154f0b6ad4910e7",
+            "url" : "https://github.com/adam-fowler/compress-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/adam-fowler/compress-nio@1.5.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.0"
+    },
+    {
+      "bom-ref" : "compress-nio:CompressNIO",
+      "externalReferences" : [
+
+      ],
+      "name" : "CompressNIO",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "e238631c31f06274ad75c003c154f0b6ad4910e7",
+            "url" : "https://github.com/adam-fowler/compress-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/adam-fowler/compress-nio:CompressNIO@1.5.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.0"
+    },
+    {
+      "bom-ref" : "hummingbird",
+      "externalReferences" : [
+
+      ],
+      "name" : "hummingbird",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "aa61ccf3fe6e6c012823a0c08a45d79855a26ee0",
+            "url" : "https://github.com/hummingbird-project/hummingbird.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/hummingbird@2.29.0",
+      "scope" : "required",
+      "type" : "application",
+      "version" : "2.29.0"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket",
+      "externalReferences" : [
+
+      ],
+      "name" : "hummingbird-websocket",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:AutobahnServerTest",
+      "externalReferences" : [
+
+      ],
+      "name" : "AutobahnServerTest",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:AutobahnServerTest",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:HummingbirdWSClient",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdWSClient",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:HummingbirdWSClient",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:HummingbirdWSCompression",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdWSCompression",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:HummingbirdWSCompression",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:HummingbirdWSTesting",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdWSTesting",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:HummingbirdWSTesting",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:HummingbirdWebSocket",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdWebSocket",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:HummingbirdWebSocket",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:HummingbirdWebSocketTests",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdWebSocketTests",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:HummingbirdWebSocketTests",
+      "scope" : "excluded",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird-websocket:WebsocketTest",
+      "externalReferences" : [
+
+      ],
+      "name" : "WebsocketTest",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket/hummingbird-websocket:WebsocketTest",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    {
+      "bom-ref" : "hummingbird:Hummingbird",
+      "externalReferences" : [
+
+      ],
+      "name" : "Hummingbird",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "aa61ccf3fe6e6c012823a0c08a45d79855a26ee0",
+            "url" : "https://github.com/hummingbird-project/hummingbird.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/hummingbird:Hummingbird@2.29.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.29.0"
+    },
+    {
+      "bom-ref" : "hummingbird:HummingbirdTesting",
+      "externalReferences" : [
+
+      ],
+      "name" : "HummingbirdTesting",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "aa61ccf3fe6e6c012823a0c08a45d79855a26ee0",
+            "url" : "https://github.com/hummingbird-project/hummingbird.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/hummingbird:HummingbirdTesting@2.29.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.29.0"
+    },
+    {
+      "bom-ref" : "swift-algorithms",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-algorithms",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+            "url" : "https://github.com/apple/swift-algorithms.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-algorithms@1.2.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.2.1"
+    },
+    {
+      "bom-ref" : "swift-algorithms:Algorithms",
+      "externalReferences" : [
+
+      ],
+      "name" : "Algorithms",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+            "url" : "https://github.com/apple/swift-algorithms.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-algorithms:Algorithms@1.2.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.2.1"
+    },
+    {
+      "bom-ref" : "swift-async-algorithms",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-async-algorithms",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "13713a4ffdee8abd929f92568ee9462a46ae26e0",
+            "url" : "https://github.com/apple/swift-async-algorithms.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-async-algorithms@1.1.7",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.1.7"
+    },
+    {
+      "bom-ref" : "swift-async-algorithms:AsyncAlgorithms",
+      "externalReferences" : [
+
+      ],
+      "name" : "AsyncAlgorithms",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "13713a4ffdee8abd929f92568ee9462a46ae26e0",
+            "url" : "https://github.com/apple/swift-async-algorithms.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-async-algorithms:AsyncAlgorithms@1.1.7",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.1.7"
+    },
+    {
+      "bom-ref" : "swift-atomics",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-atomics",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0442cb5a3f98ab802acb777929fdb446bda11a34",
+            "url" : "https://github.com/apple/swift-atomics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-atomics@1.3.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.3.1"
+    },
+    {
+      "bom-ref" : "swift-atomics:Atomics",
+      "externalReferences" : [
+
+      ],
+      "name" : "Atomics",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0442cb5a3f98ab802acb777929fdb446bda11a34",
+            "url" : "https://github.com/apple/swift-atomics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-atomics:Atomics@1.3.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.3.1"
+    },
+    {
+      "bom-ref" : "swift-collections",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-collections",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "88754449ab766a739610b660e117762115fabc9c",
+            "url" : "https://github.com/apple/swift-collections.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-collections@1.7.6",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.6"
+    },
+    {
+      "bom-ref" : "swift-collections:DequeModule",
+      "externalReferences" : [
+
+      ],
+      "name" : "DequeModule",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "88754449ab766a739610b660e117762115fabc9c",
+            "url" : "https://github.com/apple/swift-collections.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-collections:DequeModule@1.7.6",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.6"
+    },
+    {
+      "bom-ref" : "swift-collections:OrderedCollections",
+      "externalReferences" : [
+
+      ],
+      "name" : "OrderedCollections",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "88754449ab766a739610b660e117762115fabc9c",
+            "url" : "https://github.com/apple/swift-collections.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-collections:OrderedCollections@1.7.6",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.6"
+    },
+    {
+      "bom-ref" : "swift-configuration",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-configuration",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0b0c23215764302f7db752b079c024fbaff12e62",
+            "url" : "https://github.com/apple/swift-configuration.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-configuration@1.5.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.0"
+    },
+    {
+      "bom-ref" : "swift-configuration:Configuration",
+      "externalReferences" : [
+
+      ],
+      "name" : "Configuration",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0b0c23215764302f7db752b079c024fbaff12e62",
+            "url" : "https://github.com/apple/swift-configuration.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-configuration:Configuration@1.5.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.0"
+    },
+    {
+      "bom-ref" : "swift-distributed-tracing",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-distributed-tracing",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "9f982a7ec8dd815bf57024e39de592813ca14399",
+            "url" : "https://github.com/apple/swift-distributed-tracing.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-distributed-tracing@1.7.4",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.4"
+    },
+    {
+      "bom-ref" : "swift-distributed-tracing:Instrumentation",
+      "externalReferences" : [
+
+      ],
+      "name" : "Instrumentation",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "9f982a7ec8dd815bf57024e39de592813ca14399",
+            "url" : "https://github.com/apple/swift-distributed-tracing.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-distributed-tracing:Instrumentation@1.7.4",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.4"
+    },
+    {
+      "bom-ref" : "swift-distributed-tracing:Tracing",
+      "externalReferences" : [
+
+      ],
+      "name" : "Tracing",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "9f982a7ec8dd815bf57024e39de592813ca14399",
+            "url" : "https://github.com/apple/swift-distributed-tracing.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-distributed-tracing:Tracing@1.7.4",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.7.4"
+    },
+    {
+      "bom-ref" : "swift-http-types",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-http-types",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "bff4b6903cdc99dda49649dd52f46c11cfd3ed50",
+            "url" : "https://github.com/apple/swift-http-types.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-http-types@1.8.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.8.0"
+    },
+    {
+      "bom-ref" : "swift-http-types:HTTPTypes",
+      "externalReferences" : [
+
+      ],
+      "name" : "HTTPTypes",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "bff4b6903cdc99dda49649dd52f46c11cfd3ed50",
+            "url" : "https://github.com/apple/swift-http-types.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-http-types:HTTPTypes@1.8.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.8.0"
+    },
+    {
+      "bom-ref" : "swift-log",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-log",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "c7413d967b97aae67c46452bf7645bdb7b200e8e",
+            "url" : "https://github.com/apple/swift-log.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-log@1.17.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.17.2"
+    },
+    {
+      "bom-ref" : "swift-log:Logging",
+      "externalReferences" : [
+
+      ],
+      "name" : "Logging",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "c7413d967b97aae67c46452bf7645bdb7b200e8e",
+            "url" : "https://github.com/apple/swift-log.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-log:Logging@1.17.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.17.2"
+    },
+    {
+      "bom-ref" : "swift-metrics",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-metrics",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "5da0b6ea2a89dcce222eec559289e298d357d0a5",
+            "url" : "https://github.com/apple/swift-metrics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-metrics@2.13.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.13.1"
+    },
+    {
+      "bom-ref" : "swift-metrics:Metrics",
+      "externalReferences" : [
+
+      ],
+      "name" : "Metrics",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "5da0b6ea2a89dcce222eec559289e298d357d0a5",
+            "url" : "https://github.com/apple/swift-metrics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-metrics:Metrics@2.13.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.13.1"
+    },
+    {
+      "bom-ref" : "swift-nio",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-nio",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio-extras",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-nio-extras",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-extras:NIOExtras",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOExtras",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras:NIOExtras@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-extras:NIOHTTPCompression",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOHTTPCompression",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras:NIOHTTPCompression@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-extras:NIOHTTPTypes",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOHTTPTypes",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras:NIOHTTPTypes@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-extras:NIOHTTPTypesHTTP1",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOHTTPTypesHTTP1",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras:NIOHTTPTypesHTTP1@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-extras:NIOSOCKS",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOSOCKS",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "4858e3120f71175373f835181b437116021c4c6e",
+            "url" : "https://github.com/apple/swift-nio-extras.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-extras:NIOSOCKS@1.35.3",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.35.3"
+    },
+    {
+      "bom-ref" : "swift-nio-http2",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-nio-http2",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "bf446775a1683f5dc13240f56de2f9c55c299431",
+            "url" : "https://github.com/apple/swift-nio-http2.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-http2@1.46.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.46.1"
+    },
+    {
+      "bom-ref" : "swift-nio-http2:NIOHTTP2",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOHTTP2",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "bf446775a1683f5dc13240f56de2f9c55c299431",
+            "url" : "https://github.com/apple/swift-nio-http2.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-http2:NIOHTTP2@1.46.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.46.1"
+    },
+    {
+      "bom-ref" : "swift-nio-ssl",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-nio-ssl",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "2a439aff650ba63077cf7bed86677c739f76d782",
+            "url" : "https://github.com/apple/swift-nio-ssl.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-ssl@2.37.7",
+      "scope" : "required",
+      "type" : "application",
+      "version" : "2.37.7"
+    },
+    {
+      "bom-ref" : "swift-nio-ssl:NIOSSL",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOSSL",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "2a439aff650ba63077cf7bed86677c739f76d782",
+            "url" : "https://github.com/apple/swift-nio-ssl.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-ssl:NIOSSL@2.37.7",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.37.7"
+    },
+    {
+      "bom-ref" : "swift-nio-transport-services",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-nio-transport-services",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "67787bb645a5e67d2edcdfbe48a216cc549222d5",
+            "url" : "https://github.com/apple/swift-nio-transport-services.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-transport-services@1.28.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.28.0"
+    },
+    {
+      "bom-ref" : "swift-nio-transport-services:NIOTransportServices",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOTransportServices",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "67787bb645a5e67d2edcdfbe48a216cc549222d5",
+            "url" : "https://github.com/apple/swift-nio-transport-services.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio-transport-services:NIOTransportServices@1.28.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.28.0"
+    },
+    {
+      "bom-ref" : "swift-nio:NIO",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIO",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIO@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOConcurrencyHelpers",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOConcurrencyHelpers",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOConcurrencyHelpers@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOCore",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOCore",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOCore@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOEmbedded",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOEmbedded",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOEmbedded@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOFoundationEssentialsCompat",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOFoundationEssentialsCompat",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOFoundationEssentialsCompat@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOHTTP1",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOHTTP1",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOHTTP1@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOPosix",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOPosix",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOPosix@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOTLS",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOTLS",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOTLS@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:NIOWebSocket",
+      "externalReferences" : [
+
+      ],
+      "name" : "NIOWebSocket",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:NIOWebSocket@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-nio:_NIOFileSystem",
+      "externalReferences" : [
+
+      ],
+      "name" : "_NIOFileSystem",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "b003027fc38b649a43e9aad77c3d4e4a2c5b6997",
+            "url" : "https://github.com/apple/swift-nio.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-nio:_NIOFileSystem@2.105.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.105.2"
+    },
+    {
+      "bom-ref" : "swift-numerics",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-numerics",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+            "url" : "https://github.com/apple/swift-numerics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-numerics@1.1.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.1.1"
+    },
+    {
+      "bom-ref" : "swift-numerics:RealModule",
+      "externalReferences" : [
+
+      ],
+      "name" : "RealModule",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+            "url" : "https://github.com/apple/swift-numerics.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-numerics:RealModule@1.1.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.1.1"
+    },
+    {
+      "bom-ref" : "swift-service-context",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-service-context",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "853ba3d9ce78851b9cc20108e8bd4f13f7fa546c",
+            "url" : "https://github.com/apple/swift-service-context.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-service-context@1.5.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.1"
+    },
+    {
+      "bom-ref" : "swift-service-context:ServiceContextModule",
+      "externalReferences" : [
+
+      ],
+      "name" : "ServiceContextModule",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "853ba3d9ce78851b9cc20108e8bd4f13f7fa546c",
+            "url" : "https://github.com/apple/swift-service-context.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-service-context:ServiceContextModule@1.5.1",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.5.1"
+    },
+    {
+      "bom-ref" : "swift-service-lifecycle",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-service-lifecycle",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "a18ee16b8039866fd919bdb4e8e906882d4ecc75",
+            "url" : "https://github.com/swift-server/swift-service-lifecycle"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/swift-server/swift-service-lifecycle@2.13.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.13.0"
+    },
+    {
+      "bom-ref" : "swift-service-lifecycle:ServiceLifecycle",
+      "externalReferences" : [
+
+      ],
+      "name" : "ServiceLifecycle",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "a18ee16b8039866fd919bdb4e8e906882d4ecc75",
+            "url" : "https://github.com/swift-server/swift-service-lifecycle"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/swift-server/swift-service-lifecycle:ServiceLifecycle@2.13.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "2.13.0"
+    },
+    {
+      "bom-ref" : "swift-system",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-system",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "640e5755b5826f4437eaeedd366fd776737db62c",
+            "url" : "https://github.com/apple/swift-system.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-system@1.9.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.9.0"
+    },
+    {
+      "bom-ref" : "swift-system:SystemPackage",
+      "externalReferences" : [
+
+      ],
+      "name" : "SystemPackage",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "640e5755b5826f4437eaeedd366fd776737db62c",
+            "url" : "https://github.com/apple/swift-system.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/apple/swift-system:SystemPackage@1.9.0",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.9.0"
+    },
+    {
+      "bom-ref" : "swift-websocket",
+      "externalReferences" : [
+
+      ],
+      "name" : "swift-websocket",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "3252bb076ead38f733d0cc72940872780964d048",
+            "url" : "https://github.com/hummingbird-project/swift-websocket.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/swift-websocket@1.6.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.6.2"
+    },
+    {
+      "bom-ref" : "swift-websocket:WSClient",
+      "externalReferences" : [
+
+      ],
+      "name" : "WSClient",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "3252bb076ead38f733d0cc72940872780964d048",
+            "url" : "https://github.com/hummingbird-project/swift-websocket.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/swift-websocket:WSClient@1.6.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.6.2"
+    },
+    {
+      "bom-ref" : "swift-websocket:WSCompression",
+      "externalReferences" : [
+
+      ],
+      "name" : "WSCompression",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "3252bb076ead38f733d0cc72940872780964d048",
+            "url" : "https://github.com/hummingbird-project/swift-websocket.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/swift-websocket:WSCompression@1.6.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.6.2"
+    },
+    {
+      "bom-ref" : "swift-websocket:WSCore",
+      "externalReferences" : [
+
+      ],
+      "name" : "WSCore",
+      "pedigree" : {
+        "commits" : [
+          {
+            "uid" : "3252bb076ead38f733d0cc72940872780964d048",
+            "url" : "https://github.com/hummingbird-project/swift-websocket.git"
+          }
+        ]
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-product"
+        }
+      ],
+      "purl" : "pkg:swift/github.com/hummingbird-project/swift-websocket:WSCore@1.6.2",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "1.6.2"
+    }
+  ],
+  "dependencies" : [
+    {
+      "dependsOn" : [
+        "async-http-client:AsyncHTTPClient",
+        "swift-algorithms",
+        "swift-atomics",
+        "swift-configuration",
+        "swift-distributed-tracing",
+        "swift-log",
+        "swift-nio",
+        "swift-nio-extras",
+        "swift-nio-http2",
+        "swift-nio-ssl",
+        "swift-service-context"
+      ],
+      "ref" : "async-http-client"
+    },
+    {
+      "dependsOn" : [
+        "swift-algorithms:Algorithms",
+        "swift-atomics:Atomics",
+        "swift-configuration:Configuration",
+        "swift-distributed-tracing:Tracing",
+        "swift-log:Logging",
+        "swift-nio-extras:NIOHTTPCompression",
+        "swift-nio-extras:NIOSOCKS",
+        "swift-nio-http2:NIOHTTP2",
+        "swift-nio-ssl:NIOSSL",
+        "swift-nio:NIO",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOHTTP1",
+        "swift-nio:NIOPosix",
+        "swift-nio:NIOTLS",
+        "swift-service-context:ServiceContextModule"
+      ],
+      "ref" : "async-http-client:AsyncHTTPClient"
+    },
+    {
+      "dependsOn" : [
+        "compress-nio:CompressNIO",
+        "swift-nio"
+      ],
+      "ref" : "compress-nio"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio:NIOCore"
+      ],
+      "ref" : "compress-nio:CompressNIO"
+    },
+    {
+      "dependsOn" : [
+        "async-http-client",
+        "hummingbird:Hummingbird",
+        "hummingbird:HummingbirdTesting",
+        "swift-async-algorithms",
+        "swift-atomics",
+        "swift-collections",
+        "swift-distributed-tracing",
+        "swift-http-types",
+        "swift-log",
+        "swift-metrics",
+        "swift-nio",
+        "swift-nio-extras",
+        "swift-nio-ssl",
+        "swift-service-lifecycle"
+      ],
+      "ref" : "hummingbird"
+    },
+    {
+      "dependsOn" : [
+        "async-http-client",
+        "compress-nio",
+        "hummingbird",
+        "hummingbird-websocket:AutobahnServerTest",
+        "hummingbird-websocket:HummingbirdWSClient",
+        "hummingbird-websocket:HummingbirdWSCompression",
+        "hummingbird-websocket:HummingbirdWSTesting",
+        "hummingbird-websocket:HummingbirdWebSocket",
+        "hummingbird-websocket:HummingbirdWebSocketTests",
+        "hummingbird-websocket:WebsocketTest",
+        "swift-algorithms",
+        "swift-async-algorithms",
+        "swift-configuration",
+        "swift-nio",
+        "swift-nio-extras",
+        "swift-nio-http2",
+        "swift-nio-ssl",
+        "swift-nio-transport-services",
+        "swift-service-context",
+        "swift-service-lifecycle",
+        "swift-websocket"
+      ],
+      "ref" : "hummingbird-websocket"
+    },
+    {
+      "dependsOn" : [
+        "hummingbird:Hummingbird",
+        "hummingbird:HummingbirdTesting",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-websocket:WSClient",
+        "swift-websocket:WSCompression",
+        "swift-websocket:WSCore"
+      ],
+      "ref" : "hummingbird-websocket:AutobahnServerTest"
+    },
+    {
+      "dependsOn" : [
+        "swift-websocket:WSClient"
+      ],
+      "ref" : "hummingbird-websocket:HummingbirdWSClient"
+    },
+    {
+      "dependsOn" : [
+        "swift-websocket:WSCompression"
+      ],
+      "ref" : "hummingbird-websocket:HummingbirdWSCompression"
+    },
+    {
+      "dependsOn" : [
+        "hummingbird:HummingbirdTesting",
+        "swift-websocket:WSClient"
+      ],
+      "ref" : "hummingbird-websocket:HummingbirdWSTesting"
+    },
+    {
+      "dependsOn" : [
+        "hummingbird:Hummingbird",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-websocket:WSCore"
+      ],
+      "ref" : "hummingbird-websocket:HummingbirdWebSocket"
+    },
+    {
+      "dependsOn" : [
+        "hummingbird:Hummingbird",
+        "hummingbird:HummingbirdTesting",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-websocket:WSClient",
+        "swift-websocket:WSCompression",
+        "swift-websocket:WSCore"
+      ],
+      "ref" : "hummingbird-websocket:WebsocketTest"
+    },
+    {
+      "dependsOn" : [
+        "swift-async-algorithms:AsyncAlgorithms",
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule",
+        "swift-distributed-tracing:Instrumentation",
+        "swift-distributed-tracing:Tracing",
+        "swift-http-types:HTTPTypes",
+        "swift-log:Logging",
+        "swift-metrics:Metrics",
+        "swift-nio-extras:NIOExtras",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOFoundationEssentialsCompat",
+        "swift-nio:NIOPosix",
+        "swift-nio:_NIOFileSystem",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "hummingbird:Hummingbird"
+    },
+    {
+      "dependsOn" : [
+        "async-http-client:AsyncHTTPClient",
+        "swift-async-algorithms:AsyncAlgorithms",
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule",
+        "swift-distributed-tracing:Instrumentation",
+        "swift-distributed-tracing:Tracing",
+        "swift-http-types:HTTPTypes",
+        "swift-log:Logging",
+        "swift-metrics:Metrics",
+        "swift-nio-extras:NIOExtras",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-nio-ssl:NIOSSL",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOEmbedded",
+        "swift-nio:NIOFoundationEssentialsCompat",
+        "swift-nio:NIOPosix",
+        "swift-nio:_NIOFileSystem",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "hummingbird:HummingbirdTesting"
+    },
+    {
+      "dependsOn" : [
+        "swift-algorithms:Algorithms",
+        "swift-numerics"
+      ],
+      "ref" : "swift-algorithms"
+    },
+    {
+      "dependsOn" : [
+        "swift-numerics:RealModule"
+      ],
+      "ref" : "swift-algorithms:Algorithms"
+    },
+    {
+      "dependsOn" : [
+        "swift-async-algorithms:AsyncAlgorithms",
+        "swift-collections"
+      ],
+      "ref" : "swift-async-algorithms"
+    },
+    {
+      "dependsOn" : [
+        "swift-collections:DequeModule",
+        "swift-collections:OrderedCollections"
+      ],
+      "ref" : "swift-async-algorithms:AsyncAlgorithms"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics"
+      ],
+      "ref" : "swift-atomics"
+    },
+    {
+      "dependsOn" : [
+        "swift-collections:DequeModule",
+        "swift-collections:OrderedCollections"
+      ],
+      "ref" : "swift-collections"
+    },
+    {
+      "dependsOn" : [
+        "swift-collections",
+        "swift-configuration:Configuration",
+        "swift-system"
+      ],
+      "ref" : "swift-configuration"
+    },
+    {
+      "dependsOn" : [
+        "swift-collections:DequeModule",
+        "swift-system:SystemPackage"
+      ],
+      "ref" : "swift-configuration:Configuration"
+    },
+    {
+      "dependsOn" : [
+        "swift-distributed-tracing:Instrumentation",
+        "swift-distributed-tracing:Tracing"
+      ],
+      "ref" : "swift-distributed-tracing"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types:HTTPTypes"
+      ],
+      "ref" : "swift-http-types"
+    },
+    {
+      "dependsOn" : [
+        "swift-log:Logging"
+      ],
+      "ref" : "swift-log"
+    },
+    {
+      "dependsOn" : [
+        "swift-metrics:Metrics"
+      ],
+      "ref" : "swift-metrics"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics",
+        "swift-collections",
+        "swift-nio:NIO",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOEmbedded",
+        "swift-nio:NIOFoundationEssentialsCompat",
+        "swift-nio:NIOHTTP1",
+        "swift-nio:NIOPosix",
+        "swift-nio:NIOTLS",
+        "swift-nio:NIOWebSocket",
+        "swift-nio:_NIOFileSystem",
+        "swift-system"
+      ],
+      "ref" : "swift-nio"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types",
+        "swift-nio",
+        "swift-nio-extras:NIOExtras",
+        "swift-nio-extras:NIOHTTPCompression",
+        "swift-nio-extras:NIOHTTPTypes",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-nio-extras:NIOSOCKS"
+      ],
+      "ref" : "swift-nio-extras"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio:NIO",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOHTTP1"
+      ],
+      "ref" : "swift-nio-extras:NIOExtras"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio:NIO",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOHTTP1"
+      ],
+      "ref" : "swift-nio-extras:NIOHTTPCompression"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types:HTTPTypes",
+        "swift-nio:NIOCore"
+      ],
+      "ref" : "swift-nio-extras:NIOHTTPTypes"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types:HTTPTypes",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOHTTP1"
+      ],
+      "ref" : "swift-nio-extras:NIOHTTPTypesHTTP1"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio:NIO",
+        "swift-nio:NIOCore"
+      ],
+      "ref" : "swift-nio-extras:NIOSOCKS"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics",
+        "swift-nio",
+        "swift-nio-http2:NIOHTTP2"
+      ],
+      "ref" : "swift-nio-http2"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-nio:NIO",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOHTTP1",
+        "swift-nio:NIOTLS"
+      ],
+      "ref" : "swift-nio-http2:NIOHTTP2"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio",
+        "swift-nio-ssl:NIOSSL"
+      ],
+      "ref" : "swift-nio-ssl"
+    },
+    {
+      "dependsOn" : [
+        "swift-nio:NIO",
+        "swift-nio:NIOConcurrencyHelpers",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOTLS"
+      ],
+      "ref" : "swift-nio-ssl:NIOSSL"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics",
+        "swift-nio",
+        "swift-nio-transport-services:NIOTransportServices"
+      ],
+      "ref" : "swift-nio-transport-services"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-nio:NIO",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOTLS"
+      ],
+      "ref" : "swift-nio-transport-services:NIOTransportServices"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIO"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOCore"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOEmbedded"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOFoundationEssentialsCompat"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOHTTP1"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOPosix"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOTLS"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule"
+      ],
+      "ref" : "swift-nio:NIOWebSocket"
+    },
+    {
+      "dependsOn" : [
+        "swift-atomics:Atomics",
+        "swift-collections:DequeModule",
+        "swift-system:SystemPackage"
+      ],
+      "ref" : "swift-nio:_NIOFileSystem"
+    },
+    {
+      "dependsOn" : [
+        "swift-numerics:RealModule"
+      ],
+      "ref" : "swift-numerics"
+    },
+    {
+      "dependsOn" : [
+        "swift-distributed-tracing",
+        "swift-service-context:ServiceContextModule"
+      ],
+      "ref" : "swift-service-context"
+    },
+    {
+      "dependsOn" : [
+        "swift-distributed-tracing:Instrumentation"
+      ],
+      "ref" : "swift-service-context:ServiceContextModule"
+    },
+    {
+      "dependsOn" : [
+        "swift-async-algorithms",
+        "swift-log",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "swift-service-lifecycle"
+    },
+    {
+      "dependsOn" : [
+        "swift-async-algorithms:AsyncAlgorithms",
+        "swift-log:Logging"
+      ],
+      "ref" : "swift-service-lifecycle:ServiceLifecycle"
+    },
+    {
+      "dependsOn" : [
+        "swift-system:SystemPackage"
+      ],
+      "ref" : "swift-system"
+    },
+    {
+      "dependsOn" : [
+        "compress-nio",
+        "swift-http-types",
+        "swift-log",
+        "swift-nio",
+        "swift-nio-extras",
+        "swift-nio-ssl",
+        "swift-nio-transport-services",
+        "swift-service-lifecycle",
+        "swift-websocket:WSClient",
+        "swift-websocket:WSCompression",
+        "swift-websocket:WSCore"
+      ],
+      "ref" : "swift-websocket"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types:HTTPTypes",
+        "swift-log:Logging",
+        "swift-nio-extras:NIOHTTPTypesHTTP1",
+        "swift-nio-extras:NIOSOCKS",
+        "swift-nio-ssl:NIOSSL",
+        "swift-nio-transport-services:NIOTransportServices",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOPosix",
+        "swift-nio:NIOWebSocket",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "swift-websocket:WSClient"
+    },
+    {
+      "dependsOn" : [
+        "compress-nio:CompressNIO",
+        "swift-http-types:HTTPTypes",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOWebSocket",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "swift-websocket:WSCompression"
+    },
+    {
+      "dependsOn" : [
+        "swift-http-types:HTTPTypes",
+        "swift-nio:NIOCore",
+        "swift-nio:NIOWebSocket",
+        "swift-service-lifecycle:ServiceLifecycle"
+      ],
+      "ref" : "swift-websocket:WSCore"
+    }
+  ],
+  "metadata" : {
+    "component" : {
+      "bom-ref" : "hummingbird-websocket",
+      "externalReferences" : [
+
+      ],
+      "name" : "hummingbird-websocket",
+      "pedigree" : {
+
+      },
+      "properties" : [
+        {
+          "name" : "swift-entity",
+          "value" : "swift-package"
+        }
+      ],
+      "purl" : "pkg:swift/hummingbird-websocket",
+      "scope" : "required",
+      "type" : "library",
+      "version" : "unknown"
+    },
+    "timestamp" : "2026-11-26T10:15:04Z",
+    "tools" : {
+      "components" : [
+        {
+          "bom-ref" : "urn:uuid:a809a9cd-d07c-4c78-b389-ce30ba854a7b",
+          "licenses" : [
+            {
+              "license" : {
+                "id" : "Apache-2.0",
+                "url" : "http://swift.org/LICENSE.txt"
+              }
+            }
+          ],
+          "name" : "swift-package-manager",
+          "purl" : "pkg:swift/github.com/swiftlang/swift-package-manager@6.4.3",
+          "scope" : "excluded",
+          "type" : "application",
+          "version" : "6.4.3"
+        }
+      ]
+    }
+  },
+  "serialNumber" : "urn:uuid:0e11cfc6-15d1-45b4-9fb3-45819fa167ce",
+  "specVersion" : "1.7",
+  "version" : 1
+}
