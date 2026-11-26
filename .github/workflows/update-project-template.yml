@@ -17,6 +17,8 @@ permissions:
 jobs:
   update-project:
     name: Update Project
-    uses: hummingbird-project/hummingbird-project-template/.github/workflows/update-project-template.yml@main
+    uses: hummingbird-project/hummingbird-project-template/.github/workflows/update-project-template.yml@workflows
     with:
-      project_name: hummingbird-websocket
+      project-name: hummingbird-websocket
+      client-id: ${{ secrets.HB_APP_ID }}
+      private-key: ${{ secrets.HB_APP_PRIVATE_KEY }}
