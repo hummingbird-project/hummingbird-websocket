@@ -11,5 +11,4 @@ permissions:
 
 jobs:
   validate:
-    name: Validity Check
     uses: hummingbird-project/hummingbird-project-template/.github/workflows/validate.yml@workflows

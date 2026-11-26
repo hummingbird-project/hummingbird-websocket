@@ -15,6 +15,5 @@ permissions:
 
 jobs:
   verify-documentation:
-    name: Verify Documentation
     uses: hummingbird-project/hummingbird-project-template/.github/workflows/verify-documentation.yml@workflows
 
