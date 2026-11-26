@@ -20,5 +20,6 @@ jobs:
     uses: hummingbird-project/hummingbird-project-template/.github/workflows/update-project-template.yml@workflows
     with:
       project-name: hummingbird-websocket
-      client-id: ${{ secrets.HB_APP_ID }}
-      private-key: ${{ secrets.HB_APP_PRIVATE_KEY }}
+    secrets:
+      app-client-id: ${{ secrets.HB_APP_ID }}
+      app-private-key: ${{ secrets.HB_APP_PRIVATE_KEY }}
