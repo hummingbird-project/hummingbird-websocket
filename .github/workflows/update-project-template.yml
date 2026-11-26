@@ -17,6 +17,6 @@ permissions:
 jobs:
   update-project:
     name: Update Project
-    uses: hummingbird-project/hummingbird-project-template/.github/workflows/update-project-template@main
+    uses: hummingbird-project/hummingbird-project-template/.github/workflows/update-project-template.yml@main
     with:
       project_name: hummingbird-websocket
